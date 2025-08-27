@@ -1,0 +1,22 @@
+# train_data_path: "C:\\Users\\Rose_Lab\\Documents\\omnicrack30k_rearranged\\train"
+# validation_data_path: "C:\\Users\\Rose_Lab\\Documents\\omnicrack30k_rearranged\\validation"
+train_data_path: "C:\\Users\\Rose_Lab\\Documents\\Baselines\\deeplabv3\\tiny_data\\train"
+validation_data_path: "C:\\Users\\Rose_Lab\\Documents\\Baselines\\deeplabv3\\tiny_data\\test"
+lambda_values: [0.8, 0.9, 1.0]
+learning_rates: [0.0001, 0.0005, 0.0009]
+batch_sizes: [2, 4, 8]
+num_epochs: 1
+weight_decay: 0.00005
+# NUM_EXP: 8
+n_iter: 1
+sam2_checkpoint_path: "sam2.1_hiera_tiny.pt"
+model_cfg: "configs/sam2.1/sam2.1_hiera_t.yaml"
+# sam2_checkpoint_path: "sam2.1_hiera_small.pt"
+# model_cfg: "configs/sam2.1/sam2.1_hiera_s.yaml"
+# sam2_checkpoint_path: "sam2.1_hiera_base_plus.pt"
+# model_cfg: "configs/sam2.1/sam2.1_hiera_b+.yaml"
+
+
+
+
+
