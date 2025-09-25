@@ -1,14 +1,14 @@
 # train_data_path: "C:\\Users\\Rose_Lab\\Documents\\omnicrack30k_rearranged\\train"
 # validation_data_path: "C:\\Users\\Rose_Lab\\Documents\\omnicrack30k_rearranged\\validation"
-train_data_path: "C:\\Users\\Rose_Lab\\Documents\\Baselines\\deeplabv3\\tiny_data\\train"
-validation_data_path: "C:\\Users\\Rose_Lab\\Documents\\Baselines\\deeplabv3\\tiny_data\\test"
+train_data_path: "/mnt/SDA/SegmentationProject/Segmentation_Dataset/Dataset/SegmentationDataset/train"
+validation_data_path: "/mnt/SDA/SegmentationProject/Segmentation_Dataset/Dataset/SegmentationDataset/val"
 lambda_value : 0.65
 batch_size: 2
-num_epochs: 1
+num_epochs: 50
 learning_rate: 0.0005
 weight_decay: 0.00005
-NUM_EXP: 0
-sam2_checkpoint_path: "sam2.1_hiera_tiny.pt"
+NUM_EXP: 1
+sam2_checkpoint_path: "/mnt/SDA/SegmentationProject/SlideProcessor/SAM2_finetuning/sam2.1_hiera_tiny.pt"
 model_cfg: "configs/sam2.1/sam2.1_hiera_t.yaml"
 # sam2_checkpoint_path: "sam2.1_hiera_small.pt"
 # model_cfg: "configs/sam2.1/sam2.1_hiera_s.yaml"

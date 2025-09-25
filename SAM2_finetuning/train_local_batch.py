@@ -13,7 +13,7 @@ from scripts.utils import SaveModel, DiceBCELoss, EarlyStopping
 
 if __name__ == '__main__':
 
-    with open("config/local_config.yaml", 'r') as config_file:
+    with open("/mnt/SDA/SegmentationProject/SlideProcessor/SAM2_finetuning/config/local_config.yaml", 'r') as config_file:
         config = yaml.safe_load(config_file)
 
     # Assign parameters from config
@@ -111,11 +111,19 @@ if __name__ == '__main__':
 
     predictor.model.to(DEVICE)
 
-    for epoch in tqdm(range(NUM_EPOCHS)):
+    epoch_iterator = tqdm(range(NUM_EPOCHS), desc="Epochs", unit="epoch")
+    for epoch in epoch_iterator:
         predictor.model.train()
         train_loss = 0
 
-        for batch, (image_batch, mask_batch, bbox_batch) in enumerate(train_dataloader):
+        train_iterator = tqdm(
+            train_dataloader,
+            desc=f"Epoch {epoch + 1}/{NUM_EPOCHS} [Train]",
+            leave=False,
+            unit="batch",
+        )
+
+        for image_batch, mask_batch, bbox_batch in train_iterator:
             optimizer.zero_grad()
 
             images = [img.permute(1, 2, 0).cpu().numpy() for img in image_batch]
@@ -158,6 +166,8 @@ if __name__ == '__main__':
             loss.backward()
             optimizer.step()
 
+            train_iterator.set_postfix(batch_loss=loss.item())
+
 
         scheduler.step()
         avg_train_loss = train_loss / len(train_dataloader)
@@ -165,8 +175,15 @@ if __name__ == '__main__':
         # Validation
         predictor.model.eval()
         val_loss = 0
-        with torch.inference_mode():  
-            for batch, (image_batch, mask_batch, bbox_batch) in enumerate(val_dataloader):
+        with torch.inference_mode():
+            val_iterator = tqdm(
+                val_dataloader,
+                desc=f"Epoch {epoch + 1}/{NUM_EPOCHS} [Val]",
+                leave=False,
+                unit="batch",
+            )
+
+            for image_batch, mask_batch, bbox_batch in val_iterator:
                 images = [img.permute(1, 2, 0).cpu().numpy() for img in image_batch]
                 masks = mask_batch.to(DEVICE)
                 bboxes = [bbox if len(bbox.shape) > 1 else bbox[None, None, :] for bbox in bbox_batch]
@@ -203,10 +220,14 @@ if __name__ == '__main__':
                 loss = loss_fn(prd_masks, masks)
                 val_loss += loss.item()
 
+                val_iterator.set_postfix(batch_loss=loss.item())
+
             avg_val_loss = val_loss / len(val_dataloader)
 
         writer.add_scalars('Loss', {'train': avg_train_loss, 'validation': avg_val_loss}, epoch + 1)
         print(f"Epoch {epoch+1}: Train Loss={avg_train_loss:.4f}, Val Loss={avg_val_loss:.4f}")
+
+        epoch_iterator.set_postfix(train_loss=avg_train_loss, val_loss=avg_val_loss)
 
         early_stopping(avg_val_loss)
         if early_stopping.should_stop:
@@ -217,4 +238,3 @@ if __name__ == '__main__':
 
 
     SaveModel(predictor.model, optimizer, NUM_EPOCHS, saved_model_name)
-
