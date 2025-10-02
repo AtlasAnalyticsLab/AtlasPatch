@@ -1,10 +1,16 @@
-"""Run CLAM tissue segmentation on a folder of WSIs and export masks."""
+"""Run CLAM tissue segmentation on a folder of WSIs and export masks.
+
+Configuration is loaded from a JSON file referenced by `CONFIG_PATH` inside this
+script. Update that constant to point at your preferred configuration file.
+"""
 
 from __future__ import annotations
 
-import argparse
+import json
 import os
 import time
+from pathlib import Path
+from typing import Any, Dict
 
 import numpy as np
 import pandas as pd
@@ -12,6 +18,20 @@ from tqdm import tqdm
 
 from wsi_core.WholeSlideImage import WholeSlideImage
 from wsi_core.batch_process_utils import initialize_df
+
+# Path to the configuration file (update as needed).
+CONFIG_PATH = Path(__file__).with_name("clam_segmentation_config.json")
+
+
+def load_config(path: Path) -> Dict[str, Any]:
+    if not path.is_file():
+        raise FileNotFoundError(f"Configuration file not found: {path}")
+    with path.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def ensure_dir(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
 
 
 def segment_slide(wsi: WholeSlideImage, seg_params, filter_params, mask_file=None):
@@ -26,27 +46,22 @@ def segment_slide(wsi: WholeSlideImage, seg_params, filter_params, mask_file=Non
 
 
 def run_segmentation(
-    source: str,
-    save_dir: str,
-    mask_save_dir: str,
+    source: Path,
+    save_dir: Path,
+    mask_save_dir: Path,
     seg_params,
     filter_params,
     vis_params,
     use_default_params: bool = False,
     save_mask: bool = True,
     auto_skip: bool = False,
-    process_list: str | None = None,
     mask_suffix: str = ".jpg",
 ):
     slides = sorted(os.listdir(source))
-    slides = [slide for slide in slides if os.path.isfile(os.path.join(source, slide))]
+    slides = [slide for slide in slides if os.path.isfile(source / slide)]
     patch_params_stub = {"use_padding": True, "contour_fn": "four_pt"}
 
-    if process_list is None:
-        df = initialize_df(slides, seg_params, filter_params, vis_params, patch_params_stub)
-    else:
-        df = pd.read_csv(process_list)
-        df = initialize_df(df, seg_params, filter_params, vis_params, patch_params_stub)
+    df = initialize_df(slides, seg_params, filter_params, vis_params, patch_params_stub)
 
     mask = df["process"] == 1
     process_stack = df[mask]
@@ -67,7 +82,7 @@ def run_segmentation(
     accumulated_seg_time = 0.0
 
     for i in tqdm(range(total)):
-        df.to_csv(os.path.join(save_dir, "process_list_autogen.csv"), index=False)
+        df.to_csv(save_dir / "process_list_autogen.csv", index=False)
         idx = process_stack.index[i]
         slide = process_stack.loc[idx, "slide_id"]
         print("\n\nprogress: {:.2f}, {}/{}".format(i / total, i, total))
@@ -75,15 +90,15 @@ def run_segmentation(
 
         df.loc[idx, "process"] = 0
         slide_id, _ = os.path.splitext(slide)
-        mask_output_path = os.path.join(mask_save_dir, slide_id + mask_suffix)
+        mask_output_path = mask_save_dir / f"{slide_id}{mask_suffix}"
 
-        if auto_skip and os.path.isfile(mask_output_path):
-            print("{} mask already exists in destination location, skipped".format(slide_id))
+        if auto_skip and mask_output_path.is_file():
+            print(f"{slide_id} mask already exists in destination location, skipped")
             df.loc[idx, "status"] = "already_exist"
             continue
 
-        full_path = os.path.join(source, slide)
-        wsi_object = WholeSlideImage(full_path)
+        full_path = source / slide
+        wsi_object = WholeSlideImage(str(full_path))
 
         if use_default_params:
             current_vis_params = vis_params.copy()
@@ -146,7 +161,7 @@ def run_segmentation(
 
         w, h = wsi_object.level_dim[current_seg_params["seg_level"]]
         if w * h > 1e8:
-            print("level_dim {} x {} is likely too large for successful segmentation, aborting".format(w, h))
+            print(f"level_dim {w} x {h} is likely too large for successful segmentation, aborting")
             df.loc[idx, "status"] = "failed_seg"
             continue
 
@@ -159,7 +174,7 @@ def run_segmentation(
             mask_img = wsi_object.visWSI(**current_vis_params)
             mask_img.save(mask_output_path)
 
-        print("segmentation took {} seconds".format(seg_time_elapsed))
+        print(f"segmentation took {seg_time_elapsed} seconds")
         df.loc[idx, "status"] = "processed"
         accumulated_seg_time += seg_time_elapsed
 
@@ -168,65 +183,52 @@ def run_segmentation(
     else:
         avg_seg_time = 0.0
 
-    df.to_csv(os.path.join(save_dir, "process_list_autogen.csv"), index=False)
-    print("average segmentation time in s per slide: {}".format(avg_seg_time))
+    df.to_csv(save_dir / "process_list_autogen.csv", index=False)
+    print(f"average segmentation time in s per slide: {avg_seg_time}")
 
     return avg_seg_time
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run CLAM tissue segmentation and export masks")
-    parser.add_argument("--source", type=str, required=True, help="Path to folder containing raw WSI image files")
-    parser.add_argument("--save_dir", type=str, required=True, help="Directory to save processed data")
-    parser.add_argument("--auto_skip", action="store_true", help="Skip slides whose mask already exists")
-    parser.add_argument("--preset", default=None, type=str, help="CSV of default segmentation and filter parameters")
-    parser.add_argument("--process_list", type=str, default=None, help="CSV of slides to process with parameters")
-    parser.add_argument("--mask_suffix", type=str, default=".jpg", help="Extension for saved masks (e.g. .jpg/.png)")
-    parser.add_argument("--use_default_params", action="store_true", help="Use default parameters for all slides")
-    return parser.parse_args()
+def main() -> None:
+    config = load_config(CONFIG_PATH)
+
+    source = Path(config["source"]).expanduser()
+    save_dir = Path(config["save_dir"]).expanduser()
+    mask_suffix = config.get("mask_suffix", ".jpg")
+    auto_skip = bool(config.get("auto_skip", False))
+    use_default_params = bool(config.get("use_default_params", False))
+    mask_save_dir = save_dir / "masks"
+
+    for path in (save_dir, mask_save_dir):
+        ensure_dir(path)
+
+    directories = {"source": source, "save_dir": save_dir, "mask_save_dir": mask_save_dir}
+
+    for key, val in directories.items():
+        print(f"{key} : {val}")
+
+    seg_params = config.get(
+        "seg_params",
+        {"seg_level": -1, "sthresh": 8, "mthresh": 7, "close": 4, "use_otsu": False, "keep_ids": "none", "exclude_ids": "none"},
+    )
+    filter_params = config.get("filter_params", {"a_t": 100, "a_h": 16, "max_n_holes": 8})
+    vis_params = config.get("vis_params", {"vis_level": -1, "line_thickness": 250})
+
+    print({"seg_params": seg_params, "filter_params": filter_params, "vis_params": vis_params})
+
+    run_segmentation(
+        source=source,
+        save_dir=save_dir,
+        mask_save_dir=mask_save_dir,
+        seg_params=seg_params,
+        filter_params=filter_params,
+        vis_params=vis_params,
+        use_default_params=use_default_params,
+        save_mask=True,
+        auto_skip=auto_skip,
+        mask_suffix=mask_suffix,
+    )
 
 
 if __name__ == "__main__":
-    args = parse_args()
-
-    save_dir = args.save_dir
-    mask_save_dir = os.path.join(save_dir, "masks")
-
-    if args.process_list:
-        process_list_path = os.path.join(save_dir, args.process_list)
-    else:
-        process_list_path = None
-
-    directories = {"source": args.source, "save_dir": save_dir, "mask_save_dir": mask_save_dir}
-
-    for key, val in directories.items():
-        print("{} : {}".format(key, val))
-        if key != "source":
-            os.makedirs(val, exist_ok=True)
-
-    seg_params = {"seg_level": -1, "sthresh": 8, "mthresh": 7, "close": 4, "use_otsu": False,
-                  "keep_ids": "none", "exclude_ids": "none"}
-    filter_params = {"a_t": 100, "a_h": 16, "max_n_holes": 8}
-    vis_params = {"vis_level": -1, "line_thickness": 250}
-
-    if args.preset:
-        preset_df = pd.read_csv(os.path.join("presets", args.preset))
-        for key in seg_params.keys():
-            seg_params[key] = preset_df.loc[0, key]
-        for key in filter_params.keys():
-            filter_params[key] = preset_df.loc[0, key]
-        for key in vis_params.keys():
-            vis_params[key] = preset_df.loc[0, key]
-
-    parameters = {"seg_params": seg_params, "filter_params": filter_params, "vis_params": vis_params}
-    print(parameters)
-
-    run_segmentation(
-        **directories,
-        **parameters,
-        use_default_params=args.use_default_params,
-        save_mask=True,
-        auto_skip=args.auto_skip,
-        process_list=process_list_path,
-        mask_suffix=args.mask_suffix,
-    )
+    main()

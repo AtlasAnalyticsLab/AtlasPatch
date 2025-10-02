@@ -1,0 +1,25 @@
+{
+  "source": "PATH/TO/WSI_DIRECTORY",
+  "save_dir": "PATH/TO/OUTPUT_DIRECTORY",
+  "auto_skip": true,
+  "mask_suffix": ".jpg",
+  "use_default_params": false,
+  "seg_params": {
+    "seg_level": -1,
+    "sthresh": 8,
+    "mthresh": 7,
+    "close": 4,
+    "use_otsu": false,
+    "keep_ids": "none",
+    "exclude_ids": "none"
+  },
+  "filter_params": {
+    "a_t": 100,
+    "a_h": 16,
+    "max_n_holes": 8
+  },
+  "vis_params": {
+    "vis_level": -1,
+    "line_thickness": 250
+  }
+}
