@@ -6,7 +6,7 @@ import torch
 import numpy as np
 from tqdm import tqdm
 from torchvision import transforms
-from dataset import SegmentationDataset
+from scripts.dataset import SegmentationDataset
 from torchvision.transforms import v2
 from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score, accuracy_score, jaccard_score
 from torch.utils.data import random_split
@@ -93,7 +93,7 @@ def evaluate_all_datasets(predictor, test_datasets, threshold=0.5, device='cuda'
     return avg_metrics
 
 
-def test_with_metrics(dataset_path, save_path, CHECK_POINT):
+def test_with_metrics(dataset_path, save_path, CHECK_POINT, Image_Size=256):
     """
     Run inference on a dataset and compute metrics.
 
@@ -121,14 +121,11 @@ def test_with_metrics(dataset_path, save_path, CHECK_POINT):
 
     # Define transformations
     images_transform = v2.Compose([
-        v2.Resize(size=(256, 256)),
+        v2.Resize(size=(Image_Size, Image_Size)),
         v2.ToTensor(),
-        # v2.Normalize((0.511, 0.507, 0.496), (0.126, 0.126, 0.126)),  # Omnicrack30K mean/std
-        # v2.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)), # SA-V Video stats  self.mean = [0.485, 0.456, 0.406] self.std = [0.229, 0.224, 0.225]
-        # v2.Normalize((0.245, 0.244, 0.237), (0.124, 0.12, 0.13)), # SA-1B stats
     ])
     masks_transform = v2.Compose([
-        v2.Resize(size=(256, 256)),
+        v2.Resize(size=(Image_Size, Image_Size)),
         v2.ToTensor(),
     ])
 
@@ -143,14 +140,9 @@ def test_with_metrics(dataset_path, save_path, CHECK_POINT):
     ]
 
     # Build model and load weights
-    sam2_checkpoint_path = "sam2.1_hiera_tiny.pt"
+    sam2_checkpoint_path = "/mnt/SDA/SegmentationProject/SlideProcessor/SAM2_finetuning/sam2.1_hiera_tiny.pt"
     model_cfg = "configs/sam2.1/sam2.1_hiera_t.yaml"
-    # sam2_checkpoint_path = "sam2.1_hiera_small.pt"
-    # model_cfg = "configs/sam2.1/sam2.1_hiera_s.yaml"
-    # sam2_checkpoint_path = "sam2.1_hiera_base_plus.pt"
-    # model_cfg = "configs/sam2.1/sam2.1_hiera_b+.yaml"
-    # sam2_checkpoint_path = "sam2.1_hiera_large.pt"
-    # model_cfg = "configs/sam2.1/sam2.1_hiera_l.yaml"
+
 
 
     predictor = SAM2ImagePredictor(build_sam2(model_cfg, sam2_checkpoint_path))
@@ -170,12 +162,10 @@ def test_with_metrics(dataset_path, save_path, CHECK_POINT):
     return avg_metrics
 
 if __name__ == '__main__':
+    Image_Size = 256
     test_with_metrics(
-        dataset_path='C:\\Users\\Rose_Lab\\Documents\\omnicrack30k_rearranged\\test',
-        # dataset_path= 'C:\\Users\\Rose_Lab\\Documents\\zero_shot_datasets\\Road420',
-        # dataset_path="C:\\Users\\Rose_Lab\\Documents\\zero_shot_datasets\\Facade390",
-        # dataset_path="C:\\Users\\Rose_Lab\\Documents\\zero_shot_datasets\\concrete3k",
-        save_path='C:\\Users\\Rose_Lab\\Documents\\Baselines\\DeepCrack\\Results',
-        # CHECK_POINT='saved_models\\trained_sam2_layernorm6.pth'
-        CHECK_POINT='saved_models\\sam2_dataset_scaling_exp_19500.pth'
+        dataset_path='/mnt/SDA/SegmentationProject/Segmentation_Dataset/Dataset/SegmentationDataset/test',
+        save_path='/mnt/SDA/SegmentationProject/SlideProcessor/SAM2_finetuning/Results',
+        CHECK_POINT='/mnt/SDA/SegmentationProject/SlideProcessor/SAM2_finetuning/saved_models/trained_sam2_layernorm_1024.pth',
+        Image_Size=Image_Size
     )

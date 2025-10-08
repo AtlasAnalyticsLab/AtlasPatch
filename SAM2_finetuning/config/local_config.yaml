@@ -5,9 +5,9 @@ validation_data_path: "/mnt/SDA/SegmentationProject/Segmentation_Dataset/Dataset
 lambda_value : 0.65
 batch_size: 2
 num_epochs: 50
-learning_rate: 0.0005
+learning_rate: 0.0009
 weight_decay: 0.00005
-NUM_EXP: 1
+NUM_EXP: 2
 sam2_checkpoint_path: "/mnt/SDA/SegmentationProject/SlideProcessor/SAM2_finetuning/sam2.1_hiera_tiny.pt"
 model_cfg: "configs/sam2.1/sam2.1_hiera_t.yaml"
 # sam2_checkpoint_path: "sam2.1_hiera_small.pt"
