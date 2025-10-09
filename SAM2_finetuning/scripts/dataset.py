@@ -7,25 +7,29 @@ from typing import Optional, Callable
 from torchvision.datasets import VisionDataset
 from PIL import ImageFile
 
-def get_bounding_box(ground_truth_map):
-    # get bounding box from mask
-    y_indices, x_indices = np.where(ground_truth_map > 0)
-    if len(x_indices) == 0 or len(y_indices) == 0:
-        x_min, x_max = 0, 0
-        y_min, y_max = 0, 0
-    else:
-        x_min, x_max = np.min(x_indices), np.max(x_indices)
-        y_min, y_max = np.min(y_indices), np.max(y_indices)
-    # add perturbation to bounding box coordinates
-    H, W = ground_truth_map.shape
-    x_min = max(0, x_min - np.random.randint(0, 20))
-    x_max = min(W, x_max + np.random.randint(0, 20))
-    y_min = max(0, y_min - np.random.randint(0, 20))
-    y_max = min(H, y_max + np.random.randint(0, 20))
-    bbox = np.array([x_min, y_min, x_max, y_max])
+def get_bounding_box(width, height):
+    # always return the full-image bounding box to match inference-time behaviour
+    return np.array([0, 0, width, height])
 
-    return bbox
 
+# def get_bounding_box(ground_truth_map):
+#     # get bounding box from mask
+#     y_indices, x_indices = np.where(ground_truth_map > 0)
+#     if len(x_indices) == 0 or len(y_indices) == 0:
+#         x_min, x_max = 0, 0
+#         y_min, y_max = 0, 0
+#     else:
+#         x_min, x_max = np.min(x_indices), np.max(x_indices)
+#         y_min, y_max = np.min(y_indices), np.max(y_indices)
+#     # add perturbation to bounding box coordinates
+#     H, W = ground_truth_map.shape
+#     x_min = max(0, x_min - np.random.randint(0, 20))
+#     x_max = min(W, x_max + np.random.randint(0, 20))
+#     y_min = max(0, y_min - np.random.randint(0, 20))
+#     y_max = min(H, y_max + np.random.randint(0, 20))
+#     bbox = np.array([x_min, y_min, x_max, y_max])
+
+#     return bbox
 
 
 class SegmentationDataset(VisionDataset):
@@ -61,15 +65,18 @@ class SegmentationDataset(VisionDataset):
             mask = Image.open(mask_file).convert("1")
 
             # For bounding box prompt
-            mask_1024 = mask.resize((1024, 1024))
-            mask_array_1024 = np.array(mask_1024)
-            bbox_prompt = get_bounding_box(mask_array_1024)
+            # mask_1024 = mask.resize((1024, 1024))
+            # mask_array_1024 = np.array(mask_1024)
+            # bbox_prompt = get_bounding_box(1024, 1024)
 
             if self.image_transform:
                 image = self.image_transform(image)
             if self.mask_transform:
                 mask = self.mask_transform(mask)
 
+            h, w = image.shape[-2:]
+            bbox_prompt = get_bounding_box(h, w)
+            
             return (
                 image,
                 mask,
@@ -183,5 +190,4 @@ class SegmentationDataset(VisionDataset):
                 torch.tensor(bbox_prompt).float(),
             )
 """       
-
 

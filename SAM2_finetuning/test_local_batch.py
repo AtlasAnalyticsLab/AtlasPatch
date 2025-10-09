@@ -140,7 +140,7 @@ def test_with_metrics(dataset_path, save_path, CHECK_POINT, Image_Size=256):
     ]
 
     # Build model and load weights
-    sam2_checkpoint_path = "/mnt/SDA/SegmentationProject/SlideProcessor/SAM2_finetuning/sam2.1_hiera_tiny.pt"
+    sam2_checkpoint_path = "/home/a_alagha/SegmentationProject/SlideProcessor/SAM2_finetuning/sam2.1_hiera_tiny.pt"
     model_cfg = "configs/sam2.1/sam2.1_hiera_t.yaml"
 
 
@@ -162,10 +162,10 @@ def test_with_metrics(dataset_path, save_path, CHECK_POINT, Image_Size=256):
     return avg_metrics
 
 if __name__ == '__main__':
-    Image_Size = 256
+    Image_Size = 512
     test_with_metrics(
-        dataset_path='/mnt/SDA/SegmentationProject/Segmentation_Dataset/Dataset/SegmentationDataset/test',
-        save_path='/mnt/SDA/SegmentationProject/SlideProcessor/SAM2_finetuning/Results',
-        CHECK_POINT='/mnt/SDA/SegmentationProject/SlideProcessor/SAM2_finetuning/saved_models/trained_sam2_layernorm_1024.pth',
+        dataset_path='/data1/SegmentationDataset/test',
+        save_path='/home/a_alagha/SegmentationProject/SlideProcessor/SAM2_finetuning/results',
+        CHECK_POINT='/home/common-data/SegmentationModels/saved_models_1/trained_sam2_layernorm512.pth',
         Image_Size=Image_Size
     )

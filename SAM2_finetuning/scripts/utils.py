@@ -5,7 +5,7 @@ import random
 import numpy as np
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
-from typing import Dict, List
+from typing import Any, Dict, List, Optional
 from pathlib import Path
 import torchvision.transforms.functional as TF
 from PIL import Image
@@ -113,21 +113,29 @@ def plot_transformed_mask(image_paths, transform, n=2, seed=52):
 
 
 
-def SaveModel(model, optimizer, epochs,  file_name: str):
+def SaveModel(
+    model,
+    optimizer,
+    epochs,
+    file_name: str,
+    save_dir: str,
+    hyperparams: Optional[Dict[str, Any]] = None,
+    losses: Optional[Dict[int, Dict[str, float]]] = None,
+):
     """
     This functions saves your models. 
     Please enter your file_name as string.
     
     """
     
-    models_path = Path("saved_models") 
+    models_path = Path(save_dir)
 
     # If the folder doesn't exist, make one... 
-    if models_path.is_dir():
-        print(f"{models_path} directory exists.")
-    else:
+    if not models_path.is_dir():
         print(f"Did not find {models_path} directory, creating one...")
         models_path.mkdir(parents=True, exist_ok=True)
+    else:
+        print(f"{models_path} directory exists.")
     
     name = f"{file_name}.pth"  #give it a name
     model_path = models_path / name 
@@ -137,6 +145,22 @@ def SaveModel(model, optimizer, epochs,  file_name: str):
             "optimizer": optimizer.state_dict(),
             'epoch': epochs,
             }, model_path)
+
+    summary_path = models_path / f"{file_name}_hyperparameters.txt"
+    with summary_path.open("w", encoding="utf-8") as summary_file:
+        summary_file.write("Training Hyperparameters Summary\n")
+        summary_file.write(f"Saved Epoch: {epochs}\n")
+        summary_file.write("\n")
+        if hyperparams:
+            for key in sorted(hyperparams.keys()):
+                summary_file.write(f"{key}: {hyperparams[key]}\n")
+        summary_file.write("\nFinal Epoch Losses\n")
+        if losses:
+            for epoch_idx in sorted(losses.keys()):
+                epoch_info = losses[epoch_idx]
+                summary_file.write(
+                    f"Epoch {epoch_idx}: train_loss={epoch_info.get('train_loss')}, val_loss={epoch_info.get('val_loss')}\n"
+                )
     
 
 def convert_checkpoint(sam_checkpoint_path: str,
@@ -152,4 +176,3 @@ def convert_checkpoint(sam_checkpoint_path: str,
         sam_ckpt[key] = medsam_ckpt["model"][key]
 
     torch.save(sam_ckpt, saving_path)
-

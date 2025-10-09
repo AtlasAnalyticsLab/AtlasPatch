@@ -13,7 +13,7 @@ from scripts.utils import SaveModel, DiceBCELoss, EarlyStopping
 
 if __name__ == '__main__':
 
-    with open("/mnt/SDA/SegmentationProject/SlideProcessor/SAM2_finetuning/config/local_config.yaml", 'r') as config_file:
+    with open("/home/a_alagha/SegmentationProject/SlideProcessor/SAM2_finetuning/config/local_config.yaml", 'r') as config_file:
         config = yaml.safe_load(config_file)
 
     # Assign parameters from config
@@ -27,9 +27,17 @@ if __name__ == '__main__':
     NUM_EXP = config['NUM_EXP']
     sam2_checkpoint_path = config['sam2_checkpoint_path']
     model_cfg = config['model_cfg']
+    saved_model_dir = config['saved_model_dir']
 
-    custom_log_dir = f"logs/experiment_sam2_layernorm{NUM_EXP}/" + dt.now().strftime("%Y%m%d-%H%M%S")
+    image_size = config.get('image_size', 256)
+    config['image_size'] = image_size
+
+    run_timestamp = dt.now().strftime("%Y%m%d-%H%M%S")
+    config['run_timestamp'] = run_timestamp
+
+    custom_log_dir = f"logs/experiment_sam2_layernorm{NUM_EXP}/{run_timestamp}"
     saved_model_name = f"trained_sam2_layernorm{NUM_EXP}"
+    run_save_dir = f"{saved_model_dir}/experiment_sam2_layernorm{NUM_EXP}_{run_timestamp}"
 
     # Select device
     if torch.backends.mps.is_available(): 
@@ -45,11 +53,11 @@ if __name__ == '__main__':
 
     # Dataset & DataLoader setup
     images_transform = v2.Compose([
-        v2.Resize(size=(256, 256)),
+        v2.Resize(size=(image_size, image_size)),
         v2.ToTensor(), #sam2 normalizes images internally
     ])
     masks_transform = v2.Compose([
-        v2.Resize(size=(256, 256)),
+        v2.Resize(size=(image_size, image_size)),
         v2.ToTensor(),
     ])
 
@@ -112,6 +120,9 @@ if __name__ == '__main__':
     predictor.model.to(DEVICE)
 
     epoch_iterator = tqdm(range(NUM_EPOCHS), desc="Epochs", unit="epoch")
+    last_saved_epoch = 0
+    final_epoch = 0
+    epoch_losses = {}
     for epoch in epoch_iterator:
         predictor.model.train()
         train_loss = 0
@@ -139,14 +150,14 @@ if __name__ == '__main__':
             num_images = len(predictor._features["image_embed"])
            
             _, _, _, unnorm_box = predictor._prep_prompts(
-            point_coords=None, point_labels=None, box=torch.stack(bboxes).to(DEVICE) if bboxes else None, mask_logits=None, normalize_coords=False
+            point_coords=None, point_labels=None, box=torch.stack(bboxes).to(DEVICE) if bboxes else None, mask_logits=None, normalize_coords=True
                 )
             
             sparse_embeddings, dense_embeddings = predictor.model.sam_prompt_encoder(
             points=None, boxes=unnorm_box.to(DEVICE), masks=None
                 )
             
-            high_res_features = [feat_level[-1].unsqueeze(0).to(DEVICE) for feat_level in predictor._features["high_res_feats"]]
+            high_res_features = [feat_level.to(DEVICE) for feat_level in predictor._features["high_res_feats"]]
 
             low_res_masks, iou_predictions, _, _ = predictor.model.sam_mask_decoder(
                 image_embeddings=predictor._features["image_embed"],
@@ -196,14 +207,14 @@ if __name__ == '__main__':
                 num_images = len(predictor._features["image_embed"])
            
                 _, _, _, unnorm_box = predictor._prep_prompts(
-                point_coords=None, point_labels=None, box=torch.stack(bboxes).to(DEVICE) if bboxes else None, mask_logits=None, normalize_coords=False
+                point_coords=None, point_labels=None, box=torch.stack(bboxes).to(DEVICE) if bboxes else None, mask_logits=None, normalize_coords=True
                     )
                 
                 sparse_embeddings, dense_embeddings = predictor.model.sam_prompt_encoder(
                 points=None, boxes=unnorm_box.to(DEVICE), masks=None
                     )
                 
-                high_res_features = [feat_level[-1].unsqueeze(0).to(DEVICE) for feat_level in predictor._features["high_res_feats"]]
+                high_res_features = [feat_level.to(DEVICE) for feat_level in predictor._features["high_res_feats"]]
 
                 low_res_masks, iou_predictions, _, _ = predictor.model.sam_mask_decoder(
                     image_embeddings=predictor._features["image_embed"],
@@ -224,10 +235,30 @@ if __name__ == '__main__':
 
             avg_val_loss = val_loss / len(val_dataloader)
 
-        writer.add_scalars('Loss', {'train': avg_train_loss, 'validation': avg_val_loss}, epoch + 1)
-        print(f"Epoch {epoch+1}: Train Loss={avg_train_loss:.4f}, Val Loss={avg_val_loss:.4f}")
+        current_epoch = epoch + 1
+        final_epoch = current_epoch
+
+        writer.add_scalars('Loss', {'train': avg_train_loss, 'validation': avg_val_loss}, current_epoch)
+        print(f"Epoch {current_epoch}: Train Loss={avg_train_loss:.4f}, Val Loss={avg_val_loss:.4f}")
 
         epoch_iterator.set_postfix(train_loss=avg_train_loss, val_loss=avg_val_loss)
+
+        epoch_losses[current_epoch] = {
+            "train_loss": avg_train_loss,
+            "val_loss": avg_val_loss,
+        }
+
+        if current_epoch % 5 == 0:
+            SaveModel(
+                predictor.model,
+                optimizer,
+                current_epoch,
+                saved_model_name,
+                run_save_dir,
+                hyperparams=config,
+                losses=epoch_losses,
+            )
+            last_saved_epoch = current_epoch
 
         early_stopping(avg_val_loss)
         if early_stopping.should_stop:
@@ -237,4 +268,13 @@ if __name__ == '__main__':
     writer.close()
 
 
-    SaveModel(predictor.model, optimizer, NUM_EPOCHS, saved_model_name)
+    if final_epoch > 0 and final_epoch != last_saved_epoch:
+        SaveModel(
+            predictor.model,
+            optimizer,
+            final_epoch,
+            saved_model_name,
+            run_save_dir,
+            hyperparams=config,
+            losses=epoch_losses,
+        )
