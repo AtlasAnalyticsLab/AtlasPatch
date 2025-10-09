@@ -157,7 +157,7 @@ if __name__ == '__main__':
             points=None, boxes=unnorm_box.to(DEVICE), masks=None
                 )
             
-            high_res_features = [feat_level.to(DEVICE) for feat_level in predictor._features["high_res_feats"]]
+            high_res_features = [feat_level[-1].unsqueeze(0).to(DEVICE) for feat_level in predictor._features["high_res_feats"]]
 
             low_res_masks, iou_predictions, _, _ = predictor.model.sam_mask_decoder(
                 image_embeddings=predictor._features["image_embed"],
@@ -214,7 +214,7 @@ if __name__ == '__main__':
                 points=None, boxes=unnorm_box.to(DEVICE), masks=None
                     )
                 
-                high_res_features = [feat_level.to(DEVICE) for feat_level in predictor._features["high_res_feats"]]
+                high_res_features = [feat_level[-1].unsqueeze(0).to(DEVICE) for feat_level in predictor._features["high_res_feats"]]
 
                 low_res_masks, iou_predictions, _, _ = predictor.model.sam_mask_decoder(
                     image_embeddings=predictor._features["image_embed"],

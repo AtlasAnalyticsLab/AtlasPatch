@@ -7,7 +7,7 @@ batch_size: 2
 num_epochs: 50
 learning_rate: 0.0005
 weight_decay: 0.00005
-NUM_EXP: 7
+NUM_EXP: 100
 sam2_checkpoint_path: "/home/a_alagha/SegmentationProject/SlideProcessor/SAM2_finetuning/sam2.1_hiera_tiny.pt"
 model_cfg: "configs/sam2.1/sam2.1_hiera_t.yaml"
 saved_model_dir: "/home/a_alagha/SegmentationProject/SlideProcessor/SAM2_finetuning/saved_models"
