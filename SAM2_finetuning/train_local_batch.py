@@ -1,6 +1,7 @@
 import yaml
 import torch
 from tqdm import tqdm
+from pathlib import Path
 from datetime import datetime as dt
 from torchvision.transforms import v2
 from torch.utils.data import DataLoader
@@ -9,6 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 from scripts.utils import SaveModel, DiceBCELoss, EarlyStopping
+from test_local_batch import test_with_metrics
 
 
 if __name__ == '__main__':
@@ -28,6 +30,8 @@ if __name__ == '__main__':
     sam2_checkpoint_path = config['sam2_checkpoint_path']
     model_cfg = config['model_cfg']
     saved_model_dir = config['saved_model_dir']
+    test_data_path = config.get('test_data_path')
+    test_num_samples = config.get('test_num_samples')
 
     image_size = config.get('image_size', 256)
     config['image_size'] = image_size
@@ -37,7 +41,8 @@ if __name__ == '__main__':
 
     custom_log_dir = f"logs/experiment_sam2_layernorm{NUM_EXP}/{run_timestamp}"
     saved_model_name = f"trained_sam2_layernorm{NUM_EXP}"
-    run_save_dir = f"{saved_model_dir}/experiment_sam2_layernorm{NUM_EXP}_{run_timestamp}"
+    run_save_dir = Path(saved_model_dir) / f"experiment_sam2_layernorm{NUM_EXP}_{run_timestamp}"
+    latest_model_path = run_save_dir / f"{saved_model_name}.pth"
 
     # Select device
     if torch.backends.mps.is_available(): 
@@ -259,6 +264,7 @@ if __name__ == '__main__':
                 losses=epoch_losses,
             )
             last_saved_epoch = current_epoch
+            latest_model_path = run_save_dir / f"{saved_model_name}.pth"
 
         early_stopping(avg_val_loss)
         if early_stopping.should_stop:
@@ -278,3 +284,22 @@ if __name__ == '__main__':
             hyperparams=config,
             losses=epoch_losses,
         )
+        last_saved_epoch = final_epoch
+        latest_model_path = run_save_dir / f"{saved_model_name}.pth"
+
+    if not latest_model_path.exists():
+        print(f"No saved model found at {latest_model_path}. Skipping testing.")
+    elif not test_data_path:
+        print("No test dataset path provided in the configuration. Skipping testing.")
+    else:
+        print(f"Starting post-training evaluation on test data: {test_data_path}")
+        try:
+            test_with_metrics(
+                dataset_path=test_data_path,
+                save_path=str(run_save_dir),
+                CHECK_POINT=str(latest_model_path),
+                Image_Size=image_size,
+                num_samples=test_num_samples,
+            )
+        except Exception as exc:
+            print(f"Testing failed with error: {exc}")

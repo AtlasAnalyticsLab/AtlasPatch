@@ -33,12 +33,18 @@ def get_bounding_box(width, height):
 
 
 class SegmentationDataset(VisionDataset):
-    def __init__(self, data_root: str, image_transform: Optional[Callable] = None,
-                 mask_transform: Optional[Callable] = None) -> None:
+    def __init__(
+        self,
+        data_root: str,
+        image_transform: Optional[Callable] = None,
+        mask_transform: Optional[Callable] = None,
+        return_mask_path: bool = False,
+    ) -> None:
         super().__init__(data_root)
         self.data_root = data_root
         self.image_transform = image_transform
         self.mask_transform = mask_transform
+        self.return_mask_path = return_mask_path
         self.gt_path = Path(data_root) / 'masks'
         self.images_path = Path(data_root) / 'images'
 
@@ -76,12 +82,16 @@ class SegmentationDataset(VisionDataset):
 
             h, w = image.shape[-2:]
             bbox_prompt = get_bounding_box(h, w)
-            
-            return (
-                image,
-                mask,
-                bbox_prompt
-            )
+
+            if self.return_mask_path:
+                return (
+                    image,
+                    mask,
+                    bbox_prompt,
+                    str(mask_path),
+                )
+
+            return (image, mask, bbox_prompt)
 
 # class SegmentationDataset(VisionDataset):
 #     """
@@ -190,4 +200,3 @@ class SegmentationDataset(VisionDataset):
                 torch.tensor(bbox_prompt).float(),
             )
 """       
-

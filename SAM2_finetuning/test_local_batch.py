@@ -7,77 +7,29 @@ from tqdm import tqdm
 from torchvision import transforms
 from scripts.dataset import SegmentationDataset
 from torchvision.transforms import v2
-from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score, accuracy_score, jaccard_score
+import torch.nn.functional as F
+from PIL import Image
 # from data.dataset import dataReadPip, loadedDataset
 from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 from datetime import datetime
 
 
-def compute_cm_metrics(predictor, threshold, test_dataloader, device='cuda', num_images=1000):
-    predictor.model.eval()
-    all_predictions, all_gt_masks = [], []
-    image_count = 0
+def _metrics_from_counts(tp, fp, fn, tn):
+    tp = int(tp)
+    fp = int(fp)
+    fn = int(fn)
+    tn = int(tn)
 
-    with torch.no_grad():
-        for image_batch, mask_batch, bbox_batch in tqdm(test_dataloader):
-            # if image_count >= num_images:
-            #     break
+    total = tp + fp + fn + tn
+    accuracy = (tp + tn) / total if total else 0.0
+    precision = tp / (tp + fp) if (tp + fp) else 0.0
+    recall = tp / (tp + fn) if (tp + fn) else 0.0
+    f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) else 0.0
+    iou = tp / (tp + fp + fn) if (tp + fp + fn) else 0.0
 
-            images = [img.permute(1, 2, 0).cpu().numpy() for img in image_batch]
-            masks_gt = mask_batch.to(device)
-            bboxes = [bbox if len(bbox.shape) > 1 else bbox[None, None, :] for bbox in bbox_batch]
-
-            predictor.set_image_batch(images)
-            masks, _, _ = predictor.predict_batch(box_batch=bboxes, multimask_output=False)
-
-            # Convert predictions and ground truth to binary masks
-            prd_mask_bin = [(m > threshold).astype(float) for m in masks]
-            
-            # Flatten for metric computation
-            # Loop through each predicted mask and corresponding ground truth
-            for prd_mask, gt_mask in zip(prd_mask_bin, masks_gt):
-                all_predictions.extend(prd_mask.reshape(-1))
-                all_gt_masks.extend(gt_mask.cpu().numpy().reshape(-1))
-
-
-            image_count += 1
-            # if image_count >= num_images:
-            #     break  # Stop processing after reaching the limit
-
-    # Convert lists to numpy arrays
-    all_predictions, all_gt_masks = np.array(all_predictions), np.array(all_gt_masks)
-
-    # Compute metrics
-    cm = confusion_matrix(all_gt_masks, all_predictions)
-    accuracy = accuracy_score(all_gt_masks, all_predictions)
-    precision = precision_score(all_gt_masks, all_predictions, zero_division=0)
-    recall = recall_score(all_gt_masks, all_predictions, zero_division=0)
-    f1 = f1_score(all_gt_masks, all_predictions, zero_division=0)
-    iou = jaccard_score(all_gt_masks, all_predictions, zero_division=0, average='binary')
-
-    return cm, accuracy, precision, recall, f1, iou
-
-
-
-def evaluate_all_datasets(predictor, test_dataloader, threshold=0.5, device='cuda', num_images=1000):
-    """
-    Compute metrics for a single test dataset.
-
-    Args:
-        predictor: The SAM2ImagePredictor object.
-        test_dataloader: The test dataloader.
-        threshold: Threshold for binary classification.
-        device: Device to run the model ('cuda' or 'cpu').
-        num_images: Maximum number of images to process per dataset.
-
-    Returns:
-        Metrics computed for the dataset.
-    """
-    _, accuracy, precision, recall, f1, iou = compute_cm_metrics(
-        predictor, threshold, test_dataloader, device, num_images
-    )
     return {
+        'confusion_matrix': np.array([[tn, fp], [fn, tp]], dtype=np.int64),
         'accuracy': accuracy,
         'precision': precision,
         'recall': recall,
@@ -86,7 +38,113 @@ def evaluate_all_datasets(predictor, test_dataloader, threshold=0.5, device='cud
     }
 
 
-def test_with_metrics(dataset_path, save_path, CHECK_POINT, Image_Size=256):
+def compute_cm_metrics(predictor, threshold, test_dataloader, device='cuda', num_images=None):
+    predictor.model.eval()
+    apply_limit = num_images is not None
+    processed = 0
+
+    tp_resized = torch.zeros((), dtype=torch.long, device=device)
+    fp_resized = torch.zeros((), dtype=torch.long, device=device)
+    fn_resized = torch.zeros((), dtype=torch.long, device=device)
+    tn_resized = torch.zeros((), dtype=torch.long, device=device)
+
+    tp_orig = torch.zeros((), dtype=torch.long, device=device)
+    fp_orig = torch.zeros((), dtype=torch.long, device=device)
+    fn_orig = torch.zeros((), dtype=torch.long, device=device)
+    tn_orig = torch.zeros((), dtype=torch.long, device=device)
+
+    with torch.no_grad():
+        for batch in tqdm(test_dataloader):
+            if apply_limit and processed >= num_images:
+                break
+
+            image_batch, mask_batch, bbox_batch, mask_paths = batch
+
+            images = [img.permute(1, 2, 0).cpu().numpy() for img in image_batch]
+            masks_gt = mask_batch.to(device)
+            bboxes = [bbox if len(bbox.shape) > 1 else bbox[None, None, :] for bbox in bbox_batch]
+
+            predictor.set_image_batch(images)
+            masks, _, _ = predictor.predict_batch(box_batch=bboxes, multimask_output=False)
+
+            for prd_mask, gt_mask, mask_path in zip(masks, masks_gt, mask_paths):
+                if apply_limit and processed >= num_images:
+                    break
+
+                prd_tensor = torch.from_numpy(prd_mask).to(device=device)
+                if prd_tensor.ndim > 2:
+                    prd_tensor = prd_tensor.squeeze(0)
+
+                gt_tensor = gt_mask.to(device=device)
+                if gt_tensor.ndim > 2:
+                    gt_tensor = gt_tensor.squeeze(0)
+
+                pred_bin_resized = prd_tensor > threshold
+                gt_bin_resized = gt_tensor > 0.5
+
+                tp_resized += torch.count_nonzero(pred_bin_resized & gt_bin_resized)
+                fp_resized += torch.count_nonzero(pred_bin_resized & ~gt_bin_resized)
+                fn_resized += torch.count_nonzero(~pred_bin_resized & gt_bin_resized)
+                tn_resized += torch.count_nonzero(~pred_bin_resized & ~gt_bin_resized)
+
+                with Image.open(mask_path) as original_mask_img:
+                    original_mask = np.array(original_mask_img.convert("L"), dtype=np.float32) / 255.0
+
+                original_mask_tensor = torch.from_numpy(original_mask).to(device=device)
+                if original_mask_tensor.ndim > 2:
+                    original_mask_tensor = original_mask_tensor.squeeze(0)
+
+                prd_for_interp = prd_tensor.unsqueeze(0).unsqueeze(0)
+                pred_upscaled = F.interpolate(
+                    prd_for_interp,
+                    size=original_mask_tensor.shape[-2:],
+                    mode='bilinear',
+                    align_corners=False,
+                ).squeeze(0).squeeze(0)
+
+                pred_bin_orig = pred_upscaled > threshold
+                gt_bin_orig = original_mask_tensor > 0.5
+
+                tp_orig += torch.count_nonzero(pred_bin_orig & gt_bin_orig)
+                fp_orig += torch.count_nonzero(pred_bin_orig & ~gt_bin_orig)
+                fn_orig += torch.count_nonzero(~pred_bin_orig & gt_bin_orig)
+                tn_orig += torch.count_nonzero(~pred_bin_orig & ~gt_bin_orig)
+
+                processed += 1
+
+            if apply_limit and processed >= num_images:
+                break
+
+    resized_metrics = _metrics_from_counts(tp_resized.item(), fp_resized.item(), fn_resized.item(), tn_resized.item())
+    original_metrics = _metrics_from_counts(tp_orig.item(), fp_orig.item(), fn_orig.item(), tn_orig.item())
+
+    return {
+        'resized': resized_metrics,
+        'original': original_metrics,
+    }
+
+
+
+def evaluate_all_datasets(predictor, test_dataloader, threshold=0.5, device='cuda', num_images=None):
+    """
+    Compute metrics for a single test dataset.
+
+    Args:
+        predictor: The SAM2ImagePredictor object.
+        test_dataloader: The test dataloader.
+        threshold: Threshold for binary classification.
+        device: Device to run the model ('cuda' or 'cpu').
+        num_images: Optional limit on number of samples to evaluate.
+
+    Returns:
+        Metrics computed for the dataset.
+    """
+    return compute_cm_metrics(
+        predictor, threshold, test_dataloader, device, num_images=num_images
+    )
+
+
+def test_with_metrics(dataset_path, save_path, CHECK_POINT, Image_Size=256, num_samples=None):
     """
     Run inference on a dataset and compute metrics.
 
@@ -94,6 +152,7 @@ def test_with_metrics(dataset_path, save_path, CHECK_POINT, Image_Size=256):
         dataset_path (str): Path to the dataset directory containing images and masks.
         save_path (str): Directory where results will be saved.
         CHECK_POINT (str): Path to the pre-trained model weights.
+        num_samples (int, optional): Limit on the number of samples to evaluate. None means all samples.
 
     Returns:
         Metrics computed for the dataset.
@@ -126,7 +185,12 @@ def test_with_metrics(dataset_path, save_path, CHECK_POINT, Image_Size=256):
     ])
 
     # Load dataset
-    test_dataset = SegmentationDataset(data_root=dataset_path, image_transform=images_transform, mask_transform=masks_transform)
+    test_dataset = SegmentationDataset(
+        data_root=dataset_path,
+        image_transform=images_transform,
+        mask_transform=masks_transform,
+        return_mask_path=True,
+    )
     cpu_count = os.cpu_count() or 1
     worker_count = min(8, cpu_count)
     loader_kwargs = {
@@ -157,24 +221,42 @@ def test_with_metrics(dataset_path, save_path, CHECK_POINT, Image_Size=256):
     predictor.model.load_state_dict(checkpoint['model'], strict=False)
 
     # Compute metrics
-    avg_metrics = evaluate_all_datasets(predictor, test_dataloader, threshold=0.5, device=DEVICE)
+    metrics_by_scale = evaluate_all_datasets(
+        predictor,
+        test_dataloader,
+        threshold=0.5,
+        device=DEVICE,
+        num_images=num_samples,
+    )
 
-    print("Average Metrics Across Datasets:")
-    for metric, value in avg_metrics.items():
-        print(f"{metric.capitalize()}: {value:.4f}")
+    print("Evaluation Metrics:")
+    for scale, metrics in metrics_by_scale.items():
+        print(f"{scale.capitalize()} Resolution:")
+        for metric_name, value in metrics.items():
+            if metric_name == 'confusion_matrix':
+                print(f"  {metric_name.replace('_', ' ').capitalize()}:\n{value}")
+            else:
+                print(f"  {metric_name.capitalize()}: {value:.4f}")
 
     metrics_filepath = os.path.join(run_dir, "metrics.txt")
     with open(metrics_filepath, "w", encoding="utf-8") as metrics_file:
         metrics_file.write(f"Dataset: {dataset_path}\n")
         metrics_file.write(f"Checkpoint: {CHECK_POINT}\n")
         metrics_file.write(f"Image Size: {Image_Size}\n")
-        metrics_file.write("Average Metrics Across Datasets:\n")
-        for metric, value in avg_metrics.items():
-            metrics_file.write(f"{metric.capitalize()}: {value:.4f}\n")
+        metrics_file.write(f"Sample Limit: {num_samples if num_samples is not None else 'All'}\n")
+        metrics_file.write("Evaluation Metrics:\n")
+        for scale, metrics in metrics_by_scale.items():
+            metrics_file.write(f"{scale.capitalize()} Resolution:\n")
+            for metric_name, value in metrics.items():
+                if metric_name == 'confusion_matrix':
+                    metrics_file.write("Confusion Matrix:\n")
+                    metrics_file.write(f"{value}\n")
+                else:
+                    metrics_file.write(f"{metric_name.capitalize()}: {value:.4f}\n")
 
     print(f"Metrics saved to {metrics_filepath}")
 
-    return avg_metrics
+    return metrics_by_scale
 
 if __name__ == '__main__':
     Image_Size = 1024
@@ -182,5 +264,6 @@ if __name__ == '__main__':
         dataset_path='/data1/SegmentationDataset/test',
         save_path='/home/a_alagha/SegmentationProject/SlideProcessor/SAM2_finetuning/results',
         CHECK_POINT='/home/a_alagha/SegmentationProject/SlideProcessor/SAM2_finetuning/saved_models/experiment_sam2_layernorm5_20251009-015749/trained_sam2_layernorm5.pth',
-        Image_Size=Image_Size
+        Image_Size=Image_Size,
+        num_samples=None  # Set to an integer to limit number of samples (e.g., 50
     )

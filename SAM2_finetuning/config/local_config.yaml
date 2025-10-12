@@ -2,6 +2,8 @@
 # validation_data_path: "C:\\Users\\Rose_Lab\\Documents\\omnicrack30k_rearranged\\validation"
 train_data_path: "/data1/SegmentationDataset/train"
 validation_data_path: "/data1/SegmentationDataset/val"
+test_data_path: "/data1/SegmentationDataset/test"
+test_num_samples:
 lambda_value : 0.65
 batch_size: 2
 num_epochs: 50
@@ -11,7 +13,7 @@ NUM_EXP: 100
 sam2_checkpoint_path: "/home/a_alagha/SegmentationProject/SlideProcessor/SAM2_finetuning/sam2.1_hiera_tiny.pt"
 model_cfg: "configs/sam2.1/sam2.1_hiera_t.yaml"
 saved_model_dir: "/home/a_alagha/SegmentationProject/SlideProcessor/SAM2_finetuning/saved_models"
-image_size: 1024
+image_size: 256
 # sam2_checkpoint_path: "sam2.1_hiera_small.pt"
 # model_cfg: "configs/sam2.1/sam2.1_hiera_s.yaml"
 # sam2_checkpoint_path: "sam2.1_hiera_base_plus.pt"
