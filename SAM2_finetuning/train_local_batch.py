@@ -29,7 +29,7 @@ if __name__ == '__main__':
     NUM_EXP = config['NUM_EXP']
     sam2_checkpoint_path = config['sam2_checkpoint_path']
     model_cfg = config['model_cfg']
-    saved_model_dir = config['saved_model_dir']
+    saved_model_dir = Path(config['saved_model_dir'])
     test_data_path = config.get('test_data_path')
     test_num_samples = config.get('test_num_samples')
 
@@ -41,7 +41,18 @@ if __name__ == '__main__':
 
     custom_log_dir = f"logs/experiment_sam2_layernorm{NUM_EXP}/{run_timestamp}"
     saved_model_name = f"trained_sam2_layernorm{NUM_EXP}"
-    run_save_dir = Path(saved_model_dir) / f"experiment_sam2_layernorm{NUM_EXP}_{run_timestamp}"
+
+    if saved_model_dir.name == "results":
+        results_root = saved_model_dir
+    else:
+        results_root = saved_model_dir.parent / "results"
+    results_root.mkdir(parents=True, exist_ok=True)
+
+    experiment_folder = (
+        f"experiment_{NUM_EXP}_size{image_size}_bs{BATCH_SIZE}_lr{LEARNING_RATE}_{run_timestamp}"
+    )
+    run_save_dir = results_root / experiment_folder
+    run_save_dir.mkdir(parents=True, exist_ok=True)
     latest_model_path = run_save_dir / f"{saved_model_name}.pth"
 
     # Select device
@@ -293,13 +304,32 @@ if __name__ == '__main__':
         print("No test dataset path provided in the configuration. Skipping testing.")
     else:
         print(f"Starting post-training evaluation on test data: {test_data_path}")
+        metrics_by_scale = None
         try:
-            test_with_metrics(
+            metrics_by_scale = test_with_metrics(
                 dataset_path=test_data_path,
                 save_path=str(run_save_dir),
                 CHECK_POINT=str(latest_model_path),
                 Image_Size=image_size,
                 num_samples=test_num_samples,
+                save_outputs=False,
             )
         except Exception as exc:
             print(f"Testing failed with error: {exc}")
+        else:
+            testing_lines = [
+                "",
+                "Testing Metrics",
+            ]
+            for scale, metrics in metrics_by_scale.items():
+                testing_lines.append(f"{scale.capitalize()} Resolution:")
+                for metric_name, value in metrics.items():
+                    if metric_name == "confusion_matrix":
+                        testing_lines.append("Confusion Matrix:")
+                        testing_lines.append(str(value))
+                    else:
+                        testing_lines.append(f"{metric_name.capitalize()}: {value:.4f}")
+
+            summary_path = run_save_dir / f"{saved_model_name}_summary.txt"
+            with summary_path.open("a", encoding="utf-8") as summary_file:
+                summary_file.write("\n".join(testing_lines) + "\n")

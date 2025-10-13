@@ -144,7 +144,14 @@ def evaluate_all_datasets(predictor, test_dataloader, threshold=0.5, device='cud
     )
 
 
-def test_with_metrics(dataset_path, save_path, CHECK_POINT, Image_Size=256, num_samples=None):
+def test_with_metrics(
+    dataset_path,
+    save_path,
+    CHECK_POINT,
+    Image_Size=256,
+    num_samples=None,
+    save_outputs=True,
+):
     """
     Run inference on a dataset and compute metrics.
 
@@ -153,6 +160,8 @@ def test_with_metrics(dataset_path, save_path, CHECK_POINT, Image_Size=256, num_
         save_path (str): Directory where results will be saved.
         CHECK_POINT (str): Path to the pre-trained model weights.
         num_samples (int, optional): Limit on the number of samples to evaluate. None means all samples.
+        save_outputs (bool, optional): When True (default), metrics are written to a timestamped
+            subfolder under save_path. Set to False to skip writing files.
 
     Returns:
         Metrics computed for the dataset.
@@ -161,9 +170,11 @@ def test_with_metrics(dataset_path, save_path, CHECK_POINT, Image_Size=256, num_
     
     # Create the save path if it doesn't exist
     os.makedirs(save_path, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = os.path.join(save_path, f"size_{Image_Size}_{timestamp}")
-    os.makedirs(run_dir, exist_ok=True)
+    run_dir = save_path
+    if save_outputs:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        run_dir = os.path.join(save_path, f"size_{Image_Size}_{timestamp}")
+        os.makedirs(run_dir, exist_ok=True)
 
     # Fetch image and mask paths
     image_dir = os.path.join(dataset_path, 'images')
@@ -238,23 +249,24 @@ def test_with_metrics(dataset_path, save_path, CHECK_POINT, Image_Size=256, num_
             else:
                 print(f"  {metric_name.capitalize()}: {value:.4f}")
 
-    metrics_filepath = os.path.join(run_dir, "metrics.txt")
-    with open(metrics_filepath, "w", encoding="utf-8") as metrics_file:
-        metrics_file.write(f"Dataset: {dataset_path}\n")
-        metrics_file.write(f"Checkpoint: {CHECK_POINT}\n")
-        metrics_file.write(f"Image Size: {Image_Size}\n")
-        metrics_file.write(f"Sample Limit: {num_samples if num_samples is not None else 'All'}\n")
-        metrics_file.write("Evaluation Metrics:\n")
-        for scale, metrics in metrics_by_scale.items():
-            metrics_file.write(f"{scale.capitalize()} Resolution:\n")
-            for metric_name, value in metrics.items():
-                if metric_name == 'confusion_matrix':
-                    metrics_file.write("Confusion Matrix:\n")
-                    metrics_file.write(f"{value}\n")
-                else:
-                    metrics_file.write(f"{metric_name.capitalize()}: {value:.4f}\n")
+    if save_outputs:
+        metrics_filepath = os.path.join(run_dir, "metrics.txt")
+        with open(metrics_filepath, "w", encoding="utf-8") as metrics_file:
+            metrics_file.write(f"Dataset: {dataset_path}\n")
+            metrics_file.write(f"Checkpoint: {CHECK_POINT}\n")
+            metrics_file.write(f"Image Size: {Image_Size}\n")
+            metrics_file.write(f"Sample Limit: {num_samples if num_samples is not None else 'All'}\n")
+            metrics_file.write("Evaluation Metrics:\n")
+            for scale, metrics in metrics_by_scale.items():
+                metrics_file.write(f"{scale.capitalize()} Resolution:\n")
+                for metric_name, value in metrics.items():
+                    if metric_name == 'confusion_matrix':
+                        metrics_file.write("Confusion Matrix:\n")
+                        metrics_file.write(f"{value}\n")
+                    else:
+                        metrics_file.write(f"{metric_name.capitalize()}: {value:.4f}\n")
 
-    print(f"Metrics saved to {metrics_filepath}")
+        print(f"Metrics saved to {metrics_filepath}")
 
     return metrics_by_scale
 

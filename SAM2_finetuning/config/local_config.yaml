@@ -12,7 +12,7 @@ weight_decay: 0.00005
 NUM_EXP: 100
 sam2_checkpoint_path: "/home/a_alagha/SegmentationProject/SlideProcessor/SAM2_finetuning/sam2.1_hiera_tiny.pt"
 model_cfg: "configs/sam2.1/sam2.1_hiera_t.yaml"
-saved_model_dir: "/home/a_alagha/SegmentationProject/SlideProcessor/SAM2_finetuning/saved_models"
+saved_model_dir: "/home/a_alagha/SegmentationProject/SlideProcessor/SAM2_finetuning/results"
 image_size: 256
 # sam2_checkpoint_path: "sam2.1_hiera_small.pt"
 # model_cfg: "configs/sam2.1/sam2.1_hiera_s.yaml"
