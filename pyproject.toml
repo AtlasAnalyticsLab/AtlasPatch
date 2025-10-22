@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "slide-processor"
+version = "0.1.0"
+description = "A Python package for processing and handling whole slide images"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    "Ahmed Alagha",
+    "Omar Metwally",
+    "Yousef Kotp" <yousefkotp@outlook.com>,
+]
+keywords = ["slide-processor", "whole-slide-image", "wsi"]
+
+dependencies = [
+    "openslide-python>=1.2.0",
+    "Pillow>=9.0.0",
+    "numpy>=1.21.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.1.0",
+    "pre-commit>=3.0.0",
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "mypy>=1.0.0",
+]
+
+[tool.setuptools]
+packages = ["slide_processor"]
+
+[tool.setuptools.package-dir]
+"" = "."
+
+[tool.ruff]
+line-length = 100
+target-version = "py38"
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+]
+ignore = [
+    "E501",   # Line too long (handled by formatter)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["slide_processor"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+skip-magic-trailing-comma = false
