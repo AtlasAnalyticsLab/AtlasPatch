@@ -1,0 +1,109 @@
+All Arguments Explained:
+--------------------------
+Argument	Default	Your Value	Description
+--wsi_path	required	Single file or folder	Path to WSI file or folder
+--output_dir	required	Your path	Output directory
+--patch_size	256	256	Patch size at level 0
+--step_size	256	256	Step size (256 = no overlap)
+--tissue_area_thresh	0.001	0.001	Min tissue % (0.001 = 0.1%)
+--contour_fn	four_pt	four_pt	four_pt or four_pt_hard
+--white_thresh	15	15	White patch saturation threshold
+--black_thresh	50	50	Black patch RGB threshold
+--save_image_patches	False	flag	Add flag to save PNG images
+--model_path	path	Your finetuned model	SAM2 finetuned checkpoint
+--base_checkpoint	path	Your base model	SAM2 base checkpoint
+--config	path	configs/sam2.1/sam2.1_hiera_t.yaml	SAM2 config file
+--input_size	1024	1024	SAM2 input resolution
+--device	cuda	cuda	Device (cuda/cpu)
+
+
+
+
+
+
+
+
+
+Inference/patchification on Individual WSIs:
+------------------------------
+cd /home/o_a38510/Segmentation_Project
+
+python patch_extractor.py \
+  --wsi_path /data1/SegmentationDataset/TestWSIs/TCGA-VQ-A8PX-01Z-00-DX1.A1886D51-DC33-4B5A-9C71-56E281F13F52.svs \
+  --output_dir /home/o_a38510/Segmentation_Project/patchification_output \
+  --patch_size 256 \
+  --step_size 256 \
+  --tissue_area_thresh 0.001 \
+  --contour_fn four_pt \
+  --white_thresh 15 \
+  --black_thresh 50 \
+  --save_image_patches \
+  --model_path /home/o_a38510/Segmentation_Project/sam2_bs2_inp1024_lr5e-4.pth \
+  --base_checkpoint /home/o_a38510/Segmentation_Project/sam2.1_hiera_tiny.pt \
+  --config configs/sam2.1/sam2.1_hiera_t.yaml \
+  --input_size 1024 \
+  --device cuda
+
+For Batch Processing (folder):
+-------------------------------
+python patch_extractor.py \
+  --wsi_path /data1/SegmentationDataset/TestWSIs \
+  --all \
+  --output_dir /home/o_a38510/Segmentation_Project/patchification_output \
+  --patch_size 256 \
+  --step_size 256 \
+  --tissue_area_thresh 0.001 \
+  --contour_fn four_pt \
+  --white_thresh 15 \
+  --black_thresh 50 \
+  --model_path /home/o_a38510/Segmentation_Project/sam2_bs2_inp1024_lr5e-4.pth \
+  --base_checkpoint /home/o_a38510/Segmentation_Project/sam2.1_hiera_tiny.pt \
+  --config configs/sam2.1/sam2.1_hiera_t.yaml \
+  --input_size 1024 \
+  --device cuda
+
+Batch-specific arguments:
+-------------------------
+--all : Process all WSIs in folder
+--num_samples N : Process N random WSIs (instead of --all)
+
+
+
+
+to run clam
+------------
+cd /home/o_a38510/CLAM
+
+# Create temp folder with single WSI
+mkdir -p /home/o_a38510/temp_single_wsi
+cp /data1/SegmentationDataset/TestWSIs/TCGA-VQ-A8PX-01Z-00-DX1.A1886D51-DC33-4B5A-9C71-56E281F13F52.svs /home/o_a38510/CLAM/temp_single_wsi/
+
+# Run CLAM
+python create_patches.py \
+  --source /home/o_a38510/temp_single_wsi \
+  --save_dir /home/o_a38510/CLAM/single_output \
+  --patch_size 256 \
+  --step_size 256 \
+  --seg \
+  --patch
+
+
+clam:
+  TIMING FOR TCGA-VQ-A8PX-01Z-00-DX1.A1886D51-DC33-4B5A-9C71-56E281F13F52:
+  Segmentation:  0.74s
+  Patching:      276.60s
+  Stitching:     -1.00s
+  Total:         276.34s
+  patches extracted: 56755
+
+ours:
+  ======================================================================
+PIPELINE SUMMARY
+======================================================================
+  Inference time:            6.968s
+  Contour conversion:        0.018s
+  Patchification:          164.341s
+  ──────────────────────────────────────────────────────────────────
+  Total time:              171.326s
+======================================================================
+  Patches extracted:      59223
