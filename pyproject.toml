@@ -20,6 +20,7 @@ dependencies = [
     "openslide-python>=1.2.0",
     "Pillow>=9.0.0",
     "numpy>=1.21.0",
+    "git+https://github.com/facebookresearch/sam2.git",
 ]
 
 [project.optional-dependencies]
