@@ -4,8 +4,8 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from .iwsi import IWSI
 from .image_wsi import ImageWSI
+from .iwsi import IWSI
 from .openslide_wsi import OpenSlideWSI
 
 

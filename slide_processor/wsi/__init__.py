@@ -1,7 +1,7 @@
 """WSI module for slide processing."""
 
-from .iwsi import IWSI
 from .image_wsi import ImageWSI
+from .iwsi import IWSI
 from .openslide_wsi import OpenSlideWSI
 from .wsi_factory import WSIFactory
 
