@@ -5,10 +5,8 @@ from PIL import Image
 
 try:
     import openslide
-except ImportError:
-    raise ImportError(
-        "OpenSlide is required. Install with: pip install openslide-python"
-    )
+except ImportError as e:
+    raise ImportError("OpenSlide is required. Install with: pip install openslide-python") from e
 
 from .iwsi import IWSI
 
@@ -39,12 +37,12 @@ class OpenSlideWSI(IWSI):
 
             self.mag = self._extract_mag()
 
-        except FileNotFoundError:
-            raise FileNotFoundError(f"File not found: {self.path}")
+        except FileNotFoundError as e:
+            raise FileNotFoundError(f"File not found: {self.path}") from e
         except openslide.OpenSlideError as e:
-            raise RuntimeError(f"OpenSlide error: {e}")
+            raise RuntimeError(f"OpenSlide error: {e}") from e
         except Exception as e:
-            raise RuntimeError(f"Setup failed: {e}")
+            raise RuntimeError(f"Setup failed: {e}") from e
 
     def _extract_mpp(self) -> Optional[float]:
         """Extract MPP from metadata."""
@@ -127,6 +125,9 @@ class OpenSlideWSI(IWSI):
 
         if self._oslide is None:
             raise RuntimeError("OpenSlide not initialized")
+
+        if self.nlvl is None or self.dims is None:
+            raise RuntimeError("Metadata not initialized")
 
         if lv < 0 or lv >= self.nlvl:
             raise IndexError(f"Level {lv} out of range")

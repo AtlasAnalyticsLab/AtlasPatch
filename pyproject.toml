@@ -12,7 +12,7 @@ license = {text = "MIT"}
 authors = [
     "Ahmed Alagha",
     "Omar Metwally",
-    "Yousef Kotp" <yousefkotp@outlook.com>,
+    "Yousef Kotp <yousefkotp@outlook.com>",
 ]
 keywords = ["slide-processor", "whole-slide-image", "wsi"]
 

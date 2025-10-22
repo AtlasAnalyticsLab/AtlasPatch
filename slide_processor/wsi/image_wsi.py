@@ -47,10 +47,10 @@ class ImageWSI(IWSI):
 
             self.mag = self._extract_mag()
 
-        except FileNotFoundError:
-            raise FileNotFoundError(f"Image not found: {self.path}")
+        except FileNotFoundError as e:
+            raise FileNotFoundError(f"Image not found: {self.path}") from e
         except Exception as e:
-            raise RuntimeError(f"Setup failed: {e}")
+            raise RuntimeError(f"Setup failed: {e}") from e
 
     def _load_image(self) -> None:
         """Load and convert image to RGB."""
@@ -58,7 +58,7 @@ class ImageWSI(IWSI):
             try:
                 self._pil_img = Image.open(self.path).convert("RGB")
             except Exception as e:
-                raise ValueError(f"Cannot open: {self.path}: {e}")
+                raise ValueError(f"Cannot open: {self.path}: {e}") from e
 
     def _extract_mpp(self) -> Optional[float]:
         """Return configured MPP value."""
@@ -110,6 +110,9 @@ class ImageWSI(IWSI):
 
         if self._pil_img is None:
             raise RuntimeError("Image not loaded")
+
+        if self.w is None or self.h is None:
+            raise RuntimeError("Image dimensions not set")
 
         return (self.w, self.h)
 
