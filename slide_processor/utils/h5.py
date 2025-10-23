@@ -100,8 +100,9 @@ class PatchesH5:
     Provides lazy access with indexing and length, and exposes metadata.
 
     Datasets expected:
-      - "imgs": (N, H, W, 3) uint8
       - "coords": (N, 2) int32
+      - "coords_ext": (N, 5) int32 (x, y, w, h, level) [optional]
+      - "imgs": (N, H, W, 3) uint8 [optional]
 
     Root attributes (optional):
       - "patch_size": int
@@ -150,15 +151,33 @@ class PatchesH5:
         f = self._require_open()
         return f["coords"]
 
+    @property
+    def coords_ext(self):
+        f = self._require_open()
+        if "coords_ext" in f:
+            return f["coords_ext"]
+        raise KeyError("'coords_ext' not found; older files may only contain 'coords'.")
+
+    @property
+    def has_images(self) -> bool:
+        f = self._require_open()
+        return "imgs" in f
+
     def __len__(self) -> int:
-        try:
-            return int(self.images.shape[0])
-        except Exception:
-            return 0
+        f = self._require_open()
+        if "imgs" in f:
+            return int(f["imgs"].shape[0])
+        if "coords" in f:
+            return int(f["coords"].shape[0])
+        return 0
 
     def __getitem__(self, idx):
-        imgs = self.images[idx]
-        cds = self.coords[idx]
+        f = self._require_open()
+        cds = f["coords"][idx]
+        if "imgs" in f:
+            imgs = f["imgs"][idx]
+        else:
+            imgs = None
         return imgs, cds
 
     @property
@@ -201,6 +220,11 @@ def load_patches_h5(path: str) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
     Returns: (imgs, coords, metadata)
     """
     with h5py.File(path, "r") as f:
+        if "imgs" not in f:
+            raise KeyError(
+                "'imgs' dataset not found in H5. This file was saved without image arrays. "
+                "Use PatchesH5 for coords/metadata or re-extract images from the source WSI using 'coords_ext'."
+            )
         imgs = np.array(f["imgs"], dtype=np.uint8)
         coords = np.array(f["coords"], dtype=np.int32)
         meta = dict(f.attrs)

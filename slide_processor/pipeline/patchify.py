@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Callable
 
 import numpy as np
 
@@ -56,6 +57,10 @@ def segment_and_patchify(
     seg: SegmentParams,
     patch: PatchifyParams,
     save_images: bool = False,
+    store_images: bool = True,
+    fast_mode: bool = False,
+    predict_fn: Callable[[Any], np.ndarray] | None = None,
+    thumb_max: int | None = None,
 ) -> str | None:
     """High-level pipeline: segment tissue and patchify WSI into an HDF5 file.
 
@@ -77,7 +82,10 @@ def segment_and_patchify(
     wsi = WSIFactory.load(wsi_path)
     W, H = wsi.get_size(lv=0)
 
-    predict_fn, thumb_max = _build_segmentation_predictor(seg)
+    if predict_fn is None or thumb_max is None:
+        predict_fn, thumb_max = _build_segmentation_predictor(seg)
+    # mypy: ensure non-None after lazy init
+    assert predict_fn is not None and thumb_max is not None
     thumb = wsi.get_thumb((thumb_max, thumb_max))
 
     # Predict binary mask (H, W) in [0, 1]
@@ -118,6 +126,8 @@ def segment_and_patchify(
         holes_contours,
         out_h5,
         image_output_dir=img_dir,
+        store_images=store_images,
+        fast_mode=fast_mode,
         batch=512,
     )
 

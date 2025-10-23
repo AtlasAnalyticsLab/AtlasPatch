@@ -114,6 +114,8 @@ Main command for processing whole slide images with tissue segmentation and patc
 | `--require-all-points` | flag | False | No | Require all 4 corner points inside tissue (strict mode) |
 | `--use-padding` | flag | True | No | Allow patches at image boundaries with padding |
 | `--save-images` | flag | False | No | Export individual patch images as PNG files |
+| `--h5-images/--no-h5-images` | flag | `--h5-images` | No | Store image arrays in the HDF5 file (`imgs` dataset). Disable to save only coordinates + metadata |
+| `--fast-mode` | flag | False | No | Skip per-patch content filtering for faster extraction (may include background patches) |
 | `--verbose/-v` | flag | False | No | Enable verbose logging output |
 
 **Available SAM2 Configs (YAML paths):**
@@ -218,6 +220,26 @@ Display information about supported formats and features.
 ```bash
 slideproc info
 ```
+
+## HDF5 Output Structure
+
+Each processed slide produces a single HDF5 file under `<output>/<stem>/<stem>.h5`.
+
+- Datasets
+  - `coords`: int32 shape `(N, 2)` containing `(x, y)` at level 0
+  - `coords_ext`: int32 shape `(N, 5)` containing `(x, y, w, h, level)` for reliable re-reading
+  - `imgs`: uint8 shape `(N, H, W, 3)` RGB patches (optional; present only when `--h5-images` is enabled)
+- File attributes
+  - `patch_size`: int
+  - `wsi_path`: original WSI path
+  - `num_patches`: total number of patches
+
+When images are not stored in the HDF5 (`--no-h5-images`), you can reconstruct any patch by re-reading from the original WSI using `(x, y, w, h, level)` from `coords_ext`.
+
+### Performance Notes
+
+- The SAM2 predictor is now initialized once and reused across files to reduce per-slide overhead.
+- Enable `--fast-mode` to skip per-patch white/black filtering. This can substantially reduce I/O, especially together with `--no-h5-images`.
 
 Shows:
 - Supported WSI formats

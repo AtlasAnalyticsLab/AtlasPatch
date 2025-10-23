@@ -9,6 +9,7 @@ import click
 from slide_processor.pipeline.patchify import (
     PatchifyParams,
     SegmentParams,
+    _build_segmentation_predictor,
     segment_and_patchify,
 )
 
@@ -218,11 +219,28 @@ def cli():
     help="Export individual patch images as PNG files.",
 )
 @click.option(
+    "--h5-images/--no-h5-images",
+    default=True,
+    help=(
+        "Store image arrays in the HDF5 file ('imgs' dataset). "
+        "Disable to save only coordinates + metadata. [default: --h5-images]"
+    ),
+)
+@click.option(
     "--verbose",
     "-v",
     is_flag=True,
     default=False,
     help="Enable verbose logging output.",
+)
+@click.option(
+    "--fast-mode",
+    is_flag=True,
+    default=False,
+    help=(
+        "Skip per-patch content filtering to speed up extraction. "
+        "May include more background patches."
+    ),
 )
 def process(
     wsi_path: str,
@@ -239,7 +257,9 @@ def process(
     require_all_points: bool,
     use_padding: bool,
     save_images: bool,
+    h5_images: bool,
     verbose: bool,
+    fast_mode: bool,
 ):
     """Process whole slide image(s) with tissue segmentation and patch extraction.
 
@@ -333,6 +353,9 @@ def process(
     successful = 0
     failed = 0
 
+    # Build SAM2 predictor once and reuse across files
+    predict_fn, thumb_max = _build_segmentation_predictor(seg_params)
+
     with click.progressbar(wsi_files, label="Processing WSI files") as pbar:
         for wsi_file in pbar:
             try:
@@ -343,6 +366,10 @@ def process(
                     seg=seg_params,
                     patch=patch_params,
                     save_images=save_images,
+                    store_images=h5_images,
+                    fast_mode=fast_mode,
+                    predict_fn=predict_fn,
+                    thumb_max=thumb_max,
                 )
 
                 if result_h5:
@@ -391,8 +418,9 @@ def info():
 
     click.echo("\nOutput Format:")
     click.echo("  • HDF5 file per WSI containing:")
-    click.echo("    - 'imgs': (N, H, W, 3) uint8 RGB patches")
+    click.echo("    - 'imgs': (N, H, W, 3) uint8 RGB patches (optional)")
     click.echo("    - 'coords': (N, 2) int32 (x, y) coordinates")
+    click.echo("    - 'coords_ext': (N, 5) int32 (x, y, w, h, level)")
     click.echo("    - Metadata: patch_size, wsi_path, num_patches")
     click.echo("  • Optional PNG patches in 'images/' subdirectory")
 
