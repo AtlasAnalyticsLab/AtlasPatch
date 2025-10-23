@@ -101,10 +101,12 @@ class SAM2SegmentationModel:
             Numpy array in RGB format with shape (H, W, 3).
         """
         if isinstance(image, Image.Image):
-            # Convert PIL Image to numpy array
+            # Convert PIL Image to writable numpy array
             if image.mode != "RGB":
                 image = image.convert("RGB")
-            return np.asarray(image)
+            # np.asarray(image) can be read-only; use np.array(copy=True)
+            arr = np.array(image, copy=True)
+            return arr
         elif isinstance(image, torch.Tensor):
             # Convert tensor to numpy array
             image = image.cpu().detach().numpy()
@@ -118,6 +120,11 @@ class SAM2SegmentationModel:
             # Handle channel-first format (C, H, W) -> (H, W, C)
             if len(image.shape) == 3 and image.shape[0] == 3:
                 image = np.transpose(image, (1, 2, 0))
+            # Ensure writable and contiguous memory to avoid torchvision warnings
+            if not image.flags.writeable:
+                image = image.copy()
+            if not image.flags.c_contiguous:
+                image = np.ascontiguousarray(image)
             return image
         elif isinstance(image, np.ndarray):
             # Ensure proper format
@@ -129,6 +136,11 @@ class SAM2SegmentationModel:
                     image = image.astype(np.uint8)
             elif image.dtype != np.uint8:
                 image = image.astype(np.uint8)
+            # Ensure writable and contiguous memory
+            if not image.flags.writeable:
+                image = image.copy()
+            if not image.flags.c_contiguous:
+                image = np.ascontiguousarray(image)
             return image
         else:
             raise TypeError(f"Unsupported input type: {type(image)}")
