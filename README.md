@@ -222,7 +222,6 @@ slideproc info
 Shows:
 - Supported WSI formats
 - Supported image formats
-- Key features
 - Output format details
 
 ### Output
