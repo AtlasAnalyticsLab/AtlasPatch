@@ -63,13 +63,28 @@ def mask_to_contours(
     if hierarchy is None or len(contours) == 0:
         return [], []
 
-    # hierarchy: (N, 1, 4) -> (N, 4): [next, prev, first_child, parent]
-    hierarchy = hierarchy[:, 0, :]
+    # Normalize hierarchy to shape (N, 4): [next, prev, first_child, parent]
+    # OpenCV returns either (1, N, 4) or (N, 1, 4) depending on version/platform.
+    if hierarchy.ndim == 3:
+        if hierarchy.shape[0] == 1:  # (1, N, 4)
+            hierarchy = hierarchy[0]
+        elif hierarchy.shape[1] == 1:  # (N, 1, 4)
+            hierarchy = hierarchy[:, 0, :]
+        else:
+            # Unexpected shape; flatten conservatively
+            hierarchy = hierarchy.reshape(-1, 4)
+    elif hierarchy.ndim == 2 and hierarchy.shape[1] == 4:
+        # already (N, 4)
+        pass
+    else:
+        hierarchy = hierarchy.reshape(-1, 4)
 
     # Compute minimum tissue area threshold from percentage of image area
     H, W = mask.shape[:2]
     image_area = float(H * W)
-    min_area_threshold = (tissue_area_thresh / 100.0) * image_area
+    min_area_threshold = (
+        tissue_area_thresh * image_area
+    )  # changed from (tissue_area_thresh / 100.0 * image_area)
     effective_min_area = max(min_area_threshold, float(filter_params["a_t"]))
 
     # Collect tissue contours (parent == -1) and holes (parent != -1)
