@@ -113,7 +113,7 @@ Main command for processing whole slide images with tissue segmentation and patc
 | `--black-thresh` | int | `50` | No | RGB threshold for filtering black patches |
 | `--require-all-points` | flag | False | No | Require all 4 corner points inside tissue (strict mode) |
 | `--use-padding` | flag | True | No | Allow patches at image boundaries with padding |
-| `--save-images` | flag | False | No | Export individual patch images as PNG files |
+| `--save-images` | flag | False | No | Export individual patch images as PNG files in `/images` folder |
 | `--h5-images/--no-h5-images` | flag | `--h5-images` | No | Store image arrays in the HDF5 file (`imgs` dataset). Disable to save only coordinates + metadata |
 | `--fast-mode` | flag | False | No | Skip per-patch content filtering for faster extraction (may include background patches) |
 | `--visualize` | flag | False | No | Generate visualization of patches overlaid on WSI thumbnail with processing info |
@@ -340,3 +340,11 @@ Each file represents a single extracted patch with its coordinates in the filena
 - **`--use-padding`**: Allow patches extending beyond image boundaries
   - True (default): Patches at edges can extend beyond bounds
   - False: Patches must be fully contained within image
+
+## Tasks
+- [ ] Extract patches at different magnification level
+- [ ] Add visualization module to visualize the patches
+- [ ] Decide on the final arguments and parameter we are going to expose / de-expose
+- [ ] Check if file exist in the output directory and if so then skip it
+- [ ] Support parallelization for a single GPU
+- [ ] Support paralelization for multipl GPUs
