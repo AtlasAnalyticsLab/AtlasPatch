@@ -10,9 +10,9 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
-    "Ahmed Alagha",
-    "Omar Metwally",
-    "Yousef Kotp <yousefkotp@outlook.com>",
+    {name = "Ahmed Alagha"},
+    {name = "Omar Metwally"},
+    {name = "Yousef Kotp", email = "yousefkotp@outlook.com"},
 ]
 keywords = ["slide-processor", "whole-slide-image", "wsi"]
 
@@ -22,7 +22,8 @@ dependencies = [
     "numpy>=1.21.0",
     "h5py>=3.8.0",
     "opencv-python>=4.7.0",
-    "git+https://github.com/facebookresearch/sam2.git",
+    "click>=8.0.0",
+    "torch>=2.0.0",
 ]
 
 [project.optional-dependencies]
@@ -33,6 +34,9 @@ dev = [
     "pytest-cov>=4.0.0",
     "mypy>=1.0.0",
 ]
+
+[project.scripts]
+slideproc = "slide_processor.cli:main"
 
 [tool.setuptools]
 packages = ["slide_processor"]
