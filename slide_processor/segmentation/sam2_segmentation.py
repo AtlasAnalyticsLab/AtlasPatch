@@ -191,7 +191,5 @@ class SAM2SegmentationModel:
 
     def __repr__(self) -> str:
         return (
-            f"SAM2SegmentationModel("
-            f"device={self.device}, "
-            f"checkpoint={self.checkpoint_path.name})"
+            f"SAM2SegmentationModel(device={self.device}, checkpoint={self.checkpoint_path.name})"
         )

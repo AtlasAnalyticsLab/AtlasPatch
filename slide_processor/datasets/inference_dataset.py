@@ -69,7 +69,7 @@ class InferenceSegmentationDataset(VisionDataset):
             for i, img in enumerate(self.image_data):
                 if not isinstance(img, (Image.Image, np.ndarray)):
                     raise ValueError(
-                        f"Image at index {i} must be PIL Image or numpy array, " f"got {type(img)}"
+                        f"Image at index {i} must be PIL Image or numpy array, got {type(img)}"
                     )
         else:
             raise ValueError("images must be a directory path or list of PIL Images/numpy arrays")
