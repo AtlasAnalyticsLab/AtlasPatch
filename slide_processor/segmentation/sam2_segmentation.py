@@ -1,11 +1,15 @@
+import logging
 from pathlib import Path
 from typing import Union
 
 import numpy as np
 import torch
+from hydra.utils import instantiate
+from omegaconf import OmegaConf
 from PIL import Image
-from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
+
+logger = logging.getLogger("slide_processor.segmentation")
 
 
 class SAM2SegmentationModel:
@@ -30,26 +34,45 @@ class SAM2SegmentationModel:
             **kwargs: Additional predictor arguments.
         """
         self.checkpoint_path = Path(checkpoint_path)
-        self.config_file = Path(config_file)
-        self.device = torch.device(device)
+
+        # Require a YAML filesystem path for the SAM2 config
+        cfg_arg = config_file if isinstance(config_file, str) else str(config_file)
+        self.config_path = Path(cfg_arg)
+        if self.config_path.suffix.lower() not in {".yaml", ".yml"}:
+            raise ValueError(
+                f"--config must be a YAML file path (*.yaml|*.yml), got: {self.config_path}"
+            )
+
+        dev_str = str(device).lower()
+        if dev_str == "cuda" and not torch.cuda.is_available():
+            logger.warning(
+                "CUDA requested but not available; falling back to CPU. "
+                "Use --device cpu to silence this warning."
+            )
+            dev_str = "cpu"
+        self.device = torch.device(dev_str)
         self.mask_threshold = mask_threshold
 
         if not self.checkpoint_path.exists():
             raise FileNotFoundError(f"Checkpoint not found: {self.checkpoint_path}")
-        if not self.config_file.exists():
-            raise FileNotFoundError(f"Config file not found: {self.config_file}")
+        if not self.config_path.exists():
+            raise FileNotFoundError(f"Config file not found: {self.config_path}")
 
         self.model = self._build_sam2()
         self.predictor = self._create_predictor(**kwargs)
 
     def _build_sam2(self) -> torch.nn.Module:
-        """Build and load SAM2 model."""
+        """Build and load SAM2 model from YAML file."""
         try:
-            model = build_sam2(config_file=str(self.config_file), ckpt_path=None)
-
+            conf = OmegaConf.load(str(self.config_path))
+            # Configs in SAM2 typically have a top-level 'model' node
+            model_cfg = conf.get("model", conf)
+            model = instantiate(model_cfg)
             return model
         except Exception as e:
-            raise RuntimeError(f"Failed to build SAM2 model: {e}") from e
+            raise RuntimeError(
+                f"Failed to build SAM2 model from YAML: {self.config_path}: {e}"
+            ) from e
 
     def _create_predictor(self, **kwargs) -> SAM2ImagePredictor:
         """Create SAM2ImagePredictor."""

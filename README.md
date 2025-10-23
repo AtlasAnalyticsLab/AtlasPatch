@@ -73,15 +73,15 @@ SlideProcessor provides an intuitive command-line interface for processing whole
 ### Quick Start
 
 ```bash
-# Process a single WSI file
-slideproc process sample.svs --checkpoint model.pt --config sam2.yaml
+# Process a single WSI file (YAML config path)
+slideproc process sample.svs --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml
 
 # Process all WSI files in a directory
-slideproc process ./wsi_folder/ --checkpoint model.pt --config sam2.yaml --output ./results
+slideproc process ./wsi_folder/ --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml --output ./results
 
 # With custom patch settings
 slideproc process sample.svs \
-    --checkpoint model.pt --config sam2.yaml \
+    --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \
     --patch-size 512 --step-size 256 \
     --output ./output --save-images
 ```
@@ -97,7 +97,7 @@ Main command for processing whole slide images with tissue segmentation and patc
 
 **Required Options:**
 - `--checkpoint/-c` **(required)**: Path to SAM2 model checkpoint file (.pt)
-- `--config` **(required)**: Path to SAM2 config file (YAML)
+- `--config` **(required)**: Path to a SAM2 YAML config file. Only filesystem paths are accepted (e.g., `slide_processor/configs/sam2.1_hiera_b+.yaml`).
 
 **Optional Parameters:**
 
@@ -116,6 +116,20 @@ Main command for processing whole slide images with tissue segmentation and patc
 | `--save-images` | flag | False | No | Export individual patch images as PNG files |
 | `--verbose/-v` | flag | False | No | Enable verbose logging output |
 
+**Available SAM2 Configs (YAML paths):**
+
+- `sam2.1_hiera_t` — Tiny model, fastest and lowest memory; lowest accuracy.
+- `sam2.1_hiera_s` — Small model, balanced speed/VRAM/accuracy.
+- `sam2.1_hiera_b+` — Base+ model, recommended default; higher accuracy; more VRAM.
+- `sam2.1_hiera_l` — Large model, highest accuracy; slowest; high VRAM.
+
+Configs are provided under `slide_processor/configs/`. Always pass the YAML path, for example:
+
+- `--config slide_processor/configs/sam2.1_hiera_t.yaml`
+- `--config slide_processor/configs/sam2.1_hiera_s.yaml`
+- `--config slide_processor/configs/sam2.1_hiera_b+.yaml`
+- `--config slide_processor/configs/sam2.1_hiera_l.yaml`
+
 **Supported WSI Formats:**
 - **OpenSlide formats**: .svs, .tif, .tiff, .ndpi, .vms, .vmu, .scn, .mrxs, .bif, .dcm
 - **Image formats**: .png, .jpg, .jpeg, .bmp, .webp, .gif
@@ -125,7 +139,7 @@ Main command for processing whole slide images with tissue segmentation and patc
 #### Basic Single File Processing
 
 ```bash
-slideproc process sample.svs --checkpoint model.pt --config sam2.yaml
+slideproc process sample.svs --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml
 ```
 
 #### Batch Processing Multiple Files
@@ -133,7 +147,7 @@ slideproc process sample.svs --checkpoint model.pt --config sam2.yaml
 ```bash
 # Process all .svs files in a directory
 slideproc process ./slides/ \
-    --checkpoint model.pt --config sam2.yaml \
+    --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \
     --output ./processed_slides
 ```
 
@@ -142,7 +156,7 @@ slideproc process ./slides/ \
 ```bash
 # Extract larger patches with different stride
 slideproc process sample.svs \
-    --checkpoint model.pt --config sam2.yaml \
+    --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \
     --patch-size 512 \
     --step-size 256 \
     --output ./results
@@ -153,7 +167,7 @@ slideproc process sample.svs \
 ```bash
 # Generate individual PNG files for each patch
 slideproc process sample.svs \
-    --checkpoint model.pt --config sam2.yaml \
+    --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \
     --save-images \
     --output ./output
 # Creates: output/<stem>/images/<stem>_x<x>_y<y>.png
@@ -164,7 +178,7 @@ slideproc process sample.svs \
 ```bash
 # Require all 4 patch corners to be within tissue (stricter filtering)
 slideproc process sample.svs \
-    --checkpoint model.pt --config sam2.yaml \
+    --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \
     --require-all-points
 ```
 
@@ -173,7 +187,7 @@ slideproc process sample.svs \
 ```bash
 # Use CPU instead of GPU (slower but no GPU required)
 slideproc process sample.svs \
-    --checkpoint model.pt --config sam2.yaml \
+    --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \
     --device cpu
 ```
 
@@ -182,7 +196,7 @@ slideproc process sample.svs \
 ```bash
 # Adjust thresholds for different tissue characteristics
 slideproc process sample.svs \
-    --checkpoint model.pt --config sam2.yaml \
+    --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \
     --white-thresh 20 \
     --black-thresh 40 \
     --tissue-thresh 0.05
@@ -193,7 +207,7 @@ slideproc process sample.svs \
 ```bash
 # Enable detailed logging for debugging
 slideproc process sample.svs \
-    --checkpoint model.pt --config sam2.yaml \
+    --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \
     --verbose
 ```
 

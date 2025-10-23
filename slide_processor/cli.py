@@ -97,18 +97,18 @@ def cli():
     3. Saving patches to HDF5 format for efficient data handling
 
     Examples:
-        # Process single WSI file
-        slideproc process wsi.svs --checkpoint ckpt.pt --config sam2.yaml
+        # Process single WSI file (YAML config path)
+        slideproc process wsi.svs --checkpoint ckpt.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml
 
         # Process directory of WSI files
-        slideproc process ./wsi_folder/ --checkpoint ckpt.pt --config sam2.yaml
+        slideproc process ./wsi_folder/ --checkpoint ckpt.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml
 
         # With custom patch settings
-        slideproc process wsi.svs --checkpoint ckpt.pt --config sam2.yaml \\
+        slideproc process wsi.svs --checkpoint ckpt.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \\
             --patch-size 512 --step-size 256 --output ./output
 
         # Export individual patch images
-        slideproc process wsi.svs --checkpoint ckpt.pt --config sam2.yaml \\
+        slideproc process wsi.svs --checkpoint ckpt.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \\
             --save-images --output ./output
 
     For detailed help on specific commands, run:
@@ -131,7 +131,7 @@ def cli():
     type=click.Path(exists=True),
     required=True,
     callback=validate_path,
-    help="Path to SAM2 config file (YAML).",
+    help=("Path to SAM2 YAML config file. Only filesystem paths are accepted."),
 )
 @click.option(
     "--output",
@@ -247,27 +247,27 @@ def process(
 
         # Single file processing
         slideproc process sample.svs \\
-            --checkpoint model.pt --config sam2.yaml
+            --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml
 
         # Batch processing (all .svs files in directory)
         slideproc process ./slides/ \\
-            --checkpoint model.pt --config sam2.yaml \\
+            --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \\
             --output ./processed_slides
 
         # Custom patch settings with image export
         slideproc process sample.svs \\
-            --checkpoint model.pt --config sam2.yaml \\
+            --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \\
             --patch-size 512 --step-size 256 \\
             --save-images --output ./results
 
         # Strict tissue requirement (all 4 corners must be in tissue)
         slideproc process sample.svs \\
-            --checkpoint model.pt --config sam2.yaml \\
+            --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \\
             --require-all-points
 
         # Using CPU instead of GPU
         slideproc process sample.svs \\
-            --checkpoint model.pt --config sam2.yaml \\
+            --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \\
             --device cpu
     """
     if verbose:
