@@ -17,6 +17,17 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
+
+
+# Suppress a noisy third-party info log emitted to the root logger.
+# Example: "For numpy array image, we assume (HxWxC) format"
+class _SuppressNumpyHxWxCFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:  # type: ignore[override]
+        msg = record.getMessage()
+        return "For numpy array image, we assume (HxWxC) format" not in msg
+
+
+logging.getLogger().addFilter(_SuppressNumpyHxWxCFilter())
 logger = logging.getLogger("slide_processor.cli")
 
 
