@@ -92,3 +92,116 @@ def save_h5(
                 os.remove(tmp_path)
             except Exception:
                 pass
+
+
+class PatchesH5:
+    """Lightweight reader for patch HDF5 files produced by PatchExtractor.
+
+    Provides lazy access with indexing and length, and exposes metadata.
+
+    Datasets expected:
+      - "imgs": (N, H, W, 3) uint8
+      - "coords": (N, 2) int32
+
+    Root attributes (optional):
+      - "patch_size": int
+      - "wsi_path": str
+      - "num_patches": int
+    """
+
+    def __init__(self, path: str) -> None:
+        self.path = path
+        self._f: h5py.File | None = None
+
+    def open(self) -> None:
+        if self._f is None:
+            self._f = h5py.File(self.path, "r")
+
+    def close(self) -> None:
+        if self._f is not None:
+            try:
+                self._f.close()
+            except Exception:
+                pass
+            finally:
+                self._f = None
+
+    def __enter__(self):
+        self.open()
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+
+    # Internal
+    def _require_open(self) -> h5py.File:
+        if self._f is None:
+            self.open()
+        assert self._f is not None
+        return self._f
+
+    @property
+    def images(self) -> "h5py.Dataset":
+        f = self._require_open()
+        return f["imgs"]
+
+    @property
+    def coords(self) -> "h5py.Dataset":
+        f = self._require_open()
+        return f["coords"]
+
+    def __len__(self) -> int:
+        try:
+            return int(self.images.shape[0])
+        except Exception:
+            return 0
+
+    def __getitem__(self, idx):
+        imgs = self.images[idx]
+        cds = self.coords[idx]
+        return imgs, cds
+
+    @property
+    def metadata(self) -> dict[str, Any]:
+        f = self._require_open()
+        return dict(f.attrs)
+
+    @property
+    def patch_size(self) -> int | None:
+        md = self.metadata
+        v = md.get("patch_size")
+        if v is None:
+            return None
+        try:
+            return int(v)
+        except Exception:
+            return None
+
+    @property
+    def wsi_path(self) -> str | None:
+        md = self.metadata
+        v = md.get("wsi_path")
+        return str(v) if v is not None else None
+
+    @property
+    def num_patches(self) -> int | None:
+        md = self.metadata
+        v = md.get("num_patches")
+        if v is None:
+            return None
+        try:
+            return int(v)
+        except Exception:
+            return None
+
+
+def load_patches_h5(path: str) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
+    """Eagerly load all patches and coordinates into memory with metadata.
+
+    Returns: (imgs, coords, metadata)
+    """
+    with h5py.File(path, "r") as f:
+        imgs = np.array(f["imgs"], dtype=np.uint8)
+        coords = np.array(f["coords"], dtype=np.int32)
+        meta = dict(f.attrs)
+    return imgs, coords, meta
