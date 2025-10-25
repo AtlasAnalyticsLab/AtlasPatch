@@ -79,11 +79,11 @@ slideproc process sample.svs --checkpoint model.pt --config slide_processor/conf
 # Process all WSI files in a directory
 slideproc process ./wsi_folder/ --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml --output ./results
 
-# With custom patch settings
+# With custom patch settings and visualization
 slideproc process sample.svs \
     --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \
     --patch-size 512 --step-size 256 \
-    --output ./output --save-images
+    --output ./output --save-images --visualize
 ```
 
 ### Commands
@@ -116,6 +116,8 @@ Main command for processing whole slide images with tissue segmentation and patc
 | `--save-images` | flag | False | No | Export individual patch images as PNG files |
 | `--h5-images/--no-h5-images` | flag | `--h5-images` | No | Store image arrays in the HDF5 file (`imgs` dataset). Disable to save only coordinates + metadata |
 | `--fast-mode` | flag | False | No | Skip per-patch content filtering for faster extraction (may include background patches) |
+| `--visualize` | flag | False | No | Generate visualization of patches overlaid on WSI thumbnail with processing info |
+| `--show-random-patches` | int | None | No | Visualize N random patches in a grid (e.g., `--show-random-patches 20`) |
 | `--verbose/-v` | flag | False | No | Enable verbose logging output |
 
 **Available SAM2 Configs (YAML paths):**
@@ -212,6 +214,33 @@ slideproc process sample.svs \
     --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \
     --verbose
 ```
+
+#### Generate Visualizations
+
+```bash
+# Generate patch overlay visualization on thumbnail
+slideproc process sample.svs \
+    --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \
+    --visualize
+
+# Show 20 random patches in a grid
+slideproc process sample.svs \
+    --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \
+    --show-random-patches 20
+
+# Combine both visualizations
+slideproc process sample.svs \
+    --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \
+    --visualize --show-random-patches 20
+```
+
+The `--visualize` flag creates a visualization showing:
+- WSI thumbnail with patch locations overlaid as green rectangles
+- Information panel with extraction statistics and parameters used
+
+The `--show-random-patches N` flag creates a grid visualization of N randomly selected patches with their coordinates.
+
+Both visualizations are saved in the output directory: `output/<wsi_stem>/patches_on_thumbnail.png` and `output/<wsi_stem>/random_patches_visualization.png`.
 
 #### `slideproc info`
 

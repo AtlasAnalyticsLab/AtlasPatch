@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import time
 from pathlib import Path
 
 import click
@@ -11,6 +12,10 @@ from slide_processor.pipeline.patchify import (
     SegmentParams,
     _build_segmentation_predictor,
     segment_and_patchify,
+)
+from slide_processor.visualization import (
+    visualize_patches_on_thumbnail,
+    visualize_random_patches,
 )
 
 # Configure logging
@@ -242,6 +247,18 @@ def cli():
         "May include more background patches."
     ),
 )
+@click.option(
+    "--visualize",
+    is_flag=True,
+    default=False,
+    help="Generate visualization of patches overlaid on WSI thumbnail with processing info.",
+)
+@click.option(
+    "--show-random-patches",
+    type=int,
+    default=None,
+    help="Visualize N random patches in a grid. Example: --show-random-patches 20",
+)
 def process(
     wsi_path: str,
     checkpoint: str,
@@ -260,6 +277,8 @@ def process(
     h5_images: bool,
     verbose: bool,
     fast_mode: bool,
+    visualize: bool,
+    show_random_patches: int | None,
 ):
     """Process whole slide image(s) with tissue segmentation and patch extraction.
 
@@ -360,6 +379,10 @@ def process(
         for wsi_file in pbar:
             try:
                 logger.info(f"Processing: {Path(wsi_file).name}")
+
+                # Track processing time
+                start_time = time.time()
+
                 result_h5 = segment_and_patchify(
                     wsi_path=wsi_file,
                     output_dir=str(output_path),
@@ -372,9 +395,64 @@ def process(
                     thumb_max=thumb_max,
                 )
 
+                processing_time = time.time() - start_time
+
                 if result_h5:
                     successful += 1
                     logger.info(f"Saved patches to: {result_h5}")
+
+                    # Generate visualizations if requested
+                    stem = Path(wsi_file).stem
+                    vis_output_dir = output_path / stem
+
+                    # Prepare CLI arguments for info box
+                    cli_args_dict = {
+                        "patch_size": patch_size,
+                        "step_size": effective_step_size,
+                        "thumbnail_size": thumbnail_size,
+                        "device": device,
+                        "tissue_thresh": tissue_thresh,
+                        "white_thresh": white_thresh,
+                        "black_thresh": black_thresh,
+                        "require_all_points": require_all_points,
+                        "use_padding": use_padding,
+                        "fast_mode": fast_mode,
+                        "save_images": save_images,
+                        "h5_images": h5_images,
+                    }
+
+                    if visualize:
+                        try:
+                            vis_path = visualize_patches_on_thumbnail(
+                                hdf5_path=result_h5,
+                                wsi_path=wsi_file,
+                                output_dir=str(vis_output_dir),
+                                patch_size=patch_size,
+                                processing_time=processing_time,
+                                cli_args=cli_args_dict,
+                            )
+                            logger.info(f"Visualization saved to: {vis_path}")
+                        except Exception as e:
+                            logger.error(f"Failed to generate visualization: {e}")
+                            if verbose:
+                                raise
+
+                    if show_random_patches is not None:
+                        try:
+                            # Determine if we need to pass wsi_path
+                            wsi_path_arg = None if h5_images else wsi_file
+
+                            random_vis_path = visualize_random_patches(
+                                hdf5_path=result_h5,
+                                output_dir=str(vis_output_dir),
+                                wsi_path=wsi_path_arg,
+                                n_patches=show_random_patches,
+                            )
+                            logger.info(f"Random patches visualization saved to: {random_vis_path}")
+                        except Exception as e:
+                            logger.error(f"Failed to generate random patches visualization: {e}")
+                            if verbose:
+                                raise
                 else:
                     logger.warning(f"No patches extracted from {Path(wsi_file).name}")
 
