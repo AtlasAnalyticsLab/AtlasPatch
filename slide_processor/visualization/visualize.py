@@ -20,7 +20,6 @@ def visualize_patches_on_thumbnail(
     hdf5_path: str,
     wsi_path: str,
     output_dir: str,
-    patch_size: int = 256,
     processing_time: float | None = None,
     cli_args: dict[str, Any] | None = None,
 ) -> str:
@@ -39,8 +38,6 @@ def visualize_patches_on_thumbnail(
         Path to the whole slide image file.
     output_dir : str
         Directory where the visualization image will be saved.
-    patch_size : int, default 256
-        Size of extracted patches at level 0 (in pixels).
     processing_time : float | None, default None
         Time taken for patch extraction in seconds. If provided, displayed in info box.
     cli_args : dict[str, Any] | None, default None
@@ -61,11 +58,13 @@ def visualize_patches_on_thumbnail(
     """
     logger.info("Creating patch overlay visualization on thumbnail...")
 
-    # Read coordinates from HDF5
+    # Read coordinates and metadata from HDF5
     with h5py.File(hdf5_path, "r") as f:
         if "coords" not in f:
             raise KeyError(f"'coords' dataset not found in {hdf5_path}")
         coords = f["coords"][:]
+        # Always use level-0 patch size from file attrs
+        patch_size = int(f.attrs["patch_size_level0"])  # raises KeyError if missing
 
     num_patches = len(coords)
     logger.debug(f"Found {num_patches} patches in HDF5 file")
@@ -177,151 +176,4 @@ def visualize_patches_on_thumbnail(
     plt.close()
 
     logger.info(f"Saved patch overlay visualization: {output_path}")
-    return str(output_path)
-
-
-def visualize_random_patches(
-    hdf5_path: str,
-    output_dir: str,
-    wsi_path: str | None = None,
-    n_patches: int = 10,
-) -> str:
-    """
-    Visualize random patches from HDF5 file in a grid layout.
-
-    Creates a grid visualization showing randomly selected patches with their
-    indices and coordinates. If the HDF5 file does not contain image data,
-    patches are read directly from the WSI using stored coordinates.
-
-    Parameters
-    ----------
-    hdf5_path : str
-        Path to HDF5 file containing patches and/or coordinates.
-    output_dir : str
-        Directory where the visualization image will be saved.
-    wsi_path : str | None, default None
-        Path to WSI file. Required if HDF5 file does not contain image data
-        (i.e., when --no-h5-images was used during extraction).
-    n_patches : int, default 10
-        Number of random patches to display in the grid.
-
-    Returns
-    -------
-    str
-        Path to the saved visualization image.
-
-    Raises
-    ------
-    FileNotFoundError
-        If the HDF5 file or WSI file (when required) does not exist.
-    ValueError
-        If n_patches is less than 1, or if HDF5 lacks images and no WSI path provided.
-    KeyError
-        If required datasets are missing from the HDF5 file.
-    """
-    logger.info(f"Visualizing {n_patches} random patches from HDF5...")
-
-    if n_patches < 1:
-        raise ValueError(f"n_patches must be at least 1, got {n_patches}")
-
-    with h5py.File(hdf5_path, "r") as f:
-        total_patches = f["coords"].shape[0]
-
-        # Adjust if requesting more patches than available
-        if total_patches < n_patches:
-            logger.warning(
-                f"Requested {n_patches} patches but only {total_patches} available. "
-                f"Showing all {total_patches} patches."
-            )
-            n_patches = total_patches
-
-        # Select random indices
-        random_indices = np.random.choice(total_patches, n_patches, replace=False)
-        random_indices = np.sort(random_indices)
-
-        # Check if images are stored in HDF5
-        has_images = "imgs" in f
-
-        if has_images:
-            # Read patches directly from HDF5
-            patches_list = []
-            coords_list = []
-            for idx in random_indices:
-                patches_list.append(f["imgs"][idx])
-                coords_list.append(f["coords"][idx])
-
-            patches = np.array(patches_list)
-            coords = np.array(coords_list)
-        else:
-            # Need to read patches from WSI using coords_ext
-            if wsi_path is None:
-                raise ValueError(
-                    "HDF5 file does not contain image data. "
-                    "Please provide wsi_path to read patches from the original WSI."
-                )
-
-            if "coords_ext" not in f:
-                raise KeyError(
-                    "'coords_ext' dataset not found in HDF5. "
-                    "Cannot reconstruct patches without extended coordinates."
-                )
-
-            logger.info("Reading patches from WSI (no images stored in HDF5)...")
-            coords_ext_list = []
-            coords_list = []
-            for idx in random_indices:
-                coords_ext_list.append(f["coords_ext"][idx])
-                coords_list.append(f["coords"][idx])
-
-            coords_ext = np.array(coords_ext_list)
-            coords = np.array(coords_list)
-
-            # Load patches from WSI
-            from slide_processor.wsi import WSIFactory
-
-            wsi = WSIFactory.load(wsi_path)
-            patches_list = []
-            for coord_ext in coords_ext:
-                x, y, w, h, level = coord_ext
-                patch = wsi.extract(
-                    xy=(int(x), int(y)), lv=int(level), wh=(int(w), int(h)), mode="array"
-                )
-                patches_list.append(patch)
-
-            try:
-                wsi.cleanup()
-            except Exception:
-                pass
-
-            patches = np.array(patches_list)
-
-    # Create visualization grid
-    n_cols = 5
-    n_rows = (n_patches + n_cols - 1) // n_cols
-
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, 3 * n_rows))
-    if n_patches == 1:
-        axes = [axes]
-    else:
-        axes = axes.flatten()
-
-    for idx, (patch, coord, ax) in enumerate(zip(patches, coords, axes)):
-        ax.imshow(patch)
-        ax.set_title(
-            f"Patch {random_indices[idx]}\nCoord: ({coord[0]}, {coord[1]})",
-            fontsize=9,
-        )
-        ax.axis("off")
-
-    # Hide extra subplots
-    for idx in range(n_patches, len(axes)):
-        axes[idx].axis("off")
-
-    plt.tight_layout()
-
-    output_path = Path(output_dir) / "random_patches_visualization.png"
-    plt.savefig(output_path, dpi=150, bbox_inches="tight")
-    plt.close()
-
-    logger.info(f"Saved random patches visualization: {output_path}")
     return str(output_path)

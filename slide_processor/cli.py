@@ -15,7 +15,6 @@ from slide_processor.pipeline.patchify import (
 )
 from slide_processor.visualization import (
     visualize_patches_on_thumbnail,
-    visualize_random_patches,
 )
 
 # Configure logging
@@ -115,18 +114,20 @@ def cli():
 
     Examples:
         # Process single WSI file (YAML config path)
-        slideproc process wsi.svs --checkpoint ckpt.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml
+        slideproc process wsi.svs --checkpoint ckpt.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \\
+            --patch-size 256 --target-mag 20
 
         # Process directory of WSI files
-        slideproc process ./wsi_folder/ --checkpoint ckpt.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml
+        slideproc process ./wsi_folder/ --checkpoint ckpt.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \\
+            --patch-size 256 --target-mag 20
 
         # With custom patch settings
         slideproc process wsi.svs --checkpoint ckpt.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \\
-            --patch-size 512 --step-size 256 --output ./output
+            --patch-size 512 --step-size 256 --target-mag 20 --output ./output
 
         # Export individual patch images
         slideproc process wsi.svs --checkpoint ckpt.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \\
-            --save-images --output ./output
+            --save-images --patch-size 256 --target-mag 20 --output ./output
 
     For detailed help on specific commands, run:
         slideproc <command> --help
@@ -160,9 +161,9 @@ def cli():
 @click.option(
     "--patch-size",
     type=int,
-    default=256,
+    required=True,
     callback=validate_positive_int,
-    help="Size of extracted patches in pixels. [default: 256]",
+    help="Target size of extracted patches in pixels (required)",
 )
 @click.option(
     "--step-size",
@@ -170,6 +171,15 @@ def cli():
     default=None,
     callback=validate_positive_int,
     help="Step size for patch extraction (stride). Defaults to patch-size if not set.",
+)
+@click.option(
+    "--target-mag",
+    type=click.Choice(["1", "2", "4", "5", "10", "20", "40", "60", "80"], case_sensitive=False),
+    required=True,
+    help=(
+        "Target magnification for patch extraction (e.g., 40, 20, 10). "
+        "Required. Coordinates are always saved at level 0."
+    ),
 )
 @click.option(
     "--device",
@@ -253,12 +263,6 @@ def cli():
     default=False,
     help="Generate visualization of patches overlaid on WSI thumbnail with processing info.",
 )
-@click.option(
-    "--show-random-patches",
-    type=int,
-    default=None,
-    help="Visualize N random patches in a grid. Example: --show-random-patches 20",
-)
 def process(
     wsi_path: str,
     checkpoint: str,
@@ -278,7 +282,7 @@ def process(
     verbose: bool,
     fast_mode: bool,
     visualize: bool,
-    show_random_patches: int | None,
+    target_mag: str,
 ):
     """Process whole slide image(s) with tissue segmentation and patch extraction.
 
@@ -297,27 +301,31 @@ def process(
 
         # Single file processing
         slideproc process sample.svs \\
-            --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml
+            --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \\
+            --patch-size 256 --target-mag 20
 
         # Batch processing (all .svs files in directory)
         slideproc process ./slides/ \\
             --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \\
+            --patch-size 256 --target-mag 20 \\
             --output ./processed_slides
 
         # Custom patch settings with image export
         slideproc process sample.svs \\
             --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \\
-            --patch-size 512 --step-size 256 \\
+            --patch-size 512 --step-size 256 --target-mag 20 \\
             --save-images --output ./results
 
         # Strict tissue requirement (all 4 corners must be in tissue)
         slideproc process sample.svs \\
             --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \\
+            --patch-size 256 --target-mag 20 \\
             --require-all-points
 
         # Using CPU instead of GPU
         slideproc process sample.svs \\
             --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \\
+            --patch-size 256 --target-mag 20 \\
             --device cpu
     """
     if verbose:
@@ -361,6 +369,7 @@ def process(
     patch_params = PatchifyParams(
         patch_size=patch_size,
         step_size=effective_step_size,
+        target_magnification=int(target_mag),
         tissue_area_thresh=tissue_thresh,
         require_all_points=require_all_points,
         white_thresh=white_thresh,
@@ -419,6 +428,7 @@ def process(
                         "fast_mode": fast_mode,
                         "save_images": save_images,
                         "h5_images": h5_images,
+                        "target_mag": int(target_mag),
                     }
 
                     if visualize:
@@ -427,7 +437,6 @@ def process(
                                 hdf5_path=result_h5,
                                 wsi_path=wsi_file,
                                 output_dir=str(vis_output_dir),
-                                patch_size=patch_size,
                                 processing_time=processing_time,
                                 cli_args=cli_args_dict,
                             )
@@ -437,22 +446,6 @@ def process(
                             if verbose:
                                 raise
 
-                    if show_random_patches is not None:
-                        try:
-                            # Determine if we need to pass wsi_path
-                            wsi_path_arg = None if h5_images else wsi_file
-
-                            random_vis_path = visualize_random_patches(
-                                hdf5_path=result_h5,
-                                output_dir=str(vis_output_dir),
-                                wsi_path=wsi_path_arg,
-                                n_patches=show_random_patches,
-                            )
-                            logger.info(f"Random patches visualization saved to: {random_vis_path}")
-                        except Exception as e:
-                            logger.error(f"Failed to generate random patches visualization: {e}")
-                            if verbose:
-                                raise
                 else:
                     logger.warning(f"No patches extracted from {Path(wsi_file).name}")
 
@@ -499,7 +492,9 @@ def info():
     click.echo("    - 'imgs': (N, H, W, 3) uint8 RGB patches (optional)")
     click.echo("    - 'coords': (N, 2) int32 (x, y) coordinates")
     click.echo("    - 'coords_ext': (N, 5) int32 (x, y, w, h, level)")
-    click.echo("    - Metadata: patch_size, wsi_path, num_patches")
+    click.echo(
+        "    - Metadata: patch_size, wsi_path, num_patches, level0_magnification, target_magnification, patch_size_level0"
+    )
     click.echo("  • Optional PNG patches in 'images/' subdirectory")
 
     click.echo("\n" + "=" * 70 + "\n")

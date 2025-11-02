@@ -16,6 +16,7 @@ class PatchifyParams:
     """Patch extraction configuration."""
 
     patch_size: int
+    target_magnification: int
     step_size: int | None = None  # Defaults to patch_size when None
     tissue_area_thresh: float = 0.01
     require_all_points: bool = False
@@ -66,7 +67,7 @@ def segment_and_patchify(
 
     Required parameters:
     - seg: SegmentParams (checkpoint, config, device, thumbnail_max)
-    - patch: PatchifyParams (patch_size required; step_size defaults to patch_size if None)
+    - patch: PatchifyParams (patch_size and target_magnification required; step_size defaults to patch_size if None)
 
     Behavior:
     - If `save_images` is True, PNGs are saved under `<output_dir>/<stem>/images/`.
@@ -107,6 +108,7 @@ def segment_and_patchify(
     extractor = PatchExtractor(
         patch_size=patch.patch_size,
         step_size=patch.step_size,
+        target_mag=patch.target_magnification,
         white_thresh=patch.white_thresh,
         black_thresh=patch.black_thresh,
         use_padding=patch.use_padding,

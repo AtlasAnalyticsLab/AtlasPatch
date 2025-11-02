@@ -19,6 +19,7 @@ from slide_processor.wsi.iwsi import IWSI
 class PatchExtractor:
     """Patch extraction over tissue contours."""
 
+    target_mag: int
     patch_size: int = 256
     step_size: int = 256
     white_thresh: int = 15
@@ -27,24 +28,70 @@ class PatchExtractor:
     center_shift: float = 0.5
     require_all_points: bool = False  # True -> hard, False -> easy
 
-    def _point_in_holes(self, pt: tuple[int, int], holes: Sequence[np.ndarray]) -> bool:
-        cx = pt[0] + self.patch_size // 2
-        cy = pt[1] + self.patch_size // 2
+    def _point_in_holes(
+        self, pt: tuple[int, int], holes: Sequence[np.ndarray], patch_size_src: int
+    ) -> bool:
+        cx = pt[0] + patch_size_src // 2
+        cy = pt[1] + patch_size_src // 2
         for hole in holes:
             if cv2.pointPolygonTest(hole, (cx, cy), False) > 0:
                 return True
         return False
 
     def _in_tissue(
-        self, pt: tuple[int, int], contour: np.ndarray, holes: Sequence[np.ndarray]
+        self,
+        pt: tuple[int, int],
+        contour: np.ndarray,
+        holes: Sequence[np.ndarray],
+        *,
+        patch_size_src: int,
     ) -> bool:
         check_fn = FourPointContainment(
             contour=contour,
-            patch_size=self.patch_size,
+            patch_size=patch_size_src,
             center_shift=self.center_shift,
             require_all=self.require_all_points,
         )
-        return check_fn(pt) and not self._point_in_holes(pt, holes)
+        return check_fn(pt) and not self._point_in_holes(pt, holes, patch_size_src)
+
+    def _prepare_geometry(self, wsi: IWSI) -> tuple[int, tuple[int, int], int, int]:
+        """Compute reading geometry for multi-resolution extraction.
+
+        Returns: (level, read_wh, patch_size_src_level0, step_size_src_level0)
+        - level: pyramid level to read from
+        - read_wh: (w, h) size to read at that level
+        - patch_size_src_level0: patch footprint at level 0 (in px)
+        - step_size_src_level0: step/stride footprint at level 0 (in px)
+        """
+        # Determine source and target magnifications
+        src_mag = wsi.mag
+        tgt_mag = self.target_mag
+        if src_mag is None:
+            raise ValueError(
+                "Target magnification requested but WSI base magnification is unknown."
+            )
+        if int(tgt_mag) > int(src_mag):
+            raise ValueError(
+                f"Requested magnification {tgt_mag}x is higher than available {src_mag}x."
+            )
+        desired_downsample = float(src_mag) / float(tgt_mag)
+
+        # Determine best pyramid level
+        level, _ = wsi.optimal_level(desired_downsample)
+
+        # Level downsample factor
+        downsamples = wsi.ds or [1.0]
+        level_ds = float(downsamples[level])
+
+        # Patch and step footprints at level 0
+        ps_src = int(round(self.patch_size * desired_downsample))
+        ss_src = int(round(self.step_size * desired_downsample))
+
+        # Read size at computed level
+        read_w = max(1, int(round(ps_src / level_ds)))
+        read_h = read_w
+
+        return level, (read_w, read_h), ps_src, ss_src
 
     def iter_patches(
         self,
@@ -53,7 +100,7 @@ class PatchExtractor:
         holes: Sequence[np.ndarray],
         *,
         fast_mode: bool = False,
-    ) -> Iterable[tuple[int, int, np.ndarray]]:
+    ) -> Iterable[tuple[int, int, np.ndarray, tuple[int, int, int]]]:
         """Iterate (x, y, patch_rgb) for patches within the given contour.
 
         When fast_mode=True, skips white/black content filtering.
@@ -61,24 +108,30 @@ class PatchExtractor:
         x0, y0, ww, hh = cv2.boundingRect(contour)
         W, H = wsi.get_size(lv=0)
 
+        # Geometry according to requested magnification
+        level, read_wh, ps_src, ss_src = self._prepare_geometry(wsi)
+        read_w, read_h = read_wh
+
         if self.use_padding:
             stop_x = x0 + ww
             stop_y = y0 + hh
         else:
-            stop_x = min(x0 + ww, W - self.patch_size)
-            stop_y = min(y0 + hh, H - self.patch_size)
+            stop_x = min(x0 + ww, W - ps_src)
+            stop_y = min(y0 + hh, H - ps_src)
 
-        for y in range(y0, stop_y, self.step_size):
-            for x in range(x0, stop_x, self.step_size):
-                if not self._in_tissue((x, y), contour, holes):
+        for y in range(y0, stop_y, ss_src):
+            for x in range(x0, stop_x, ss_src):
+                if not self._in_tissue((x, y), contour, holes, patch_size_src=ps_src):
                     continue
 
-                patch_any = wsi.extract(
-                    (x, y), lv=0, wh=(self.patch_size, self.patch_size), mode="array"
-                )
+                patch_any = wsi.extract((x, y), lv=level, wh=(read_w, read_h), mode="array")
                 if patch_any is None or not isinstance(patch_any, np.ndarray):
                     continue
                 patch = cast(np.ndarray, patch_any)
+
+                # Resize to target output patch size if needed
+                if patch.shape[0] != self.patch_size or patch.shape[1] != self.patch_size:
+                    patch = cv2.resize(patch, (self.patch_size, self.patch_size))
 
                 # Filter out uninformative patches unless in fast mode
                 if not fast_mode:
@@ -87,7 +140,7 @@ class PatchExtractor:
                     if is_white_patch(patch, sat_thresh=self.white_thresh):
                         continue
 
-                yield x, y, patch
+                yield x, y, patch, (read_w, read_h, level)
 
     def extract_to_h5(
         self,
@@ -152,7 +205,18 @@ class PatchExtractor:
             mode = "w" if first_write else "a"
             file_attrs = None
             if first_write:
-                file_attrs = {"patch_size": int(self.patch_size), "wsi_path": wsi.path}
+                src_mag = wsi.mag
+                tgt_mag = self.target_mag
+                assert src_mag is not None, "WSI base magnification is required to write metadata"
+                patch_size_level0 = int(self.patch_size * int(src_mag) // int(tgt_mag))
+
+                file_attrs = {
+                    "patch_size": int(self.patch_size),
+                    "wsi_path": wsi.path,
+                    "level0_magnification": int(src_mag),
+                    "target_magnification": int(tgt_mag),
+                    "patch_size_level0": int(patch_size_level0),
+                }
 
             # Build payload according to configuration
             assets: dict[str, np.ndarray] = {"coords": coords, "coords_ext": coords_ext}
@@ -168,6 +232,8 @@ class PatchExtractor:
             buf_ext.clear()
 
         for cont, holes in zip(tissue_contours, holes_contours):
+            level, (read_w, read_h), ps_src, ss_src = self._prepare_geometry(wsi)
+
             if fast_mode and not store_images:
                 # Coordinate-only fast path: avoid reading patches entirely
                 x0, y0, ww, hh = cv2.boundingRect(cont)
@@ -176,25 +242,27 @@ class PatchExtractor:
                     stop_x = x0 + ww
                     stop_y = y0 + hh
                 else:
-                    stop_x = min(x0 + ww, W - self.patch_size)
-                    stop_y = min(y0 + hh, H - self.patch_size)
+                    stop_x = min(x0 + ww, W - ps_src)
+                    stop_y = min(y0 + hh, H - ps_src)
 
-                for y in range(y0, stop_y, self.step_size):
-                    for x in range(x0, stop_x, self.step_size):
-                        if not self._in_tissue((x, y), cont, holes):
+                for y in range(y0, stop_y, ss_src):
+                    for x in range(x0, stop_x, ss_src):
+                        if not self._in_tissue((x, y), cont, holes, patch_size_src=ps_src):
                             continue
                         buf_xy.append((x, y))
-                        buf_ext.append((x, y, int(self.patch_size), int(self.patch_size), 0))
+                        buf_ext.append((x, y, int(read_w), int(read_h), int(level)))
                         flush_count = len(buf_xy)
                         if flush_count >= batch:
                             flush()
                             first_write = False
             else:
-                for x, y, patch in self.iter_patches(wsi, cont, holes, fast_mode=fast_mode):
+                for x, y, patch, (rw, rh, lv) in self.iter_patches(
+                    wsi, cont, holes, fast_mode=fast_mode
+                ):
                     if store_images:
                         buf_imgs.append(patch)
                     buf_xy.append((x, y))
-                    buf_ext.append((x, y, int(self.patch_size), int(self.patch_size), 0))
+                    buf_ext.append((x, y, int(rw), int(rh), int(lv)))
 
                     # Decide flush condition based on whether images are persisted
                     flush_count = len(buf_imgs) if store_images else len(buf_xy)
@@ -229,10 +297,18 @@ class PatchExtractor:
                         coords_d = f["coords"]
                         for i in range(int(coords_d.shape[0])):
                             x, y = (int(v) for v in coords_d[i])
-                            arr_any = wsi.extract(
-                                (x, y), lv=0, wh=(self.patch_size, self.patch_size), mode="array"
-                            )
+                            # Use coords_ext to recover proper read size/level
+                            rw, rh, lv = (int(v) for v in f["coords_ext"][i][2:5])
+                            arr_any = wsi.extract((x, y), lv=lv, wh=(rw, rh), mode="array")
                             if isinstance(arr_any, np.ndarray):
+                                # Resize to target patch size for consistency
+                                if (
+                                    arr_any.shape[0] != self.patch_size
+                                    or arr_any.shape[1] != self.patch_size
+                                ):
+                                    arr_any = cv2.resize(
+                                        arr_any, (self.patch_size, self.patch_size)
+                                    )
                                 out_name = f"{stem}_x{x}_y{y}.png"
                                 Image.fromarray(arr_any).save(str(patch_imgs_dir / out_name))
 
