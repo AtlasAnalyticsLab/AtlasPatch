@@ -7,11 +7,11 @@ from pathlib import Path
 from typing import Any
 
 import h5py
-import matplotlib.patches as mpatches
-import matplotlib.pyplot as plt
 import numpy as np
 import openslide
-from matplotlib.collections import PatchCollection
+from PIL import Image, ImageDraw, ImageFont
+from PIL.ImageFont import FreeTypeFont
+from PIL.ImageFont import ImageFont as PILImageFont
 
 logger = logging.getLogger(__name__)
 
@@ -68,84 +68,108 @@ def visualize_patches_on_thumbnail(
     # Load WSI and get thumbnail
     wsi = openslide.OpenSlide(wsi_path)
     thumbnail = wsi.get_thumbnail((1024, 1024))
-    thumbnail_image = np.array(thumbnail)
+    thumbnail_image = thumbnail.convert("RGB")
     wsi_dims = wsi.dimensions
     wsi.close()
 
     # Calculate downsample factors
-    downsample_x = wsi_dims[0] / thumbnail_image.shape[1]
-    downsample_y = wsi_dims[1] / thumbnail_image.shape[0]
+    downsample_x = wsi_dims[0] / thumbnail_image.width
+    downsample_y = wsi_dims[1] / thumbnail_image.height
 
     # Scale coordinates to thumbnail space
-    coords_thumb = coords.astype(np.float32).copy()
+    coords_thumb = coords.astype(np.float32)
     coords_thumb[:, 0] = coords_thumb[:, 0] / downsample_x
     coords_thumb[:, 1] = coords_thumb[:, 1] / downsample_y
     patch_size_thumb_x = patch_size / downsample_x
     patch_size_thumb_y = patch_size / downsample_y
 
-    # Create figure with single subplot
-    fig, ax = plt.subplots(figsize=(14, 12))
-    ax.imshow(thumbnail_image)
+    # Draw rectangles directly on thumbnail
+    draw = ImageDraw.Draw(thumbnail_image, "RGBA")
 
-    # Draw all patch rectangles efficiently using PatchCollection
-    patches = [
-        mpatches.Rectangle(
-            (coord[0], coord[1]),
-            patch_size_thumb_x,
-            patch_size_thumb_y,
-        )
-        for coord in coords_thumb
-    ]
-    pc = PatchCollection(
-        patches,
-        edgecolors="lime",
-        facecolors="none",
-        alpha=0.6,
-        linewidths=0.5,
-    )
-    ax.add_collection(pc)
-    ax.axis("off")
+    # Draw all patches as green rectangles
+    for coord in coords_thumb:
+        x0 = int(coord[0])
+        y0 = int(coord[1])
+        x1 = int(coord[0] + patch_size_thumb_x)
+        y1 = int(coord[1] + patch_size_thumb_y)
+
+        # Draw green rectangle with transparent fill
+        draw.rectangle(((x0, y0), (x1, y1)), outline=(0, 255, 0), width=1)
 
     # Build information text
     info_lines = []
-    info_lines.append(f"  Patches Extracted: {num_patches}")
-    info_lines.append(f"  WSI Size: {wsi_dims[0]} x {wsi_dims[1]}")
+    info_lines.append(f"Patches Extracted: {num_patches}")
+    info_lines.append(f"WSI Size: {wsi_dims[0]} x {wsi_dims[1]}")
 
     # Parameters used
     if cli_args is not None:
-        info_lines.append(f"  Patch Size: {cli_args.get('patch_size', 'N/A')}")
-        info_lines.append(f"  Step Size: {cli_args.get('step_size', 'N/A')}")
-        info_lines.append(f"  Thumbnail Size: {cli_args.get('thumbnail_size', 'N/A')}")
-        info_lines.append(f"  Tissue Threshold: {cli_args.get('tissue_thresh', 'N/A')}")
+        info_lines.append(f"Patch Size: {cli_args.get('patch_size', 'N/A')}")
+        info_lines.append(f"Step Size: {cli_args.get('step_size', 'N/A')}")
+        info_lines.append(f"Tissue Threshold: {cli_args.get('tissue_thresh', 'N/A')}")
 
     info_text = "\n".join(info_lines)
 
-    # Add text to top-right corner of the image
-    ax.text(
-        0.98,
-        0.98,
-        info_text,
-        transform=ax.transAxes,
-        fontsize=10,
-        verticalalignment="top",
-        horizontalalignment="right",
-        family="monospace",
-        bbox={
-            "boxstyle": "round,pad=0.8",
-            "facecolor": "white",
-            "alpha": 0.9,
-            "edgecolor": "black",
-            "linewidth": 1.5,
-        },
-    )
-    plt.tight_layout()
+    # Draw info box in top-right corner
+    _draw_info_box(thumbnail_image, info_text)
 
+    # Save the image
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     stem = Path(wsi_path).stem
     output_path = out_dir / f"{stem}.png"
-    plt.savefig(output_path, dpi=200, bbox_inches="tight")
-    plt.close()
+    thumbnail_image.save(output_path, quality=95)
 
     logger.info(f"Saved patch overlay visualization: {output_path}")
     return str(output_path)
+
+
+def _draw_info_box(image: Image.Image, text: str, padding: int = 10) -> None:
+    """
+    Draw a semi-transparent white box with text in the top-right corner of the image.
+
+    Parameters
+    ----------
+    image : Image.Image
+        PIL Image object to draw on (modified in-place).
+    text : str
+        Multi-line text to display in the box.
+    padding : int
+        Padding around text in pixels.
+    """
+    draw = ImageDraw.Draw(image, "RGBA")
+
+    # Try to use a default font, fall back to default if not available
+    font: FreeTypeFont | PILImageFont
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 12)
+    except OSError:
+        font = ImageFont.load_default()
+
+    # Calculate text bounding box
+    lines = text.split("\n")
+    line_height = 16
+    max_width = 0
+
+    for line in lines:
+        bbox = draw.textbbox((0, 0), line, font=font)
+        line_width = bbox[2] - bbox[0]
+        max_width = max(max_width, line_width)
+
+    text_height = len(lines) * line_height
+    box_width = max_width + 2 * padding
+    box_height = text_height + 2 * padding
+
+    # Position in top-right corner
+    x1 = image.width - box_width - 10
+    y1 = 10
+    x2 = image.width - 10
+    y2 = y1 + box_height
+
+    # Draw semi-transparent white rectangle
+    draw.rectangle(((x1, y1), (x2, y2)), fill=(255, 255, 255, 230), outline=(0, 0, 0, 255), width=2)
+
+    # Draw text
+    text_x = x1 + padding
+    text_y = y1 + padding
+    for i, line in enumerate(lines):
+        draw.text((text_x, text_y + i * line_height), line, fill=(0, 0, 0, 255), font=font)
