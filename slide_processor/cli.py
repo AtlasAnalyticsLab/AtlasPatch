@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import time
 from pathlib import Path
 
 import click
@@ -397,8 +398,44 @@ def process(
                 logger.error(f"Failed to process {Path(wsi_file).name}: {e}")
                 raise
     else:
-        with click.progressbar(wsi_files, label="Processing WSI files") as pbar:
-            for wsi_file in pbar:
+        # Quiet mode: tqdm-like bar with processed/left, elapsed/ETA, and avg s/it
+        start_time = time.monotonic()
+
+        def _fmt_duration(s: float) -> str:
+            s = max(0.0, float(s))
+            m, sec = divmod(int(s + 0.5), 60)
+            h, min_ = divmod(m, 60)
+            if h > 0:
+                return f"{h:02d}:{min_:02d}:{sec:02d}"
+            return f"{min_:02d}:{sec:02d}"
+
+        def _show_item(item: tuple[int, str] | None) -> str:
+            if not item:
+                return ""
+            i = int(item[0])
+            done = i - 1
+            left = num_files - done
+            now = time.monotonic()
+            if done > 0:
+                elapsed = now - start_time
+                avg = elapsed / done
+                eta = avg * left
+                avg_str = f"{avg:.2f}s/it"
+                eta_str = _fmt_duration(eta)
+                elapsed_str = _fmt_duration(elapsed)
+            else:
+                avg_str = "– s/it"
+                eta_str = "--:--"
+                elapsed_str = "00:00"
+            return f"{done}/{num_files} [{elapsed_str}<{eta_str}, {avg_str}]"
+
+        with click.progressbar(
+            enumerate(wsi_files, start=1),
+            length=num_files,
+            label="Processing WSI files",
+            item_show_func=_show_item,
+        ) as pbar:
+            for _, wsi_file in pbar:
                 try:
                     stem = Path(wsi_file).stem
                     existing_h5 = output_path / "patches" / f"{stem}.h5"
