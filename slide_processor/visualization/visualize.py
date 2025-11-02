@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import warnings
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +11,7 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 import openslide
+from matplotlib.collections import PatchCollection
 
 logger = logging.getLogger(__name__)
 
@@ -20,15 +20,13 @@ def visualize_patches_on_thumbnail(
     hdf5_path: str,
     wsi_path: str,
     output_dir: str,
-    processing_time: float | None = None,
     cli_args: dict[str, Any] | None = None,
 ) -> str:
     """
     Visualize patch locations overlaid on WSI thumbnail with processing information.
 
-    Creates a figure with the WSI thumbnail showing extracted patch locations as green
-    rectangles, alongside an information panel displaying extraction statistics and
-    processing parameters.
+    Creates a single image with the WSI thumbnail showing extracted patch locations as
+    green rectangles, with an information panel overlaid in the top-right corner.
 
     Parameters
     ----------
@@ -38,8 +36,6 @@ def visualize_patches_on_thumbnail(
         Path to the whole slide image file.
     output_dir : str
         Directory where the visualization image will be saved.
-    processing_time : float | None, default None
-        Time taken for patch extraction in seconds. If provided, displayed in info box.
     cli_args : dict[str, Any] | None, default None
         Dictionary of CLI arguments used for extraction. If provided, key parameters
         are displayed in the info box.
@@ -87,88 +83,62 @@ def visualize_patches_on_thumbnail(
     patch_size_thumb_x = patch_size / downsample_x
     patch_size_thumb_y = patch_size / downsample_y
 
-    # Create figure with two subplots: thumbnail + info box
-    fig = plt.figure(figsize=(18, 12))
-    gs = fig.add_gridspec(1, 2, width_ratios=[3, 1], wspace=0.05)
+    # Create figure with single subplot
+    fig, ax = plt.subplots(figsize=(14, 12))
+    ax.imshow(thumbnail_image)
 
-    # Left subplot: Thumbnail with patches
-    ax_img = fig.add_subplot(gs[0])
-    ax_img.imshow(thumbnail_image)
-
-    # Draw all patch rectangles
-    for coord in coords_thumb:
-        rect = mpatches.Rectangle(
+    # Draw all patch rectangles efficiently using PatchCollection
+    patches = [
+        mpatches.Rectangle(
             (coord[0], coord[1]),
             patch_size_thumb_x,
             patch_size_thumb_y,
-            linewidth=0.5,
-            edgecolor="lime",
-            facecolor="none",
-            alpha=0.6,
         )
-        ax_img.add_patch(rect)
-
-    ax_img.set_title(
-        f"Patch Locations on WSI Thumbnail\n{num_patches} patches extracted",
-        fontsize=16,
-        fontweight="bold",
+        for coord in coords_thumb
+    ]
+    pc = PatchCollection(
+        patches,
+        edgecolors="lime",
+        facecolors="none",
+        alpha=0.6,
+        linewidths=0.5,
     )
-    ax_img.axis("off")
-
-    # Right subplot: Information panel
-    ax_info = fig.add_subplot(gs[1])
-    ax_info.axis("off")
+    ax.add_collection(pc)
+    ax.axis("off")
 
     # Build information text
     info_lines = []
-    info_lines.append("Processing Information")
-    info_lines.append("=" * 30)
-    info_lines.append("")
-
-    # Basic statistics
-    info_lines.append("Extraction Results:")
     info_lines.append(f"  Patches Extracted: {num_patches}")
     info_lines.append(f"  WSI Size: {wsi_dims[0]} x {wsi_dims[1]}")
 
-    if processing_time is not None:
-        info_lines.append(f"  Time Taken: {processing_time:.2f}s")
-
     # Parameters used
     if cli_args is not None:
-        info_lines.append("")
-        info_lines.append("Parameters Used:")
         info_lines.append(f"  Patch Size: {cli_args.get('patch_size', 'N/A')}")
         info_lines.append(f"  Step Size: {cli_args.get('step_size', 'N/A')}")
         info_lines.append(f"  Thumbnail Size: {cli_args.get('thumbnail_size', 'N/A')}")
-        info_lines.append(f"  Device: {cli_args.get('device', 'N/A')}")
         info_lines.append(f"  Tissue Threshold: {cli_args.get('tissue_thresh', 'N/A')}")
-        info_lines.append(f"  White Threshold: {cli_args.get('white_thresh', 'N/A')}")
-        info_lines.append(f"  Black Threshold: {cli_args.get('black_thresh', 'N/A')}")
-        info_lines.append(f"  Require All Points: {cli_args.get('require_all_points', 'N/A')}")
-        info_lines.append(f"  Use Padding: {cli_args.get('use_padding', 'N/A')}")
-        info_lines.append(f"  Fast Mode: {cli_args.get('fast_mode', 'N/A')}")
-        info_lines.append(f"  Save Images: {cli_args.get('save_images', 'N/A')}")
-        info_lines.append(f"  Store H5 Images: {cli_args.get('h5_images', 'N/A')}")
 
     info_text = "\n".join(info_lines)
 
-    # Add text to info panel with left alignment
-    ax_info.text(
-        0.05,
-        0.95,
+    # Add text to top-right corner of the image
+    ax.text(
+        0.98,
+        0.98,
         info_text,
-        transform=ax_info.transAxes,
-        fontsize=11,
+        transform=ax.transAxes,
+        fontsize=10,
         verticalalignment="top",
-        horizontalalignment="left",
+        horizontalalignment="right",
         family="monospace",
-        bbox={"boxstyle": "round,pad=1", "facecolor": "lightgray", "alpha": 0.8},
+        bbox={
+            "boxstyle": "round,pad=0.8",
+            "facecolor": "white",
+            "alpha": 0.9,
+            "edgecolor": "black",
+            "linewidth": 1.5,
+        },
     )
-
-    # Suppress tight_layout warning for axes with text boxes
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", message=".*tight_layout.*")
-        plt.tight_layout()
+    plt.tight_layout()
 
     # Save visualization
     output_path = Path(output_dir) / "patches_on_thumbnail.png"
