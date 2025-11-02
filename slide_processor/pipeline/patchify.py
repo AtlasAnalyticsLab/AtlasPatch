@@ -60,6 +60,7 @@ def segment_and_patchify(
     predict_fn: Callable[[Any], np.ndarray] | None = None,
     thumb_max: int | None = None,
     mask_override: np.ndarray | None = None,
+    write_batch: int = 8192,
 ) -> str | None:
     """High-level pipeline: segment tissue and patchify WSI into an HDF5 file.
 
@@ -129,7 +130,7 @@ def segment_and_patchify(
         out_h5,
         image_output_dir=img_dir,
         fast_mode=fast_mode,
-        batch=512,
+        batch=write_batch,
     )
 
     try:

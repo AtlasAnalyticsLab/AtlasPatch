@@ -10,7 +10,7 @@ import numpy as np
 from PIL import Image
 
 from slide_processor.utils.contours import FourPointContainment
-from slide_processor.utils.h5 import save_h5
+from slide_processor.utils.h5 import H5AppendWriter
 from slide_processor.utils.image import is_black_patch, is_white_patch
 from slide_processor.wsi.iwsi import IWSI
 
@@ -147,7 +147,7 @@ class PatchExtractor:
         fast_mode: bool = False,
         batch: int = 512,
     ) -> str | None:
-        """Extract patches and save to HDF5 using utils.save_h5.
+        """Extract patches and save to HDF5.
 
         Datasets:
           - "coords": (N, 2) int32  (x, y)
@@ -156,7 +156,6 @@ class PatchExtractor:
         """
         logger = logging.getLogger("slide_processor.patch_extractor")
         total = 0
-        first_write = True
         patch_imgs_dir: Path | None = None
         stem = Path(wsi.path).stem
         logger.info(f"{stem}: start extraction (batch={batch}, fast_mode={fast_mode})")
@@ -169,44 +168,43 @@ class PatchExtractor:
         buf_xy: list[tuple[int, int]] = []
         buf_ext: list[tuple[int, int, int, int, int]] = []
 
+        # Always use atomic H5 writer; initialize up-front
+        writer: H5AppendWriter = H5AppendWriter(output_path, chunk_rows=max(1, int(batch)))
+        src_mag = wsi.mag
+        tgt_mag = self.target_mag
+        assert src_mag is not None, "WSI base magnification is required to write metadata"
+        patch_size_level0 = int(self.patch_size * int(src_mag) // int(tgt_mag))
+
+        # Create empty datasets (with attributes) so file exists even with zero patches
+        empty_coords = np.empty((0, 2), dtype=np.int32)
+        empty_coords_ext = np.empty((0, 5), dtype=np.int32)
+        dset_attrs = {
+            "coords": {"description": "(x, y) coordinates at level 0"},
+            "coords_ext": {
+                "description": "(x, y, w, h, level) at extraction",
+            },
+        }
+        writer.append(
+            {"coords": empty_coords, "coords_ext": empty_coords_ext}, attributes=dset_attrs
+        )
+        writer.update_file_attrs(
+            {
+                "patch_size": int(self.patch_size),
+                "wsi_path": wsi.path,
+                "level0_magnification": int(src_mag),
+                "target_magnification": int(tgt_mag),
+                "patch_size_level0": int(patch_size_level0),
+            }
+        )
+
         def flush() -> None:
-            nonlocal first_write, total
+            nonlocal total
             if not buf_xy:
                 return
             # Prepare buffers
             coords = np.asarray(buf_xy, dtype=np.int32)
             coords_ext = np.asarray(buf_ext, dtype=np.int32)
-            attrs = (
-                {
-                    "coords": {"description": "(x, y) coordinates at level 0"},
-                    "coords_ext": {
-                        "description": "(x, y, w, h, level) at extraction",
-                    },
-                }
-                if first_write
-                else None
-            )
-
-            mode = "w" if first_write else "a"
-            file_attrs = None
-            if first_write:
-                src_mag = wsi.mag
-                tgt_mag = self.target_mag
-                assert src_mag is not None, "WSI base magnification is required to write metadata"
-                patch_size_level0 = int(self.patch_size * int(src_mag) // int(tgt_mag))
-
-                file_attrs = {
-                    "patch_size": int(self.patch_size),
-                    "wsi_path": wsi.path,
-                    "level0_magnification": int(src_mag),
-                    "target_magnification": int(tgt_mag),
-                    "patch_size_level0": int(patch_size_level0),
-                }
-
-            # Build payload according to configuration
-            assets: dict[str, np.ndarray] = {"coords": coords, "coords_ext": coords_ext}
-
-            save_h5(output_path, assets, attributes=attrs, mode=mode, file_attrs=file_attrs)
+            writer.append({"coords": coords, "coords_ext": coords_ext})
 
             total += int(coords.shape[0])
             buf_xy.clear()
@@ -232,7 +230,6 @@ class PatchExtractor:
                         flush_count = len(buf_xy)
                         if flush_count >= batch:
                             flush()
-                            first_write = False
             else:
                 for x, y, _, (rw, rh, lv) in self.iter_patches(
                     wsi, cont, holes, fast_mode=fast_mode
@@ -244,37 +241,42 @@ class PatchExtractor:
                     flush_count = len(buf_xy)
                     if flush_count >= batch:
                         flush()
-                        first_write = False
 
-        # final flush
-        flush()
-        if not first_write:
-            # write final attrs
-            save_h5(output_path, {}, mode="a", file_attrs={"num_patches": int(total)})
+        # final flush with cleanup handling
+        try:
+            flush()
+            # finalize attributes and close the file (atomic rename)
+            writer.update_file_attrs({"num_patches": int(total)})
+            writer.close()
+        except Exception:
+            # Abort and cleanup temp file on error during finalization
+            try:
+                writer.abort()
+            except Exception:
+                pass
+            raise
 
-            # optional image export (read back from file for consistency)
-            if patch_imgs_dir is not None and total > 0:
-                # Read coords from H5 and re-extract
-                import h5py
+        # optional image export (read back from file for consistency)
+        if patch_imgs_dir is not None and total > 0:
+            # Read coords from H5 and re-extract
+            import h5py
 
-                with h5py.File(output_path, "r") as f:
-                    coords_d = f["coords"]
-                    for i in range(int(coords_d.shape[0])):
-                        x, y = (int(v) for v in coords_d[i])
-                        # Use coords_ext to recover proper read size/level
-                        rw, rh, lv = (int(v) for v in f["coords_ext"][i][2:5])
-                        arr_any = wsi.extract((x, y), lv=lv, wh=(rw, rh), mode="array")
-                        if isinstance(arr_any, np.ndarray):
-                            # Resize to target patch size for consistency
-                            if (
-                                arr_any.shape[0] != self.patch_size
-                                or arr_any.shape[1] != self.patch_size
-                            ):
-                                arr_any = cv2.resize(arr_any, (self.patch_size, self.patch_size))
-                            out_name = f"{stem}_x{x}_y{y}.png"
-                            Image.fromarray(arr_any).save(str(patch_imgs_dir / out_name))
+            with h5py.File(output_path, "r") as f:
+                coords_d = f["coords"]
+                for i in range(int(coords_d.shape[0])):
+                    x, y = (int(v) for v in coords_d[i])
+                    # Use coords_ext to recover proper read size/level
+                    rw, rh, lv = (int(v) for v in f["coords_ext"][i][2:5])
+                    arr_any = wsi.extract((x, y), lv=lv, wh=(rw, rh), mode="array")
+                    if isinstance(arr_any, np.ndarray):
+                        # Resize to target patch size for consistency
+                        if (
+                            arr_any.shape[0] != self.patch_size
+                            or arr_any.shape[1] != self.patch_size
+                        ):
+                            arr_any = cv2.resize(arr_any, (self.patch_size, self.patch_size))
+                        out_name = f"{stem}_x{x}_y{y}.png"
+                        Image.fromarray(arr_any).save(str(patch_imgs_dir / out_name))
 
-            logger.info(f"{stem}: extraction complete, total patches={total}")
-            return output_path
-
-        return None
+        logger.info(f"{stem}: extraction complete, total patches={total}")
+        return output_path
