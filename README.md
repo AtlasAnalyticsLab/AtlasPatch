@@ -119,7 +119,6 @@ Main command for processing whole slide images with tissue segmentation and patc
 | `--require-all-points` | flag | False | No | Require all 4 corner points inside tissue (strict mode) |
 | `--use-padding` | flag | True | No | Allow patches at image boundaries with padding |
 | `--save-images` | flag | False | No | Export individual patch images as PNG files in `/images` folder |
-| `--h5-images/--no-h5-images` | flag | `--h5-images` | No | Store image arrays in the HDF5 file (`imgs` dataset). Disable to save only coordinates + metadata |
 | `--fast-mode` | flag | False | No | Skip per-patch content filtering for faster extraction (may include background patches) |
 | `--visualize` | flag | False | No | Generate visualization of patches overlaid on WSI thumbnail with processing info |
 | `--verbose/-v` | flag | False | No | Enable verbose logging output |
@@ -259,7 +258,6 @@ Each processed slide produces a single HDF5 file under `<output>/<stem>/<stem>.h
 - Datasets
   - `coords`: int32 shape `(N, 2)` containing `(x, y)` at level 0
   - `coords_ext`: int32 shape `(N, 5)` containing `(x, y, w, h, level)` for reliable re-reading
-  - `imgs`: uint8 shape `(N, H, W, 3)` RGB patches (optional; present only when `--h5-images` is enabled)
 - File attributes
   - `patch_size`: int (target patch size)
   - `wsi_path`: original WSI path
@@ -268,12 +266,11 @@ Each processed slide produces a single HDF5 file under `<output>/<stem>/<stem>.h
   - `target_magnification`: magnification used for extraction
   - `patch_size_level0`: size of the patch footprint at level 0 in pixels. Used by visualizations and downstream tooling.
 
-When images are not stored in the HDF5 (`--no-h5-images`), you can reconstruct any patch by re-reading from the original WSI using `(x, y, w, h, level)` from `coords_ext`.
 
 ### Performance Notes
 
 - The SAM2 predictor is now initialized once and reused across files to reduce per-slide overhead.
-- Enable `--fast-mode` to skip per-patch white/black filtering. This can substantially reduce I/O, especially together with `--no-h5-images`.
+- Enable `--fast-mode` to skip per-patch white/black filtering. This can substantially reduce I/O.
 
 Shows:
 - Supported WSI formats
@@ -290,9 +287,9 @@ output/<wsi_stem>/<wsi_stem>.h5
 ```
 
 Contains:
-- `imgs`: Shape (N, H, W, 3), dtype uint8 - RGB patch images
 - `coords`: Shape (N, 2), dtype int32 - (x, y) coordinates at level 0
-- File attributes: `patch_size`, `wsi_path`, `num_patches`
+- `coords_ext`: Shape (N, 5), dtype int32 - (x, y, w, h, level)
+- File attributes: `patch_size`, `wsi_path`, `num_patches`, `level0_magnification`, `target_magnification`, `patch_size_level0`
 
 **Optional PNG Images** (if `--save-images` is used):
 ```

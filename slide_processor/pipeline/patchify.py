@@ -58,7 +58,6 @@ def segment_and_patchify(
     seg: SegmentParams,
     patch: PatchifyParams,
     save_images: bool = False,
-    store_images: bool = True,
     fast_mode: bool = False,
     predict_fn: Callable[[Any], np.ndarray] | None = None,
     thumb_max: int | None = None,
@@ -128,7 +127,6 @@ def segment_and_patchify(
         holes_contours,
         out_h5,
         image_output_dir=img_dir,
-        store_images=store_images,
         fast_mode=fast_mode,
         batch=512,
     )

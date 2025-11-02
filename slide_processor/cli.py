@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import sys
-import time
 from pathlib import Path
 
 import click
@@ -234,14 +233,6 @@ def cli():
     help="Export individual patch images as PNG files.",
 )
 @click.option(
-    "--h5-images/--no-h5-images",
-    default=True,
-    help=(
-        "Store image arrays in the HDF5 file ('imgs' dataset). "
-        "Disable to save only coordinates + metadata. [default: --h5-images]"
-    ),
-)
-@click.option(
     "--verbose",
     "-v",
     is_flag=True,
@@ -278,7 +269,6 @@ def process(
     require_all_points: bool,
     use_padding: bool,
     save_images: bool,
-    h5_images: bool,
     verbose: bool,
     fast_mode: bool,
     visualize: bool,
@@ -389,22 +379,16 @@ def process(
             try:
                 logger.info(f"Processing: {Path(wsi_file).name}")
 
-                # Track processing time
-                start_time = time.time()
-
                 result_h5 = segment_and_patchify(
                     wsi_path=wsi_file,
                     output_dir=str(output_path),
                     seg=seg_params,
                     patch=patch_params,
                     save_images=save_images,
-                    store_images=h5_images,
                     fast_mode=fast_mode,
                     predict_fn=predict_fn,
                     thumb_max=thumb_max,
                 )
-
-                processing_time = time.time() - start_time
 
                 if result_h5:
                     successful += 1
@@ -427,7 +411,6 @@ def process(
                         "use_padding": use_padding,
                         "fast_mode": fast_mode,
                         "save_images": save_images,
-                        "h5_images": h5_images,
                         "target_mag": int(target_mag),
                     }
 
@@ -437,7 +420,6 @@ def process(
                                 hdf5_path=result_h5,
                                 wsi_path=wsi_file,
                                 output_dir=str(vis_output_dir),
-                                processing_time=processing_time,
                                 cli_args=cli_args_dict,
                             )
                             logger.info(f"Visualization saved to: {vis_path}")
@@ -489,13 +471,12 @@ def info():
 
     click.echo("\nOutput Format:")
     click.echo("  • HDF5 file per WSI containing:")
-    click.echo("    - 'imgs': (N, H, W, 3) uint8 RGB patches (optional)")
     click.echo("    - 'coords': (N, 2) int32 (x, y) coordinates")
     click.echo("    - 'coords_ext': (N, 5) int32 (x, y, w, h, level)")
     click.echo(
         "    - Metadata: patch_size, wsi_path, num_patches, level0_magnification, target_magnification, patch_size_level0"
     )
-    click.echo("  • Optional PNG patches in 'images/' subdirectory")
+    click.echo("  • PNG patches in 'images/' subdirectory when '--save-images' is used")
 
     click.echo("\n" + "=" * 70 + "\n")
 
