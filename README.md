@@ -118,6 +118,7 @@ Main command for processing whole slide images with tissue segmentation and patc
 | `--fast-mode` | flag | False | No | Skip per-patch content filtering for faster extraction (may include background patches) |
 | `--visualize` | flag | False | No | Generate visualization of patches overlaid on WSI thumbnail with processing info |
 | `--verbose/-v` | flag | False | No | Enable verbose logging output |
+| `--seg-batch-size` | int | 1 | No | Batch size for SAM2 thumbnail segmentation when processing a folder; set >1 to enable batched inference |
 
 SAM2 Config
 
@@ -252,6 +253,7 @@ Each processed slide produces a single HDF5 file under `<output>/patches/<stem>.
 
 - The SAM2 predictor is now initialized once and reused across files to reduce per-slide overhead.
 - Enable `--fast-mode` to skip per-patch white/black filtering. This can substantially reduce I/O.
+- When processing a directory, you can enable batched SAM2 thumbnail segmentation via `--seg-batch-size <N>`. This runs SAM2 on N thumbnails at once to improve throughput (GPU memory dependent).
 
 Shows:
 - Supported WSI formats

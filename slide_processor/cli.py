@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import sys
-import time
 from pathlib import Path
 
 import click
@@ -10,12 +9,13 @@ import click
 from slide_processor.pipeline.patchify import (
     PatchifyParams,
     SegmentParams,
-    _build_segmentation_predictor,
     segment_and_patchify,
 )
+from slide_processor.segmentation.sam2_segmentation import SAM2SegmentationModel
 from slide_processor.visualization import (
     visualize_patches_on_thumbnail,
 )
+from slide_processor.wsi import WSIFactory
 
 # Configure logging
 logging.basicConfig(
@@ -228,6 +228,16 @@ def cli():
     default=False,
     help="Generate visualization of patches overlaid on WSI thumbnail with processing info.",
 )
+@click.option(
+    "--seg-batch-size",
+    type=int,
+    default=1,
+    callback=validate_positive_int,
+    help=(
+        "Batch size for SAM2 thumbnail segmentation when processing a folder. "
+        "Set >1 to enable batched inference (experimental). [default: 1]"
+    ),
+)
 def process(
     wsi_path: str,
     checkpoint: str,
@@ -243,6 +253,7 @@ def process(
     fast_mode: bool,
     visualize: bool,
     target_mag: str,
+    seg_batch_size: int,
 ):
     """Process whole slide image(s) with tissue segmentation and patch extraction.
 
@@ -333,10 +344,22 @@ def process(
     successful = 0
     failed = 0
 
-    # Build SAM2 predictor once and reuse across files
-    predict_fn, thumb_max = _build_segmentation_predictor(seg_params)
+    # Build SAM2 model once and reuse across files
+    sam2_model = SAM2SegmentationModel(
+        checkpoint_path=seg_params.checkpoint_path,
+        config_file=seg_params.config_file,
+        device=seg_params.device,
+    )
+
+    def _predict_single(img):
+        return sam2_model.predict_image(img, resize_to_input=True)
+
+    predict_fn = _predict_single
+    thumb_max = seg_params.thumbnail_max
 
     if verbose:
+        # Verbose mode: log per-file, optionally batching segmentation
+        pending: list[str] = []
         for wsi_file in wsi_files:
             try:
                 logger.info(f"Processing: {Path(wsi_file).name}")
@@ -347,145 +370,278 @@ def process(
                     logger.info(f"Skipping {Path(wsi_file).name}: already exists -> {existing_h5}")
                     continue
 
-                result_h5 = segment_and_patchify(
-                    wsi_path=wsi_file,
-                    output_dir=str(output_path),
-                    seg=seg_params,
-                    patch=patch_params,
-                    save_images=save_images,
-                    fast_mode=fast_mode,
-                    predict_fn=predict_fn,
-                    thumb_max=thumb_max,
-                )
+                pending.append(wsi_file)
 
-                if result_h5:
-                    successful += 1
-                    logger.info(f"Saved patches to: {result_h5}")
-
-                    vis_output_dir = output_path / "visualization"
-                    vis_output_dir.mkdir(parents=True, exist_ok=True)
-
-                    cli_args_dict = {
-                        "patch_size": patch_size,
-                        "step_size": effective_step_size,
-                        "thumbnail_size": 1024,
-                        "device": device,
-                        "tissue_thresh": tissue_thresh,
-                        "white_thresh": white_thresh,
-                        "black_thresh": black_thresh,
-                        "fast_mode": fast_mode,
-                        "save_images": save_images,
-                        "target_mag": int(target_mag),
-                    }
-
-                    if visualize:
+                def _process_batch(batch_files: list[str]) -> None:
+                    nonlocal successful, failed
+                    if not batch_files:
+                        return
+                    # Prepare thumbnails
+                    thumbs = []
+                    for f in batch_files:
+                        wsi_tmp = WSIFactory.load(f)
                         try:
-                            vis_path = visualize_patches_on_thumbnail(
-                                hdf5_path=result_h5,
-                                wsi_path=wsi_file,
-                                output_dir=str(vis_output_dir),
-                                cli_args=cli_args_dict,
+                            thumb = wsi_tmp.get_thumb((thumb_max, thumb_max))
+                            thumbs.append(thumb)
+                        finally:
+                            try:
+                                wsi_tmp.cleanup()
+                            except Exception:
+                                pass
+                    # Predict masks (batched when seg_batch_size>1)
+                    try:
+                        if seg_batch_size > 1:
+                            masks = sam2_model.predict_batch(thumbs, resize_to_input=True)
+                        else:
+                            masks = [predict_fn(t) for t in thumbs]
+                    except Exception as e:
+                        logger.error(f"Batch segmentation failed ({len(batch_files)} files): {e}")
+                        # Fallback to per-image
+                        masks = []
+                        for t in thumbs:
+                            try:
+                                masks.append(predict_fn(t))
+                            except Exception as ie:
+                                logger.error(f"Segmentation failed for a thumbnail: {ie}")
+                                masks.append(None)  # type: ignore
+
+                    # Patchify each file with its mask
+                    for f, m in zip(batch_files, masks):
+                        try:
+                            result_h5 = segment_and_patchify(
+                                wsi_path=f,
+                                output_dir=str(output_path),
+                                seg=seg_params,
+                                patch=patch_params,
+                                save_images=save_images,
+                                fast_mode=fast_mode,
+                                predict_fn=predict_fn,
+                                thumb_max=thumb_max,
+                                mask_override=m if m is not None else None,
                             )
-                            logger.info(f"Visualization saved to: {vis_path}")
-                        except Exception as e:
-                            logger.error(f"Failed to generate visualization: {e}")
+
+                            if result_h5:
+                                successful += 1
+                                logger.info(f"Saved patches to: {result_h5}")
+
+                                if visualize:
+                                    vis_output_dir = output_path / "visualization"
+                                    vis_output_dir.mkdir(parents=True, exist_ok=True)
+                                    cli_args_dict = {
+                                        "patch_size": patch_size,
+                                        "step_size": effective_step_size,
+                                        "thumbnail_size": 1024,
+                                        "device": device,
+                                        "tissue_thresh": tissue_thresh,
+                                        "white_thresh": white_thresh,
+                                        "black_thresh": black_thresh,
+                                        "fast_mode": fast_mode,
+                                        "save_images": save_images,
+                                        "target_mag": int(target_mag),
+                                    }
+                                    try:
+                                        vis_path = visualize_patches_on_thumbnail(
+                                            hdf5_path=result_h5,
+                                            wsi_path=f,
+                                            output_dir=str(vis_output_dir),
+                                            cli_args=cli_args_dict,
+                                        )
+                                        logger.info(f"Visualization saved to: {vis_path}")
+                                    except Exception as ve:
+                                        logger.error(f"Failed to generate visualization: {ve}")
+                                        raise
+                            else:
+                                logger.warning(f"No patches extracted from {Path(f).name}")
+                        except Exception as pe:
+                            failed += 1
+                            logger.error(f"Failed to process {Path(f).name}: {pe}")
                             raise
-                else:
-                    logger.warning(f"No patches extracted from {Path(wsi_file).name}")
+
+                # Flush batch
+                if seg_batch_size > 1 and len(pending) >= seg_batch_size:
+                    _process_batch(pending)
+                    pending = []
 
             except Exception as e:
                 failed += 1
                 logger.error(f"Failed to process {Path(wsi_file).name}: {e}")
                 raise
+        # Process any remaining files
+        if pending:
+            try:
+                _process_batch(pending)
+            except Exception:
+                failed += 1
     else:
-        # Quiet mode: tqdm-like bar with processed/left, elapsed/ETA, and avg s/it
-        start_time = time.monotonic()
+        # Quiet mode with batching support and a simple progress bar
+        processed = 0
+        with click.progressbar(length=num_files, label="Processing WSI files") as pbar:
+            pending = []
+            for wsi_file in wsi_files:
+                stem = Path(wsi_file).stem
+                existing_h5 = output_path / "patches" / f"{stem}.h5"
+                if existing_h5.exists():
+                    processed += 1
+                    pbar.update(1)
+                    continue
 
-        def _fmt_duration(s: float) -> str:
-            s = max(0.0, float(s))
-            m, sec = divmod(int(s + 0.5), 60)
-            h, min_ = divmod(m, 60)
-            if h > 0:
-                return f"{h:02d}:{min_:02d}:{sec:02d}"
-            return f"{min_:02d}:{sec:02d}"
+                pending.append(wsi_file)
+                if seg_batch_size > 1 and len(pending) < seg_batch_size:
+                    continue
 
-        def _show_item(item: tuple[int, str] | None) -> str:
-            if not item:
-                return ""
-            i = int(item[0])
-            done = i - 1
-            left = num_files - done
-            now = time.monotonic()
-            if done > 0:
-                elapsed = now - start_time
-                avg = elapsed / done
-                eta = avg * left
-                avg_str = f"{avg:.2f}s/it"
-                eta_str = _fmt_duration(eta)
-                elapsed_str = _fmt_duration(elapsed)
-            else:
-                avg_str = "– s/it"
-                eta_str = "--:--"
-                elapsed_str = "00:00"
-            return f"{done}/{num_files} [{elapsed_str}<{eta_str}, {avg_str}]"
+                # Process current pending batch
+                batch_files = pending
+                pending = []
 
-        with click.progressbar(
-            enumerate(wsi_files, start=1),
-            length=num_files,
-            label="Processing WSI files",
-            item_show_func=_show_item,
-        ) as pbar:
-            for _, wsi_file in pbar:
-                try:
-                    stem = Path(wsi_file).stem
-                    existing_h5 = output_path / "patches" / f"{stem}.h5"
-                    if existing_h5.exists():
-                        continue
-
-                    result_h5 = segment_and_patchify(
-                        wsi_path=wsi_file,
-                        output_dir=str(output_path),
-                        seg=seg_params,
-                        patch=patch_params,
-                        save_images=save_images,
-                        fast_mode=fast_mode,
-                        predict_fn=predict_fn,
-                        thumb_max=thumb_max,
-                    )
-
-                    if result_h5:
-                        successful += 1
-                    else:
-                        failed += 1
-
-                    if visualize and result_h5:
-                        vis_output_dir = output_path / "visualization"
-                        vis_output_dir.mkdir(parents=True, exist_ok=True)
-
-                        cli_args_dict = {
-                            "patch_size": patch_size,
-                            "step_size": effective_step_size,
-                            "thumbnail_size": 1024,
-                            "device": device,
-                            "tissue_thresh": tissue_thresh,
-                            "white_thresh": white_thresh,
-                            "black_thresh": black_thresh,
-                            "fast_mode": fast_mode,
-                            "save_images": save_images,
-                            "target_mag": int(target_mag),
-                        }
+                # Build thumbnails
+                thumbs = []
+                for f in batch_files:
+                    wsi_tmp = WSIFactory.load(f)
+                    try:
+                        thumbs.append(wsi_tmp.get_thumb((thumb_max, thumb_max)))
+                    finally:
                         try:
-                            _ = visualize_patches_on_thumbnail(
-                                hdf5_path=result_h5,
-                                wsi_path=wsi_file,
-                                output_dir=str(vis_output_dir),
-                                cli_args=cli_args_dict,
-                            )
+                            wsi_tmp.cleanup()
                         except Exception:
-                            # Suppress visualization errors in quiet mode; count as failure
-                            failed += 1
+                            pass
+
+                try:
+                    if seg_batch_size > 1:
+                        masks = sam2_model.predict_batch(thumbs, resize_to_input=True)
+                    else:
+                        masks = [predict_fn(t) for t in thumbs]
                 except Exception:
-                    failed += 1
+                    # Fallback to per-image segmentation if batch failed
+                    masks = []
+                    for t in thumbs:
+                        try:
+                            masks.append(predict_fn(t))
+                        except Exception:
+                            masks.append(None)  # type: ignore
+
+                # Patchify each file
+                for f, m in zip(batch_files, masks):
+                    try:
+                        result_h5 = segment_and_patchify(
+                            wsi_path=f,
+                            output_dir=str(output_path),
+                            seg=seg_params,
+                            patch=patch_params,
+                            save_images=save_images,
+                            fast_mode=fast_mode,
+                            predict_fn=predict_fn,
+                            thumb_max=thumb_max,
+                            mask_override=m if m is not None else None,
+                        )
+
+                        if result_h5:
+                            successful += 1
+                        else:
+                            failed += 1
+
+                        if visualize and result_h5:
+                            vis_output_dir = output_path / "visualization"
+                            vis_output_dir.mkdir(parents=True, exist_ok=True)
+
+                            cli_args_dict = {
+                                "patch_size": patch_size,
+                                "step_size": effective_step_size,
+                                "thumbnail_size": 1024,
+                                "device": device,
+                                "tissue_thresh": tissue_thresh,
+                                "white_thresh": white_thresh,
+                                "black_thresh": black_thresh,
+                                "fast_mode": fast_mode,
+                                "save_images": save_images,
+                                "target_mag": int(target_mag),
+                            }
+                            try:
+                                _ = visualize_patches_on_thumbnail(
+                                    hdf5_path=result_h5,
+                                    wsi_path=f,
+                                    output_dir=str(vis_output_dir),
+                                    cli_args=cli_args_dict,
+                                )
+                            except Exception:
+                                failed += 1
+                    except Exception:
+                        failed += 1
+                    finally:
+                        processed += 1
+                        pbar.update(1)
+
+            # Process any remaining pending files
+            if pending:
+                thumbs = []
+                for f in pending:
+                    wsi_tmp = WSIFactory.load(f)
+                    try:
+                        thumbs.append(wsi_tmp.get_thumb((thumb_max, thumb_max)))
+                    finally:
+                        try:
+                            wsi_tmp.cleanup()
+                        except Exception:
+                            pass
+
+                try:
+                    if seg_batch_size > 1:
+                        masks = sam2_model.predict_batch(thumbs, resize_to_input=True)
+                    else:
+                        masks = [predict_fn(t) for t in thumbs]
+                except Exception:
+                    masks = []
+                    for t in thumbs:
+                        try:
+                            masks.append(predict_fn(t))
+                        except Exception:
+                            masks.append(None)  # type: ignore
+
+                for f, m in zip(pending, masks):
+                    try:
+                        result_h5 = segment_and_patchify(
+                            wsi_path=f,
+                            output_dir=str(output_path),
+                            seg=seg_params,
+                            patch=patch_params,
+                            save_images=save_images,
+                            fast_mode=fast_mode,
+                            predict_fn=predict_fn,
+                            thumb_max=thumb_max,
+                            mask_override=m if m is not None else None,
+                        )
+                        if result_h5:
+                            successful += 1
+                        else:
+                            failed += 1
+                        if visualize and result_h5:
+                            vis_output_dir = output_path / "visualization"
+                            vis_output_dir.mkdir(parents=True, exist_ok=True)
+                            cli_args_dict = {
+                                "patch_size": patch_size,
+                                "step_size": effective_step_size,
+                                "thumbnail_size": 1024,
+                                "device": device,
+                                "tissue_thresh": tissue_thresh,
+                                "white_thresh": white_thresh,
+                                "black_thresh": black_thresh,
+                                "fast_mode": fast_mode,
+                                "save_images": save_images,
+                                "target_mag": int(target_mag),
+                            }
+                            try:
+                                _ = visualize_patches_on_thumbnail(
+                                    hdf5_path=result_h5,
+                                    wsi_path=f,
+                                    output_dir=str(vis_output_dir),
+                                    cli_args=cli_args_dict,
+                                )
+                            except Exception:
+                                failed += 1
+                    except Exception:
+                        failed += 1
+                    finally:
+                        processed += 1
+                        pbar.update(1)
 
     if failed > 0 and failed == num_files:
         raise click.ClickException("All files failed to process. Check logs for details.")

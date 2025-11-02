@@ -59,6 +59,7 @@ def segment_and_patchify(
     fast_mode: bool = False,
     predict_fn: Callable[[Any], np.ndarray] | None = None,
     thumb_max: int | None = None,
+    mask_override: np.ndarray | None = None,
 ) -> str | None:
     """High-level pipeline: segment tissue and patchify WSI into an HDF5 file.
 
@@ -82,14 +83,17 @@ def segment_and_patchify(
     wsi = WSIFactory.load(wsi_path)
     W, H = wsi.get_size(lv=0)
 
-    if predict_fn is None or thumb_max is None:
-        predict_fn, thumb_max = _build_segmentation_predictor(seg)
-    # mypy: ensure non-None after lazy init
-    assert predict_fn is not None and thumb_max is not None
-    thumb = wsi.get_thumb((thumb_max, thumb_max))
-
-    # Predict binary mask (H, W) in [0, 1]
-    mask = predict_fn(thumb)
+    if mask_override is not None:
+        mask = mask_override
+        ht, wt = mask.shape[:2]
+    else:
+        if predict_fn is None or thumb_max is None:
+            predict_fn, thumb_max = _build_segmentation_predictor(seg)
+        # ensure non-None after lazy init
+        assert predict_fn is not None and thumb_max is not None
+        thumb = wsi.get_thumb((thumb_max, thumb_max))
+        mask = predict_fn(thumb)
+        ht, wt = mask.shape[:2]
 
     # Extract contours on thumbnail
     tissue_contours_t, holes_contours_t = mask_to_contours(
@@ -97,7 +101,6 @@ def segment_and_patchify(
     )
 
     # Scale contours to level 0
-    ht, wt = mask.shape[:2]
     sx = W / float(wt)
     sy = H / float(ht)
     tissue_contours = scale_contours(tissue_contours_t, sx, sy)

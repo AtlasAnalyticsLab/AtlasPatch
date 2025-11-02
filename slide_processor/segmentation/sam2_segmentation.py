@@ -221,8 +221,58 @@ class SAM2SegmentationModel:
         return mask
 
     @torch.inference_mode()
-    def predict_batch(self):
-        pass
+    def predict_batch(
+        self,
+        images: list[Union[np.ndarray, Image.Image, torch.Tensor]],
+        *,
+        resize_to_input: bool = True,
+    ) -> list[np.ndarray]:
+        """
+        Predict segmentation masks for a batch of images.
+
+        Args:
+            images: List of images (numpy arrays, PIL Images, or tensors), each
+                    expected to be RGB. Arrays should be HxWx3 with values in
+                    [0, 255] (uint8) or [0, 1] (float).
+            resize_to_input: If True, ensure output masks match input image size.
+
+        Returns:
+            List of binary masks (each HxW, float32 in [0, 1]) in the same
+            order as input images.
+        """
+        if not isinstance(images, list) or len(images) == 0:
+            raise ValueError("images must be a non-empty list")
+
+        # Normalize all inputs to numpy arrays
+        np_images: list[np.ndarray] = [self._normalize_input(img) for img in images]
+        orig_shapes = [im.shape[:2] for im in np_images]
+
+        # Set batch into predictor
+        self.predictor.set_image_batch(np_images)
+
+        # Build full-image box prompts for each image
+        box_batch = []
+        for im in np_images:
+            h, w = im.shape[:2]
+            box = np.array([0, 0, float(w), float(h)], dtype=np.float32)
+            box_batch.append(box)
+
+        # Run batched prediction
+        masks_list, _, _ = self.predictor.predict_batch(
+            box_batch=box_batch,
+            multimask_output=False,
+            return_logits=False,
+            normalize_coords=True,
+        )
+
+        out_masks: list[np.ndarray] = []
+        for i, masks_np in enumerate(masks_list):
+            mask = masks_np[0]  # take the single output mask
+            if resize_to_input and mask.shape[:2] != orig_shapes[i]:
+                mask = self._resize_mask(mask, orig_shapes[i])
+            out_masks.append(mask.astype(np.float32))
+
+        return out_masks
 
     def __repr__(self) -> str:
         return (
