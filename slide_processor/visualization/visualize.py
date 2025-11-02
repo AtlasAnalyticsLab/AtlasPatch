@@ -140,8 +140,10 @@ def visualize_patches_on_thumbnail(
     )
     plt.tight_layout()
 
-    # Save visualization
-    output_path = Path(output_dir) / "patches_on_thumbnail.png"
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stem = Path(wsi_path).stem
+    output_path = out_dir / f"{stem}.png"
     plt.savefig(output_path, dpi=200, bbox_inches="tight")
     plt.close()
 

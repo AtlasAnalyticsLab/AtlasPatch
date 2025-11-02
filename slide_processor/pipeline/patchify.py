@@ -19,10 +19,8 @@ class PatchifyParams:
     target_magnification: int
     step_size: int | None = None  # Defaults to patch_size when None
     tissue_area_thresh: float = 0.01
-    require_all_points: bool = False
     white_thresh: int = 15
     black_thresh: int = 50
-    use_padding: bool = True
 
 
 @dataclass
@@ -69,7 +67,9 @@ def segment_and_patchify(
     - patch: PatchifyParams (patch_size and target_magnification required; step_size defaults to patch_size if None)
 
     Behavior:
-    - If `save_images` is True, PNGs are saved under `<output_dir>/<stem>/images/`.
+    - HDF5 files are saved under `<output_dir>/patches/<stem>.h5`.
+    - If `save_images` is True, per-patch PNGs are saved under
+      `<output_dir>/images/<stem>/`.
     - Returns HDF5 path as string, or None if no patches were saved.
     """
     # Ensure required patch values
@@ -110,16 +110,14 @@ def segment_and_patchify(
         target_mag=patch.target_magnification,
         white_thresh=patch.white_thresh,
         black_thresh=patch.black_thresh,
-        use_padding=patch.use_padding,
-        require_all_points=patch.require_all_points,
     )
 
     stem = Path(wsi_path).stem
-    out_dir = Path(output_dir) / stem
-    out_dir.mkdir(parents=True, exist_ok=True)
-    out_h5 = str(out_dir / f"{stem}.h5")
+    patches_root = Path(output_dir) / "patches"
+    patches_root.mkdir(parents=True, exist_ok=True)
+    out_h5 = str(patches_root / f"{stem}.h5")
 
-    img_dir = str(out_dir / "images") if save_images else None
+    img_dir = str(Path(output_dir) / "images" / stem) if save_images else None
 
     result_path = extractor.extract_to_h5(
         wsi,

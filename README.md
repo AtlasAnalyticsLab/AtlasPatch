@@ -73,17 +73,17 @@ SlideProcessor provides an intuitive command-line interface for processing whole
 ### Quick Start
 
 ```bash
-# Process a single WSI file (YAML config path)
-slideproc process sample.svs --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \
+# Process a single WSI file (uses built-in Tiny SAM2 config)
+slideproc process sample.svs --checkpoint model.pt \
     --patch-size 256 --target-mag 20
 
 # Process all WSI files in a directory
-slideproc process ./wsi_folder/ --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \
+slideproc process ./wsi_folder/ --checkpoint model.pt \
     --patch-size 256 --target-mag 20 --output ./results
 
 # With custom patch settings and visualization
 slideproc process sample.svs \
-    --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \
+    --checkpoint model.pt \
     --patch-size 512 --step-size 256 --target-mag 20 \
     --output ./output --save-images --visualize
 ```
@@ -99,7 +99,6 @@ Main command for processing whole slide images with tissue segmentation and patc
 
 **Required Options:**
 - `--checkpoint/-c` **(required)**: Path to SAM2 model checkpoint file (.pt)
-- `--config` **(required)**: Path to a SAM2 YAML config file. Only filesystem paths are accepted (e.g., `slide_processor/configs/sam2.1_hiera_b+.yaml`).
 - `--patch-size` **(required)**: Target size of extracted patches in pixels (final patch dimensions)
 - `--target-mag` **(required)**: Target magnification for extraction: one of 1, 2, 4, 5, 10, 20, 40, 60, 80
 
@@ -107,35 +106,23 @@ Main command for processing whole slide images with tissue segmentation and patc
 
 | Option | Type | Default | Required? | Description |
 |--------|------|---------|-----------|-------------|
-| `--output/-o` | Path | `./output` | No | Output directory for HDF5 files and patches |
+| `--output/-o` | Path | `./output` | No | Output directory root for results (contains `patches/`, `visualization/`, and `images/`) |
 | `--patch-size` | int | — | Yes | Target size of extracted patches in pixels (final patch dimensions) |
 | `--step-size` | int | patch-size | No | Step size for patch extraction (stride) at the target magnification. Defaults to patch-size if not set |
 | `--target-mag` | choice | — | Yes | Target magnification for extraction: one of 5, 10, 20, 40, 60, 80 |
 | `--device` | choice | `cuda` | No | Device for inference: `cuda` or `cpu` |
-| `--thumbnail-size` | int | `1024` | No | Size of thumbnail for segmentation (max dimension) |
 | `--tissue-thresh` | float | `0.01` | No | Minimum tissue area threshold as percentage of image |
 | `--white-thresh` | int | `15` | No | Saturation threshold for filtering white patches |
 | `--black-thresh` | int | `50` | No | RGB threshold for filtering black patches |
-| `--require-all-points` | flag | False | No | Require all 4 corner points inside tissue (strict mode) |
-| `--use-padding` | flag | True | No | Allow patches at image boundaries with padding |
-| `--save-images` | flag | False | No | Export individual patch images as PNG files in `/images` folder |
+| `--save-images` | flag | False | No | Export individual patch images as PNG files under `images/<stem>/` |
 | `--fast-mode` | flag | False | No | Skip per-patch content filtering for faster extraction (may include background patches) |
 | `--visualize` | flag | False | No | Generate visualization of patches overlaid on WSI thumbnail with processing info |
 | `--verbose/-v` | flag | False | No | Enable verbose logging output |
 
-**Available SAM2 Configs (YAML paths):**
+SAM2 Config
 
-- `sam2.1_hiera_t` — Tiny model, fastest and lowest memory; lowest accuracy.
-- `sam2.1_hiera_s` — Small model, balanced speed/VRAM/accuracy.
-- `sam2.1_hiera_b+` — Base+ model, recommended default; higher accuracy; more VRAM.
-- `sam2.1_hiera_l` — Large model, highest accuracy; slowest; high VRAM.
-
-Configs are provided under `slide_processor/configs/`. Always pass the YAML path, for example:
-
-- `--config slide_processor/configs/sam2.1_hiera_t.yaml`
-- `--config slide_processor/configs/sam2.1_hiera_s.yaml`
-- `--config slide_processor/configs/sam2.1_hiera_b+.yaml`
-- `--config slide_processor/configs/sam2.1_hiera_l.yaml`
+- Uses the built-in Tiny SAM2 config at `slide_processor/configs/sam2.1_hiera_t.yaml`.
+  If you need a different config, change the `default_cfg` path in `slide_processor/cli.py`.
 
 **Supported WSI Formats:**
 - **OpenSlide formats**: .svs, .tif, .tiff, .ndpi, .vms, .vmu, .scn, .mrxs, .bif, .dcm
@@ -146,7 +133,7 @@ Configs are provided under `slide_processor/configs/`. Always pass the YAML path
 #### Basic Single File Processing
 
 ```bash
-slideproc process sample.svs --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \
+slideproc process sample.svs --checkpoint model.pt \
     --patch-size 256 --target-mag 20
 ```
 
@@ -155,7 +142,7 @@ slideproc process sample.svs --checkpoint model.pt --config slide_processor/conf
 ```bash
 # Process all .svs files in a directory
 slideproc process ./slides/ \
-    --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \
+    --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
     --output ./processed_slides
 ```
@@ -165,7 +152,7 @@ slideproc process ./slides/ \
 ```bash
 # Extract larger patches with different stride and magnification
 slideproc process sample.svs \
-    --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \
+    --checkpoint model.pt \
     --patch-size 512 \
     --step-size 256 \
     --target-mag 20 \
@@ -177,29 +164,20 @@ slideproc process sample.svs \
 ```bash
 # Generate individual PNG files for each patch
 slideproc process sample.svs \
-    --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \
+    --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
     --save-images \
     --output ./output
-# Creates: output/<stem>/images/<stem>_x<x>_y<y>.png
+# Creates: output/images/<stem>/<stem>_x<x>_y<y>.png
 ```
 
-#### Strict Tissue Requirement
-
-```bash
-# Require all 4 patch corners to be within tissue (stricter filtering)
-slideproc process sample.svs \
-    --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \
-    --patch-size 256 --target-mag 20 \
-    --require-all-points
-```
 
 #### CPU Inference
 
 ```bash
 # Use CPU instead of GPU (slower but no GPU required)
 slideproc process sample.svs \
-    --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \
+    --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
     --device cpu
 ```
@@ -209,7 +187,7 @@ slideproc process sample.svs \
 ```bash
 # Adjust thresholds for different tissue characteristics
 slideproc process sample.svs \
-    --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \
+    --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
     --white-thresh 20 \
     --black-thresh 40 \
@@ -221,17 +199,20 @@ slideproc process sample.svs \
 ```bash
 # Enable detailed logging for debugging
 slideproc process sample.svs \
-    --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \
+    --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
     --verbose
 ```
+
+- Default (no --verbose): quiet mode with a progress bar and minimal output.
+- With --verbose: shows detailed logs (no progress bar).
 
 #### Generate Visualizations
 
 ```bash
 # Generate patch overlay visualization on thumbnail
 slideproc process sample.svs \
-    --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \
+    --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
     --visualize
 
@@ -241,7 +222,7 @@ The `--visualize` flag creates a visualization showing:
 - WSI thumbnail with patch locations overlaid as green rectangles
 - Information panel with extraction statistics and parameters used
 
-The visualization is saved in the output directory: `output/<wsi_stem>/patches_on_thumbnail.png`.
+The visualization is saved in the output directory: `output/visualization/<wsi_stem>.png`.
 
 #### `slideproc info`
 
@@ -253,7 +234,7 @@ slideproc info
 
 ## HDF5 Output Structure
 
-Each processed slide produces a single HDF5 file under `<output>/<stem>/<stem>.h5`.
+Each processed slide produces a single HDF5 file under `<output>/patches/<stem>.h5`.
 
 - Datasets
   - `coords`: int32 shape `(N, 2)` containing `(x, y)` at level 0
@@ -283,7 +264,7 @@ The CLI generates the following outputs:
 
 **HDF5 Files** (per input WSI):
 ```
-output/<wsi_stem>/<wsi_stem>.h5
+output/patches/<wsi_stem>.h5
 ```
 
 Contains:
@@ -293,7 +274,7 @@ Contains:
 
 **Optional PNG Images** (if `--save-images` is used):
 ```
-output/<wsi_stem>/images/<wsi_stem>_x<x>_y<y>.png
+output/images/<wsi_stem>/<wsi_stem>_x<x>_y<y>.png
 ```
 
 Each file represents a single extracted patch with its coordinates in the filename.
@@ -325,30 +306,13 @@ Each file represents a single extracted patch with its coordinates in the filena
 
 - **`--tissue-thresh`**: Minimum tissue area as percentage of image
   - Filters out very small tissue regions
-  - Typical range: 0.01-1.0
-  - Unit: percentage (not proportion)
-
-**Segmentation Parameters:**
-
-- **`--thumbnail-size`**: Size of thumbnail for SAM2 inference
-  - Larger values = more accurate segmentation but slower
-  - Common values: 1024, 2048
-  - Limited by GPU memory
-
-**Geometry Parameters:**
-
-- **`--require-all-points`**: Toggle for patch validation strictness
-  - False (default, lenient): Any of 4 corners inside tissue = valid
-  - True (strict): All 4 corners must be inside tissue
-
-- **`--use-padding`**: Allow patches extending beyond image boundaries
-  - True (default): Patches at edges can extend beyond bounds
-  - False: Patches must be fully contained within image
+  - Range: 0.0-1.0
+  - Unit: percentage
 
 ## Tasks
 - [x] Extract patches at different magnification level
-- [ ] Add visualization module to visualize the patches
-- [ ] Decide on the final arguments and parameter we are going to expose / de-expose
-- [ ] Check if file exist in the output directory and if so then skip it
+- [x] Add visualization module to visualize the patches
+- [x] Decide on the final arguments and parameter we are going to expose / de-expose
+- [x] Check if file exist in the output directory and if so then skip it
 - [ ] Support parallelization for a single GPU
 - [ ] Support paralelization for multipl GPUs

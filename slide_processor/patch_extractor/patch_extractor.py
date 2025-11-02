@@ -24,9 +24,7 @@ class PatchExtractor:
     step_size: int = 256
     white_thresh: int = 15
     black_thresh: int = 50
-    use_padding: bool = True
     center_shift: float = 0.5
-    require_all_points: bool = False  # True -> hard, False -> easy
 
     def _point_in_holes(
         self, pt: tuple[int, int], holes: Sequence[np.ndarray], patch_size_src: int
@@ -50,7 +48,6 @@ class PatchExtractor:
             contour=contour,
             patch_size=patch_size_src,
             center_shift=self.center_shift,
-            require_all=self.require_all_points,
         )
         return check_fn(pt) and not self._point_in_holes(pt, holes, patch_size_src)
 
@@ -112,12 +109,9 @@ class PatchExtractor:
         level, read_wh, ps_src, ss_src = self._prepare_geometry(wsi)
         read_w, read_h = read_wh
 
-        if self.use_padding:
-            stop_x = x0 + ww
-            stop_y = y0 + hh
-        else:
-            stop_x = min(x0 + ww, W - ps_src)
-            stop_y = min(y0 + hh, H - ps_src)
+        # Always allow patches at boundaries with padding
+        stop_x = x0 + ww
+        stop_y = y0 + hh
 
         for y in range(y0, stop_y, ss_src):
             for x in range(x0, stop_x, ss_src):
@@ -225,12 +219,9 @@ class PatchExtractor:
                 # Coordinate-only fast path: avoid reading patches entirely
                 x0, y0, ww, hh = cv2.boundingRect(cont)
                 W, H = wsi.get_size(lv=0)
-                if self.use_padding:
-                    stop_x = x0 + ww
-                    stop_y = y0 + hh
-                else:
-                    stop_x = min(x0 + ww, W - ps_src)
-                    stop_y = min(y0 + hh, H - ps_src)
+                # Always allow patches at boundaries with padding
+                stop_x = x0 + ww
+                stop_y = y0 + hh
 
                 for y in range(y0, stop_y, ss_src):
                     for x in range(x0, stop_x, ss_src):

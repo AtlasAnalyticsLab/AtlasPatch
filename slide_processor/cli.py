@@ -18,7 +18,7 @@ from slide_processor.visualization import (
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.WARNING,  # default to quiet output unless --verbose is used
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 
@@ -112,20 +112,20 @@ def cli():
     3. Saving patches to HDF5 format for efficient data handling
 
     Examples:
-        # Process single WSI file (YAML config path)
-        slideproc process wsi.svs --checkpoint ckpt.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \\
+        # Process single WSI file
+        slideproc process wsi.svs --checkpoint ckpt.pt \\
             --patch-size 256 --target-mag 20
 
         # Process directory of WSI files
-        slideproc process ./wsi_folder/ --checkpoint ckpt.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \\
+        slideproc process ./wsi_folder/ --checkpoint ckpt.pt \\
             --patch-size 256 --target-mag 20
 
         # With custom patch settings
-        slideproc process wsi.svs --checkpoint ckpt.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \\
+        slideproc process wsi.svs --checkpoint ckpt.pt \\
             --patch-size 512 --step-size 256 --target-mag 20 --output ./output
 
         # Export individual patch images
-        slideproc process wsi.svs --checkpoint ckpt.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \\
+        slideproc process wsi.svs --checkpoint ckpt.pt \\
             --save-images --patch-size 256 --target-mag 20 --output ./output
 
     For detailed help on specific commands, run:
@@ -144,18 +144,11 @@ def cli():
     help="Path to SAM2 model checkpoint (.pt file).",
 )
 @click.option(
-    "--config",
-    type=click.Path(exists=True),
-    required=True,
-    callback=validate_path,
-    help=("Path to SAM2 YAML config file. Only filesystem paths are accepted."),
-)
-@click.option(
     "--output",
     "-o",
     type=click.Path(),
     default="./output",
-    help="Output directory for HDF5 files and patches. [default: ./output]",
+    help="Output directory for results (patches/, images/, visualization/). [default: ./output]",
 )
 @click.option(
     "--patch-size",
@@ -187,13 +180,6 @@ def cli():
     help="Device for model inference. [default: cuda]",
 )
 @click.option(
-    "--thumbnail-size",
-    type=int,
-    default=1024,
-    callback=validate_positive_int,
-    help="Size of thumbnail for segmentation (max dimension). [default: 1024]",
-)
-@click.option(
     "--tissue-thresh",
     type=float,
     default=0.01,
@@ -212,19 +198,6 @@ def cli():
     default=50,
     callback=validate_positive_int,
     help="RGB threshold for filtering black patches. [default: 50]",
-)
-@click.option(
-    "--require-all-points",
-    is_flag=True,
-    default=False,
-    help="Require all 4 corner points inside tissue (strict mode). "
-    "Default is to require any point inside (lenient mode).",
-)
-@click.option(
-    "--use-padding",
-    is_flag=True,
-    default=True,
-    help="Allow patches at image boundaries with padding. [default: True]",
 )
 @click.option(
     "--save-images",
@@ -257,17 +230,13 @@ def cli():
 def process(
     wsi_path: str,
     checkpoint: str,
-    config: str,
     output: str,
     patch_size: int,
     step_size: int | None,
     device: str,
-    thumbnail_size: int,
     tissue_thresh: float,
     white_thresh: int,
     black_thresh: int,
-    require_all_points: bool,
-    use_padding: bool,
     save_images: bool,
     verbose: bool,
     fast_mode: bool,
@@ -291,31 +260,21 @@ def process(
 
         # Single file processing
         slideproc process sample.svs \\
-            --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \\
-            --patch-size 256 --target-mag 20
+            --checkpoint model.pt --patch-size 256 --target-mag 20
 
         # Batch processing (all .svs files in directory)
         slideproc process ./slides/ \\
-            --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \\
-            --patch-size 256 --target-mag 20 \\
+            --checkpoint model.pt --patch-size 256 --target-mag 20 \\
             --output ./processed_slides
 
         # Custom patch settings with image export
         slideproc process sample.svs \\
-            --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \\
-            --patch-size 512 --step-size 256 --target-mag 20 \\
+            --checkpoint model.pt --patch-size 512 --step-size 256 --target-mag 20 \\
             --save-images --output ./results
-
-        # Strict tissue requirement (all 4 corners must be in tissue)
-        slideproc process sample.svs \\
-            --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \\
-            --patch-size 256 --target-mag 20 \\
-            --require-all-points
 
         # Using CPU instead of GPU
         slideproc process sample.svs \\
-            --checkpoint model.pt --config slide_processor/configs/sam2.1_hiera_b+.yaml \\
-            --patch-size 256 --target-mag 20 \\
+            --checkpoint model.pt --patch-size 256 --target-mag 20 \\
             --device cpu
     """
     if verbose:
@@ -349,11 +308,15 @@ def process(
     effective_step_size = step_size if step_size is not None else patch_size
 
     # Create segmentation and patchification parameters
+    default_cfg = Path(__file__).resolve().parent / "configs" / "sam2.1_hiera_t.yaml"
+    if not default_cfg.exists():
+        raise click.ClickException(f"Built-in SAM2 config not found: {default_cfg}")
+
     seg_params = SegmentParams(
         checkpoint_path=Path(checkpoint),
-        config_file=Path(config),
+        config_file=default_cfg,
         device=device.lower(),
-        thumbnail_max=thumbnail_size,
+        thumbnail_max=1024,
     )
 
     patch_params = PatchifyParams(
@@ -361,10 +324,8 @@ def process(
         step_size=effective_step_size,
         target_magnification=int(target_mag),
         tissue_area_thresh=tissue_thresh,
-        require_all_points=require_all_points,
         white_thresh=white_thresh,
         black_thresh=black_thresh,
-        use_padding=use_padding,
     )
 
     # Process each WSI file
@@ -374,10 +335,16 @@ def process(
     # Build SAM2 predictor once and reuse across files
     predict_fn, thumb_max = _build_segmentation_predictor(seg_params)
 
-    with click.progressbar(wsi_files, label="Processing WSI files") as pbar:
-        for wsi_file in pbar:
+    if verbose:
+        for wsi_file in wsi_files:
             try:
                 logger.info(f"Processing: {Path(wsi_file).name}")
+
+                stem = Path(wsi_file).stem
+                existing_h5 = output_path / "patches" / f"{stem}.h5"
+                if existing_h5.exists():
+                    logger.info(f"Skipping {Path(wsi_file).name}: already exists -> {existing_h5}")
+                    continue
 
                 result_h5 = segment_and_patchify(
                     wsi_path=wsi_file,
@@ -394,21 +361,17 @@ def process(
                     successful += 1
                     logger.info(f"Saved patches to: {result_h5}")
 
-                    # Generate visualizations if requested
-                    stem = Path(wsi_file).stem
-                    vis_output_dir = output_path / stem
+                    vis_output_dir = output_path / "visualization"
+                    vis_output_dir.mkdir(parents=True, exist_ok=True)
 
-                    # Prepare CLI arguments for info box
                     cli_args_dict = {
                         "patch_size": patch_size,
                         "step_size": effective_step_size,
-                        "thumbnail_size": thumbnail_size,
+                        "thumbnail_size": 1024,
                         "device": device,
                         "tissue_thresh": tissue_thresh,
                         "white_thresh": white_thresh,
                         "black_thresh": black_thresh,
-                        "require_all_points": require_all_points,
-                        "use_padding": use_padding,
                         "fast_mode": fast_mode,
                         "save_images": save_images,
                         "target_mag": int(target_mag),
@@ -425,17 +388,67 @@ def process(
                             logger.info(f"Visualization saved to: {vis_path}")
                         except Exception as e:
                             logger.error(f"Failed to generate visualization: {e}")
-                            if verbose:
-                                raise
-
+                            raise
                 else:
                     logger.warning(f"No patches extracted from {Path(wsi_file).name}")
 
             except Exception as e:
                 failed += 1
                 logger.error(f"Failed to process {Path(wsi_file).name}: {e}")
-                if verbose:
-                    raise
+                raise
+    else:
+        with click.progressbar(wsi_files, label="Processing WSI files") as pbar:
+            for wsi_file in pbar:
+                try:
+                    stem = Path(wsi_file).stem
+                    existing_h5 = output_path / "patches" / f"{stem}.h5"
+                    if existing_h5.exists():
+                        continue
+
+                    result_h5 = segment_and_patchify(
+                        wsi_path=wsi_file,
+                        output_dir=str(output_path),
+                        seg=seg_params,
+                        patch=patch_params,
+                        save_images=save_images,
+                        fast_mode=fast_mode,
+                        predict_fn=predict_fn,
+                        thumb_max=thumb_max,
+                    )
+
+                    if result_h5:
+                        successful += 1
+                    else:
+                        failed += 1
+
+                    if visualize and result_h5:
+                        vis_output_dir = output_path / "visualization"
+                        vis_output_dir.mkdir(parents=True, exist_ok=True)
+
+                        cli_args_dict = {
+                            "patch_size": patch_size,
+                            "step_size": effective_step_size,
+                            "thumbnail_size": 1024,
+                            "device": device,
+                            "tissue_thresh": tissue_thresh,
+                            "white_thresh": white_thresh,
+                            "black_thresh": black_thresh,
+                            "fast_mode": fast_mode,
+                            "save_images": save_images,
+                            "target_mag": int(target_mag),
+                        }
+                        try:
+                            _ = visualize_patches_on_thumbnail(
+                                hdf5_path=result_h5,
+                                wsi_path=wsi_file,
+                                output_dir=str(vis_output_dir),
+                                cli_args=cli_args_dict,
+                            )
+                        except Exception:
+                            # Suppress visualization errors in quiet mode; count as failure
+                            failed += 1
+                except Exception:
+                    failed += 1
 
     if failed > 0 and failed == num_files:
         raise click.ClickException("All files failed to process. Check logs for details.")
@@ -476,7 +489,9 @@ def info():
     click.echo(
         "    - Metadata: patch_size, wsi_path, num_patches, level0_magnification, target_magnification, patch_size_level0"
     )
-    click.echo("  • PNG patches in 'images/' subdirectory when '--save-images' is used")
+    click.echo("  • HDF5 per WSI under 'patches/<stem>.h5'")
+    click.echo("  • Optional per-patch PNGs under 'images/<stem>/' when '--save-images' is used")
+    click.echo("  • Visualization PNG under 'visualization/<stem>.png' when '--visualize' is used")
 
     click.echo("\n" + "=" * 70 + "\n")
 
