@@ -212,9 +212,9 @@ class PatchExtractor:
             buf_xy.clear()
             buf_ext.clear()
 
-        for cont, holes in zip(tissue_contours, holes_contours):
-            level, (read_w, read_h), ps_src, ss_src = self._prepare_geometry(wsi)
+        level, (read_w, read_h), ps_src, ss_src = self._prepare_geometry(wsi)
 
+        for cont, holes in zip(tissue_contours, holes_contours):
             if fast_mode:
                 # Coordinate-only fast path: avoid reading patches entirely
                 x0, y0, ww, hh = cv2.boundingRect(cont)
