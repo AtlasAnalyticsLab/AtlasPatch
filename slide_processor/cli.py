@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import time
 from pathlib import Path
 
 import click
@@ -473,9 +474,36 @@ def process(
             except Exception:
                 failed += 1
     else:
-        # Quiet mode with batching support and a simple progress bar
+        start_time = time.monotonic()
+
+        def _fmt_duration(s: float) -> str:
+            s = max(0.0, float(s))
+            m, sec = divmod(int(s + 0.5), 60)
+            h, min_ = divmod(m, 60)
+            if h > 0:
+                return f"{h:02d}:{min_:02d}:{sec:02d}"
+            return f"{min_:02d}:{sec:02d}"
+
+        def _status(done: int) -> str:
+            left = max(0, num_files - done)
+            now = time.monotonic()
+            if done > 0:
+                elapsed = now - start_time
+                avg = elapsed / done
+                eta = avg * left
+                avg_str = f"{avg:.2f}s/it"
+                eta_str = _fmt_duration(eta)
+                elapsed_str = _fmt_duration(elapsed)
+            else:
+                avg_str = "– s/it"
+                eta_str = "--:--"
+                elapsed_str = "00:00"
+            return f"{done}/{num_files} [{elapsed_str}<{eta_str}, {avg_str}]  S:{successful} F:{failed}"
+
         processed = 0
-        with click.progressbar(length=num_files, label="Processing WSI files") as pbar:
+        with click.progressbar(
+            length=num_files, label=f"Processing WSI files  {_status(0)}"
+        ) as pbar:
             pending = []
             for wsi_file in wsi_files:
                 stem = Path(wsi_file).stem
@@ -483,6 +511,11 @@ def process(
                 if existing_h5.exists():
                     processed += 1
                     pbar.update(1)
+                    pbar.label = f"Processing WSI files  {_status(processed)}"
+                    try:
+                        pbar.render_progress()
+                    except Exception:
+                        pass
                     continue
 
                 pending.append(wsi_file)
@@ -569,6 +602,11 @@ def process(
                     finally:
                         processed += 1
                         pbar.update(1)
+                        pbar.label = f"Processing WSI files  {_status(processed)}"
+                        try:
+                            pbar.render_progress()
+                        except Exception:
+                            pass
 
             # Process any remaining pending files
             if pending:
@@ -642,6 +680,11 @@ def process(
                     finally:
                         processed += 1
                         pbar.update(1)
+                        pbar.label = f"Processing WSI files  {_status(processed)}"
+                        try:
+                            pbar.render_progress()
+                        except Exception:
+                            pass
 
     if failed > 0 and failed == num_files:
         raise click.ClickException("All files failed to process. Check logs for details.")
