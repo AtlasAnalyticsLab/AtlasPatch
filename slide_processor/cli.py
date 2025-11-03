@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import concurrent.futures as _fut
 import logging
 import sys
 from pathlib import Path
 
 import click
-from utils.params import get_wsi_files, validate_path, validate_positive_int
-from utils.progress import ProgressReporter
+import numpy as _np
 
 from slide_processor.pipeline.patchify import (
     PatchifyParams,
@@ -14,6 +14,12 @@ from slide_processor.pipeline.patchify import (
     segment_and_patchify,
 )
 from slide_processor.segmentation.sam2_segmentation import SAM2SegmentationModel
+from slide_processor.utils.params import (
+    get_wsi_files,
+    validate_path,
+    validate_positive_int,
+)
+from slide_processor.utils.progress import ProgressReporter
 from slide_processor.visualization import (
     visualize_patches_on_thumbnail,
 )
@@ -39,7 +45,7 @@ logger = logging.getLogger("slide_processor.cli")
 
 
 def _load_thumbnails(batch_files: list[str], thumb_max: int) -> list:
-    """Load thumbnails for a batch of WSI files."""
+    """Load thumbnails for a batch of WSI files (aspect-preserving)."""
     thumbs = []
     for f in batch_files:
         wsi_tmp = WSIFactory.load(f)
@@ -51,6 +57,97 @@ def _load_thumbnails(batch_files: list[str], thumb_max: int) -> list:
             except Exception:
                 pass
     return thumbs
+
+
+def _pack_mask(mask_arr):
+    """Pack a predicted mask to compact uint8 for IPC."""
+    if mask_arr is None:
+        return None
+    if isinstance(mask_arr, _np.ndarray):
+        return (mask_arr > 0.5).astype(_np.uint8) if mask_arr.dtype != _np.uint8 else mask_arr
+    return None
+
+
+def _build_wsi_task(
+    *,
+    file_path: str,
+    mask_arr,
+    output_dir: Path,
+    seg_params,
+    patch_params,
+    thumb_max: int,
+    effective_step_size: int,
+    save_images: bool,
+    fast_mode: bool,
+    write_batch: int,
+    visualize: bool,
+    device: str,
+    patch_size: int,
+    tissue_thresh: float,
+    white_thresh: int,
+    black_thresh: int,
+    target_mag: int,
+):
+    """Build a serializable task payload for per-WSI worker processing."""
+    return {
+        "wsi_path": file_path,
+        "mask": _pack_mask(mask_arr),
+        "output_dir": str(output_dir),
+        "seg": {
+            "checkpoint": str(seg_params.checkpoint_path),
+            "device": seg_params.device,
+            "thumb_max": int(thumb_max),
+        },
+        "patch": {
+            "patch_size": int(patch_params.patch_size),
+            "step_size": int(effective_step_size),
+            "target_mag": int(patch_params.target_magnification),
+            "tissue_thresh": float(patch_params.tissue_area_thresh),
+            "white_thresh": int(patch_params.white_thresh),
+            "black_thresh": int(patch_params.black_thresh),
+        },
+        "opts": {
+            "save_images": bool(save_images),
+            "fast_mode": bool(fast_mode),
+            "write_batch": int(write_batch),
+            "visualize": bool(visualize),
+            "device": device,
+            "patch_size": int(patch_size),
+            "step_size": int(effective_step_size),
+            "tissue_thresh": float(tissue_thresh),
+            "white_thresh": int(white_thresh),
+            "black_thresh": int(black_thresh),
+            "target_mag": int(target_mag),
+        },
+    }
+
+
+def _run_wsi_tasks(tasks, *, max_workers: int, reporter, pbar, verbose: bool) -> tuple[int, int]:
+    """Execute per-WSI tasks in a process pool and aggregate results."""
+    successful, failed = 0, 0
+    with _fut.ProcessPoolExecutor(max_workers=max(1, int(max_workers))) as ex:
+        fut_map = {ex.submit(_process_wsi_worker, t): t["wsi_path"] for t in tasks}
+        for fut in _fut.as_completed(fut_map):
+            fpath = fut_map[fut]
+            try:
+                ok, msg = fut.result()
+            except Exception as e:
+                ok, msg = False, str(e)
+            if ok:
+                successful += 1
+                if verbose:
+                    logger.info(f"Saved patches to: {msg}")
+                elif reporter:
+                    reporter.update(success=True)
+            else:
+                failed += 1
+                if verbose:
+                    logger.error(f"Failed to process {Path(fpath).name}: {msg}")
+                elif reporter:
+                    reporter.update(success=False)
+            if reporter and pbar:
+                reporter.update_progress_bar(pbar)
+    return successful, failed
 
 
 def _process_files_batch(
@@ -74,9 +171,45 @@ def _process_files_batch(
     verbose: bool,
     reporter=None,
     pbar=None,
+    wsi_workers: int = 1,
 ) -> tuple[int, int]:
     """Process a batch of files. Returns (successful, failed) counts."""
     successful, failed = 0, 0
+
+    # Parallel per-WSI processing if requested
+    if max(1, int(wsi_workers)) > 1 and len(batch_files) > 1:
+        tasks = [
+            _build_wsi_task(
+                file_path=f,
+                mask_arr=m,
+                output_dir=output_path,
+                seg_params=seg_params,
+                patch_params=patch_params,
+                thumb_max=thumb_max,
+                effective_step_size=effective_step_size,
+                save_images=save_images,
+                fast_mode=fast_mode,
+                write_batch=write_batch,
+                visualize=visualize,
+                device=device,
+                patch_size=patch_size,
+                tissue_thresh=tissue_thresh,
+                white_thresh=white_thresh,
+                black_thresh=black_thresh,
+                target_mag=target_mag,
+            )
+            for f, m in zip(batch_files, masks)
+        ]
+        s_delta, f_delta = _run_wsi_tasks(
+            tasks,
+            max_workers=max(1, int(wsi_workers)),
+            reporter=reporter,
+            pbar=pbar,
+            verbose=verbose,
+        )
+        successful += s_delta
+        failed += f_delta
+        return successful, failed
 
     for f, m in zip(batch_files, masks):
         try:
@@ -183,6 +316,91 @@ def _visualize_result(
         logger.warning(f"Visualization failed for {Path(wsi.path).name}: {e}")
 
 
+def _process_wsi_worker(task: dict) -> tuple[bool, str]:
+    """Worker: process one WSI end-to-end after mask is computed.
+
+    Returns (ok, message). On success, message is HDF5 path; on error, message is error str.
+    """
+    try:
+        from pathlib import Path as _Path
+
+        import numpy as _np
+
+        from slide_processor.pipeline.patchify import (
+            PatchifyParams as _PatchifyParams,
+        )
+        from slide_processor.pipeline.patchify import (
+            SegmentParams as _SegmentParams,
+        )
+        from slide_processor.pipeline.patchify import (
+            segment_and_patchify as _segment_and_patchify,
+        )
+        from slide_processor.visualization import visualize_patches_on_thumbnail as _viz
+        from slide_processor.wsi import WSIFactory as _WSIFactory
+
+        wsi = _WSIFactory.load(task["wsi_path"])
+        try:
+            segp = _SegmentParams(
+                checkpoint_path=_Path(task["seg"]["checkpoint"]),
+                device=task["seg"]["device"],
+                thumbnail_max=int(task["seg"]["thumb_max"]),
+            )
+            patchp = _PatchifyParams(
+                patch_size=int(task["patch"]["patch_size"]),
+                step_size=int(task["patch"]["step_size"]),
+                target_magnification=int(task["patch"]["target_mag"]),
+                tissue_area_thresh=float(task["patch"]["tissue_thresh"]),
+                white_thresh=int(task["patch"]["white_thresh"]),
+                black_thresh=int(task["patch"]["black_thresh"]),
+            )
+            mask = task["mask"]
+            if mask is not None and isinstance(mask, _np.ndarray) and mask.dtype != _np.uint8:
+                mask = (mask > 0.5).astype(_np.uint8)
+
+            out_h5 = _segment_and_patchify(
+                wsi=wsi,
+                output_dir=task["output_dir"],
+                seg=segp,
+                patch=patchp,
+                save_images=bool(task["opts"]["save_images"]),
+                fast_mode=bool(task["opts"]["fast_mode"]),
+                thumb_max=int(task["seg"]["thumb_max"]),
+                mask_override=mask,
+                write_batch=int(task["opts"]["write_batch"]),
+            )
+
+            if not out_h5:
+                return False, "No patches extracted"
+
+            if bool(task["opts"]["visualize"]):
+                cli_args_dict = {
+                    "patch_size": int(task["opts"]["patch_size"]),
+                    "step_size": int(task["opts"]["step_size"]),
+                    "thumbnail_size": 1024,
+                    "device": task["opts"]["device"],
+                    "tissue_thresh": float(task["opts"]["tissue_thresh"]),
+                    "white_thresh": int(task["opts"]["white_thresh"]),
+                    "black_thresh": int(task["opts"]["black_thresh"]),
+                    "fast_mode": bool(task["opts"]["fast_mode"]),
+                    "save_images": bool(task["opts"]["save_images"]),
+                    "target_mag": int(task["opts"]["target_mag"]),
+                }
+                _viz(
+                    hdf5_path=out_h5,
+                    wsi=wsi,
+                    output_dir=str(_Path(task["output_dir"]) / "visualization"),
+                    cli_args=cli_args_dict,
+                )
+            return True, out_h5
+        finally:
+            try:
+                wsi.cleanup()
+            except Exception:
+                pass
+    except Exception as e:
+        return False, str(e)
+
+
 @click.group()
 @click.version_option(version="0.1.0")
 def cli():
@@ -263,8 +481,9 @@ def cli():
 )
 @click.option(
     "--tissue-thresh",
+    "--min-tissue-proportion",
     type=float,
-    default=0.01,
+    default=0.0,
     help="Minimum tissue area threshold as fraction of image (0-1). [default: 0.01]",
 )
 @click.option(
@@ -329,6 +548,13 @@ def cli():
         "[default: 8192]"
     ),
 )
+@click.option(
+    "--workers",
+    type=int,
+    default=1,
+    callback=validate_positive_int,
+    help=("CPU workers for processing multiple WSIs in parallel (per-WSI). [default: 1]"),
+)
 def process(
     wsi_path: str,
     checkpoint: str,
@@ -346,6 +572,7 @@ def process(
     target_mag: str,
     seg_batch_size: int,
     write_batch: int,
+    workers: int,
 ):
     """Process whole slide image(s) with tissue segmentation and patch extraction.
 
@@ -499,6 +726,7 @@ def process(
                 verbose,
                 reporter,
                 pbar,
+                workers,
             )
             successful += s
             failed += f
@@ -529,6 +757,7 @@ def process(
                 verbose,
                 reporter,
                 pbar,
+                workers,
             )
             successful += s
             failed += f

@@ -64,7 +64,7 @@ def visualize_patches_on_thumbnail(
     num_patches = len(coords)
     logger.debug(f"Found {num_patches} patches in HDF5 file")
 
-    # Load WSI thumbnail via project abstraction
+    # Load WSI thumbnail via project abstraction (aspect-preserving)
     thumbnail = wsi.get_thumb((1024, 1024))
     thumbnail_image = thumbnail.convert("RGB")
     wsi_dims = wsi.get_size(lv=0)

@@ -119,6 +119,7 @@ Main command for processing whole slide images with tissue segmentation and patc
 | `--visualize` | flag | False | No | Generate visualization of patches overlaid on WSI thumbnail with processing info |
 | `--verbose/-v` | flag | False | No | Enable verbose logging output |
 | `--seg-batch-size` | int | 1 | No | Batch size for SAM2 thumbnail segmentation when processing a folder; set >1 to enable batched inference |
+| `--workers` | int | 1 | No | CPU workers for processing multiple WSIs in parallel (per-WSI) |
 
 SAM2 Config
 
@@ -299,17 +300,28 @@ Each file represents a single extracted patch with its coordinates in the filena
 **Filtering Parameters:**
 
 - **`--white-thresh`**: Saturation threshold for white patches
-  - Lower values = more aggressively filter white regions
+  - Lower values = more aggressively filter white regions (HSV saturation)
+  - Filtering uses majority rule: a patch is considered white if ≥70% of pixels have
+    saturation below this threshold AND brightness/value ≥ 200.
   - Useful for filtering background and faint areas
 
 - **`--black-thresh`**: RGB threshold for black patches
   - Lower values = filter darker regions
+  - Filtering uses majority rule: a patch is considered black if ≥70% of grayscale
+    pixels are below this threshold.
   - Useful for filtering shadows and staining artifacts
 
 - **`--tissue-thresh`**: Minimum tissue area as fraction of image
   - Filters out very small tissue regions
   - Range: 0.0–1.0
   - Unit: fraction (0–1)
+
+**Parallelism:**
+
+- **`--workers`**: Number of CPU workers for per-WSI parallelism
+  - Processes multiple WSIs simultaneously (after thumbnail segmentation)
+  - Each worker writes its own HDF5 file; no contention
+  - Overlaps GPU segmentation (main process) with CPU extraction (workers) for throughput
 
 ## Tasks
 - [x] Extract patches at different magnification level
