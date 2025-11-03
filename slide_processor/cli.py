@@ -293,10 +293,6 @@ def process(
         device=seg_params.device,
     )
 
-    def _predict_single(img):
-        return sam2_model.predict_image(img, resize_to_input=True)
-
-    predict_fn = _predict_single
     thumb_max = seg_params.thumbnail_max
 
     if verbose:
@@ -330,22 +326,8 @@ def process(
                                 wsi_tmp.cleanup()
                             except Exception:
                                 pass
-                    # Predict masks (batched when seg_batch_size>1)
-                    try:
-                        if seg_batch_size > 1:
-                            masks = sam2_model.predict_batch(thumbs, resize_to_input=True)
-                        else:
-                            masks = [predict_fn(t) for t in thumbs]
-                    except Exception as e:
-                        logger.error(f"Batch segmentation failed ({len(batch_files)} files): {e}")
-                        # Fallback to per-image
-                        masks = []
-                        for t in thumbs:
-                            try:
-                                masks.append(predict_fn(t))
-                            except Exception as ie:
-                                logger.error(f"Segmentation failed for a thumbnail: {ie}")
-                                masks.append(None)  # type: ignore
+                    # Predict masks using batch prediction
+                    masks = sam2_model.predict_batch(thumbs, resize_to_input=True)
 
                     # Patchify each file with its mask
                     for f, m in zip(batch_files, masks):
@@ -357,7 +339,6 @@ def process(
                                 patch=patch_params,
                                 save_images=save_images,
                                 fast_mode=fast_mode,
-                                predict_fn=predict_fn,
                                 thumb_max=thumb_max,
                                 mask_override=m if m is not None else None,
                                 write_batch=write_batch,
@@ -449,19 +430,8 @@ def process(
                         except Exception:
                             pass
 
-                try:
-                    if seg_batch_size > 1:
-                        masks = sam2_model.predict_batch(thumbs, resize_to_input=True)
-                    else:
-                        masks = [predict_fn(t) for t in thumbs]
-                except Exception:
-                    # Fallback to per-image segmentation if batch failed
-                    masks = []
-                    for t in thumbs:
-                        try:
-                            masks.append(predict_fn(t))
-                        except Exception:
-                            masks.append(None)  # type: ignore
+                # Predict masks using batch prediction
+                masks = sam2_model.predict_batch(thumbs, resize_to_input=True)
 
                 # Patchify each file
                 for f, m in zip(batch_files, masks):
@@ -473,7 +443,6 @@ def process(
                             patch=patch_params,
                             save_images=save_images,
                             fast_mode=fast_mode,
-                            predict_fn=predict_fn,
                             thumb_max=thumb_max,
                             mask_override=m if m is not None else None,
                             write_batch=write_batch,
@@ -528,18 +497,8 @@ def process(
                         except Exception:
                             pass
 
-                try:
-                    if seg_batch_size > 1:
-                        masks = sam2_model.predict_batch(thumbs, resize_to_input=True)
-                    else:
-                        masks = [predict_fn(t) for t in thumbs]
-                except Exception:
-                    masks = []
-                    for t in thumbs:
-                        try:
-                            masks.append(predict_fn(t))
-                        except Exception:
-                            masks.append(None)  # type: ignore
+                # Predict masks using batch prediction
+                masks = sam2_model.predict_batch(thumbs, resize_to_input=True)
 
                 for f, m in zip(pending, masks):
                     try:
@@ -550,7 +509,6 @@ def process(
                             patch=patch_params,
                             save_images=save_images,
                             fast_mode=fast_mode,
-                            predict_fn=predict_fn,
                             thumb_max=thumb_max,
                             mask_override=m if m is not None else None,
                             write_batch=write_batch,
