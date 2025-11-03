@@ -111,7 +111,7 @@ Main command for processing whole slide images with tissue segmentation and patc
 | `--step-size` | int | patch-size | No | Step size for patch extraction (stride) at the target magnification. Defaults to patch-size if not set |
 | `--target-mag` | choice | — | Yes | Target magnification for extraction: one of 5, 10, 20, 40, 60, 80 |
 | `--device` | choice | `cuda` | No | Device for inference: `cuda` or `cpu` |
-| `--tissue-thresh` | float | `0.01` | No | Minimum tissue area threshold as percentage of image |
+| `--tissue-thresh` | float | `0.01` | No | Minimum tissue area threshold as fraction of image (0–1) |
 | `--white-thresh` | int | `15` | No | Saturation threshold for filtering white patches |
 | `--black-thresh` | int | `50` | No | RGB threshold for filtering black patches |
 | `--save-images` | flag | False | No | Export individual patch images as PNG files under `images/<stem>/` |
@@ -306,10 +306,10 @@ Each file represents a single extracted patch with its coordinates in the filena
   - Lower values = filter darker regions
   - Useful for filtering shadows and staining artifacts
 
-- **`--tissue-thresh`**: Minimum tissue area as percentage of image
+- **`--tissue-thresh`**: Minimum tissue area as fraction of image
   - Filters out very small tissue regions
-  - Range: 0.0-1.0
-  - Unit: percentage
+  - Range: 0.0–1.0
+  - Unit: fraction (0–1)
 
 ## Tasks
 - [x] Extract patches at different magnification level
