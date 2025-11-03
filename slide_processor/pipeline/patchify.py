@@ -8,7 +8,7 @@ import numpy as np
 
 from slide_processor.patch_extractor.patch_extractor import PatchExtractor
 from slide_processor.utils.contours import mask_to_contours, scale_contours
-from slide_processor.wsi import WSIFactory
+from slide_processor.wsi.iwsi import IWSI
 
 
 @dataclass
@@ -57,7 +57,7 @@ def _build_segmentation_predictor(seg: SegmentParams):
 
 
 def segment_and_patchify(
-    wsi_path: str,
+    wsi: IWSI,
     output_dir: str,
     *,
     seg: SegmentParams,
@@ -72,6 +72,7 @@ def segment_and_patchify(
     """High-level pipeline: segment tissue and patchify WSI into an HDF5 file.
 
     Required parameters:
+    - wsi: Opened WSI object (IWSI implementation) to operate on
     - seg: SegmentParams (checkpoint, config, device, thumbnail_max)
     - patch: PatchifyParams (patch_size and target_magnification required; step_size defaults to patch_size if None)
 
@@ -87,8 +88,7 @@ def segment_and_patchify(
     if patch.step_size is None:
         patch.step_size = int(patch.patch_size)
 
-    # Load WSI and setup thumb segmentation
-    wsi = WSIFactory.load(wsi_path)
+    # Setup dimensions for segmentation/patchification
     W, H = wsi.get_size(lv=0)
 
     if mask_override is not None:
@@ -123,7 +123,7 @@ def segment_and_patchify(
         black_thresh=patch.black_thresh,
     )
 
-    stem = Path(wsi_path).stem
+    stem = Path(wsi.path).stem
     patches_root = Path(output_dir) / "patches"
     patches_root.mkdir(parents=True, exist_ok=True)
     out_h5 = str(patches_root / f"{stem}.h5")
@@ -139,10 +139,5 @@ def segment_and_patchify(
         fast_mode=fast_mode,
         batch=write_batch,
     )
-
-    try:
-        wsi.cleanup()
-    except Exception:
-        pass
 
     return result_path

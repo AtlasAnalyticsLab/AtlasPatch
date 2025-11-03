@@ -8,7 +8,6 @@ from typing import Any
 
 import h5py
 import numpy as np
-import openslide
 from PIL import Image, ImageDraw, ImageFont
 from PIL.ImageFont import FreeTypeFont
 from PIL.ImageFont import ImageFont as PILImageFont
@@ -18,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 def visualize_patches_on_thumbnail(
     hdf5_path: str,
-    wsi_path: str,
+    wsi,
     output_dir: str,
     cli_args: dict[str, Any] | None = None,
 ) -> str:
@@ -32,8 +31,8 @@ def visualize_patches_on_thumbnail(
     ----------
     hdf5_path : str
         Path to HDF5 file containing extracted patches and coordinates.
-    wsi_path : str
-        Path to the whole slide image file.
+    wsi : IWSI
+        Opened WSI object implementing get_thumb/get_size and exposing `.path`.
     output_dir : str
         Directory where the visualization image will be saved.
     cli_args : dict[str, Any] | None, default None
@@ -65,12 +64,10 @@ def visualize_patches_on_thumbnail(
     num_patches = len(coords)
     logger.debug(f"Found {num_patches} patches in HDF5 file")
 
-    # Load WSI and get thumbnail
-    wsi = openslide.OpenSlide(wsi_path)
-    thumbnail = wsi.get_thumbnail((1024, 1024))
+    # Load WSI thumbnail via project abstraction
+    thumbnail = wsi.get_thumb((1024, 1024))
     thumbnail_image = thumbnail.convert("RGB")
-    wsi_dims = wsi.dimensions
-    wsi.close()
+    wsi_dims = wsi.get_size(lv=0)
 
     # Calculate downsample factors
     downsample_x = wsi_dims[0] / thumbnail_image.width
@@ -115,7 +112,7 @@ def visualize_patches_on_thumbnail(
     # Save the image
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    stem = Path(wsi_path).stem
+    stem = Path(wsi.path).stem
     output_path = out_dir / f"{stem}.png"
     thumbnail_image.save(output_path, quality=95)
 

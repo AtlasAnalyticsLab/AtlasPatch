@@ -78,7 +78,7 @@ def mask_to_contours(
     else:
         hierarchy = hierarchy.reshape(-1, 4)
 
-    # Compute minimum tissue area threshold from percentage of image area
+    # Compute minimum tissue area threshold from fraction of image area (0..1)
     H, W = mask.shape[:2]
     image_area = float(H * W)
     min_area_threshold = tissue_area_thresh * image_area

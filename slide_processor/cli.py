@@ -80,47 +80,54 @@ def _process_files_batch(
 
     for f, m in zip(batch_files, masks):
         try:
-            result_h5 = segment_and_patchify(
-                wsi_path=f,
-                output_dir=str(output_path),
-                seg=seg_params,
-                patch=patch_params,
-                save_images=save_images,
-                fast_mode=fast_mode,
-                thumb_max=thumb_max,
-                mask_override=m if m is not None else None,
-                write_batch=write_batch,
-            )
+            wsi = WSIFactory.load(f)
+            try:
+                result_h5 = segment_and_patchify(
+                    wsi=wsi,
+                    output_dir=str(output_path),
+                    seg=seg_params,
+                    patch=patch_params,
+                    save_images=save_images,
+                    fast_mode=fast_mode,
+                    thumb_max=thumb_max,
+                    mask_override=m if m is not None else None,
+                    write_batch=write_batch,
+                )
 
-            if result_h5:
-                successful += 1
-                if verbose:
-                    logger.info(f"Saved patches to: {result_h5}")
-                elif reporter:
-                    reporter.update(success=True)
-                if visualize:
-                    _visualize_result(
-                        result_h5,
-                        f,
-                        output_path,
-                        patch_size,
-                        effective_step_size,
-                        device,
-                        tissue_thresh,
-                        white_thresh,
-                        black_thresh,
-                        fast_mode,
-                        save_images,
-                        target_mag,
-                    )
+                if result_h5:
+                    successful += 1
                     if verbose:
-                        logger.info(f"Visualization saved to: {result_h5}")
-            else:
-                failed += 1
-                if verbose:
-                    logger.warning(f"No patches extracted from {Path(f).name}")
-                elif reporter:
-                    reporter.update(success=False)
+                        logger.info(f"Saved patches to: {result_h5}")
+                    elif reporter:
+                        reporter.update(success=True)
+                    if visualize:
+                        _visualize_result(
+                            result_h5,
+                            wsi,
+                            output_path,
+                            patch_size,
+                            effective_step_size,
+                            device,
+                            tissue_thresh,
+                            white_thresh,
+                            black_thresh,
+                            fast_mode,
+                            save_images,
+                            target_mag,
+                        )
+                        if verbose:
+                            logger.info(f"Visualization saved to: {result_h5}")
+                else:
+                    failed += 1
+                    if verbose:
+                        logger.warning(f"No patches extracted from {Path(f).name}")
+                    elif reporter:
+                        reporter.update(success=False)
+            finally:
+                try:
+                    wsi.cleanup()
+                except Exception:
+                    pass
         except Exception as e:
             failed += 1
             if verbose:
@@ -137,7 +144,7 @@ def _process_files_batch(
 
 def _visualize_result(
     result_h5: str,
-    wsi_path: str,
+    wsi,
     output_path: Path,
     patch_size: int,
     step_size: int,
@@ -168,12 +175,12 @@ def _visualize_result(
     try:
         visualize_patches_on_thumbnail(
             hdf5_path=result_h5,
-            wsi_path=wsi_path,
+            wsi=wsi,
             output_dir=str(vis_output_dir),
             cli_args=cli_args_dict,
         )
     except Exception as e:
-        logger.warning(f"Visualization failed for {Path(wsi_path).name}: {e}")
+        logger.warning(f"Visualization failed for {Path(wsi.path).name}: {e}")
 
 
 @click.group()
@@ -258,7 +265,7 @@ def cli():
     "--tissue-thresh",
     type=float,
     default=0.01,
-    help="Minimum tissue area threshold as percentage of image. [default: 0.01]",
+    help="Minimum tissue area threshold as fraction of image (0-1). [default: 0.01]",
 )
 @click.option(
     "--white-thresh",
@@ -382,8 +389,8 @@ def process(
         raise click.ClickException("--patch-size must be positive")
     if step_size is not None and step_size <= 0:
         raise click.ClickException("--step-size must be positive")
-    if tissue_thresh < 0 or tissue_thresh > 100:
-        raise click.ClickException("--tissue-thresh must be between 0 and 100")
+    if tissue_thresh < 0 or tissue_thresh > 1:
+        raise click.ClickException("--tissue-thresh must be between 0 and 1")
 
     # Create output directory
     output_path = Path(output)
