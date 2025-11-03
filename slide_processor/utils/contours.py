@@ -9,16 +9,15 @@ import numpy as np
 
 @dataclass
 class FourPointContainment:
-    """Four-point containment test around patch center.
+    """Four-point containment test around patch center (lenient any-point mode).
 
-    When `require_all` is True, all probe points must be inside the contour;
-    otherwise, any probe point inside is considered a hit.
+    Computes probe points around the patch center and returns True if any probe
+    falls inside the provided contour.
     """
 
     contour: np.ndarray
     patch_size: int
     center_shift: float = 0.5
-    require_all: bool = False
 
     def __call__(self, pt: tuple[int, int]) -> bool:
         cx = pt[0] + self.patch_size // 2
@@ -36,7 +35,7 @@ class FourPointContainment:
             probes = [(cx, cy)]
 
         inside = [cv2.pointPolygonTest(self.contour, p, False) >= 0 for p in probes]
-        return all(inside) if self.require_all else any(inside)
+        return any(inside)
 
 
 def mask_to_contours(
@@ -79,12 +78,10 @@ def mask_to_contours(
     else:
         hierarchy = hierarchy.reshape(-1, 4)
 
-    # Compute minimum tissue area threshold from percentage of image area
+    # Compute minimum tissue area threshold from fraction of image area (0..1)
     H, W = mask.shape[:2]
     image_area = float(H * W)
-    min_area_threshold = (
-        tissue_area_thresh * image_area
-    )  # changed from (tissue_area_thresh / 100.0 * image_area)
+    min_area_threshold = tissue_area_thresh * image_area
     effective_min_area = max(min_area_threshold, float(filter_params["a_t"]))
 
     # Collect tissue contours (parent == -1) and holes (parent != -1)

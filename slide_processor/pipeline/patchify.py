@@ -8,7 +8,7 @@ import numpy as np
 
 from slide_processor.patch_extractor.patch_extractor import PatchExtractor
 from slide_processor.utils.contours import mask_to_contours, scale_contours
-from slide_processor.wsi import WSIFactory
+from slide_processor.wsi.iwsi import IWSI
 
 
 @dataclass
@@ -16,12 +16,11 @@ class PatchifyParams:
     """Patch extraction configuration."""
 
     patch_size: int
+    target_magnification: int
     step_size: int | None = None  # Defaults to patch_size when None
     tissue_area_thresh: float = 0.01
-    require_all_points: bool = False
     white_thresh: int = 15
     black_thresh: int = 50
-    use_padding: bool = True
 
 
 @dataclass
@@ -29,9 +28,16 @@ class SegmentParams:
     """Segmentation configuration for SAM2."""
 
     checkpoint_path: Path
-    config_file: Path
+    config_file: Path = None  # type: ignore
     device: str = "cuda"
     thumbnail_max: int = 1024
+
+    def __post_init__(self):
+        """Set default config file if not provided."""
+        default_cfg = Path(__file__).resolve().parent.parent / "configs" / "sam2.1_hiera_t.yaml"
+        if not default_cfg.exists():
+            raise FileNotFoundError(f"Built-in SAM2 config not found: {default_cfg}")
+        self.config_file = default_cfg
 
 
 def _build_segmentation_predictor(seg: SegmentParams):
@@ -51,25 +57,29 @@ def _build_segmentation_predictor(seg: SegmentParams):
 
 
 def segment_and_patchify(
-    wsi_path: str,
+    wsi: IWSI,
     output_dir: str,
     *,
     seg: SegmentParams,
     patch: PatchifyParams,
     save_images: bool = False,
-    store_images: bool = True,
     fast_mode: bool = False,
     predict_fn: Callable[[Any], np.ndarray] | None = None,
     thumb_max: int | None = None,
+    mask_override: np.ndarray | None = None,
+    write_batch: int = 8192,
 ) -> str | None:
     """High-level pipeline: segment tissue and patchify WSI into an HDF5 file.
 
     Required parameters:
+    - wsi: Opened WSI object (IWSI implementation) to operate on
     - seg: SegmentParams (checkpoint, config, device, thumbnail_max)
-    - patch: PatchifyParams (patch_size required; step_size defaults to patch_size if None)
+    - patch: PatchifyParams (patch_size and target_magnification required; step_size defaults to patch_size if None)
 
     Behavior:
-    - If `save_images` is True, PNGs are saved under `<output_dir>/<stem>/images/`.
+    - HDF5 files are saved under `<output_dir>/patches/<stem>.h5`.
+    - If `save_images` is True, per-patch PNGs are saved under
+      `<output_dir>/images/<stem>/`.
     - Returns HDF5 path as string, or None if no patches were saved.
     """
     # Ensure required patch values
@@ -78,18 +88,20 @@ def segment_and_patchify(
     if patch.step_size is None:
         patch.step_size = int(patch.patch_size)
 
-    # Load WSI and setup thumb segmentation
-    wsi = WSIFactory.load(wsi_path)
+    # Setup dimensions for segmentation/patchification
     W, H = wsi.get_size(lv=0)
 
-    if predict_fn is None or thumb_max is None:
-        predict_fn, thumb_max = _build_segmentation_predictor(seg)
-    # mypy: ensure non-None after lazy init
-    assert predict_fn is not None and thumb_max is not None
-    thumb = wsi.get_thumb((thumb_max, thumb_max))
-
-    # Predict binary mask (H, W) in [0, 1]
-    mask = predict_fn(thumb)
+    if mask_override is not None:
+        mask = mask_override
+        ht, wt = mask.shape[:2]
+    else:
+        if predict_fn is None or thumb_max is None:
+            predict_fn, thumb_max = _build_segmentation_predictor(seg)
+        # ensure non-None after lazy init
+        assert predict_fn is not None and thumb_max is not None
+        thumb = wsi.get_thumb((thumb_max, thumb_max))
+        mask = predict_fn(thumb)
+        ht, wt = mask.shape[:2]
 
     # Extract contours on thumbnail
     tissue_contours_t, holes_contours_t = mask_to_contours(
@@ -97,7 +109,6 @@ def segment_and_patchify(
     )
 
     # Scale contours to level 0
-    ht, wt = mask.shape[:2]
     sx = W / float(wt)
     sy = H / float(ht)
     tissue_contours = scale_contours(tissue_contours_t, sx, sy)
@@ -107,18 +118,17 @@ def segment_and_patchify(
     extractor = PatchExtractor(
         patch_size=patch.patch_size,
         step_size=patch.step_size,
+        target_mag=patch.target_magnification,
         white_thresh=patch.white_thresh,
         black_thresh=patch.black_thresh,
-        use_padding=patch.use_padding,
-        require_all_points=patch.require_all_points,
     )
 
-    stem = Path(wsi_path).stem
-    out_dir = Path(output_dir) / stem
-    out_dir.mkdir(parents=True, exist_ok=True)
-    out_h5 = str(out_dir / f"{stem}.h5")
+    stem = Path(wsi.path).stem
+    patches_root = Path(output_dir) / "patches"
+    patches_root.mkdir(parents=True, exist_ok=True)
+    out_h5 = str(patches_root / f"{stem}.h5")
 
-    img_dir = str(out_dir / "images") if save_images else None
+    img_dir = str(Path(output_dir) / "images" / stem) if save_images else None
 
     result_path = extractor.extract_to_h5(
         wsi,
@@ -126,14 +136,8 @@ def segment_and_patchify(
         holes_contours,
         out_h5,
         image_output_dir=img_dir,
-        store_images=store_images,
         fast_mode=fast_mode,
-        batch=512,
+        batch=write_batch,
     )
-
-    try:
-        wsi.cleanup()
-    except Exception:
-        pass
 
     return result_path
