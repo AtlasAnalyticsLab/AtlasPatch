@@ -28,9 +28,16 @@ class SegmentParams:
     """Segmentation configuration for SAM2."""
 
     checkpoint_path: Path
-    config_file: Path
+    config_file: Path = None  # type: ignore
     device: str = "cuda"
     thumbnail_max: int = 1024
+
+    def __post_init__(self):
+        """Set default config file if not provided."""
+        default_cfg = Path(__file__).resolve().parent.parent / "configs" / "sam2.1_hiera_t.yaml"
+        if not default_cfg.exists():
+            raise FileNotFoundError(f"Built-in SAM2 config not found: {default_cfg}")
+        self.config_file = default_cfg
 
 
 def _build_segmentation_predictor(seg: SegmentParams):

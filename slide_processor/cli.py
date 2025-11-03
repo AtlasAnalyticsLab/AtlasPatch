@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import logging
-import os
 import sys
-import time
 from pathlib import Path
 
 import click
+from utils.params import get_wsi_files, validate_path, validate_positive_int
+from utils.progress import ProgressReporter
 
 from slide_processor.pipeline.patchify import (
     PatchifyParams,
@@ -36,72 +36,6 @@ class _SuppressNumpyHxWxCFilter(logging.Filter):
 
 logging.getLogger().addFilter(_SuppressNumpyHxWxCFilter())
 logger = logging.getLogger("slide_processor.cli")
-
-
-def validate_path(ctx, param, value):
-    """Validate that file/directory path exists."""
-    if value is None:
-        return None
-    path = Path(value)
-    if not path.exists():
-        raise click.BadParameter(f"Path does not exist: {value}")
-    return str(path.absolute())
-
-
-def validate_positive_int(ctx, param, value):
-    """Validate that value is a positive integer."""
-    if value is not None and value <= 0:
-        raise click.BadParameter(f"{param.name} must be positive, got {value}")
-    return value
-
-
-def get_wsi_files(path: str) -> list[str]:
-    """Get list of WSI files from path (file or directory).
-
-    Supported formats:
-    - OpenSlide: .svs, .tif, .tiff, .ndpi, .vms, .vmu, .scn, .mrxs, .bif, .dcm
-    - Image: .png, .jpg, .jpeg, .bmp, .webp, .gif
-    """
-    supported_exts = {
-        ".svs",
-        ".tif",
-        ".tiff",
-        ".ndpi",
-        ".vms",
-        ".vmu",
-        ".scn",
-        ".mrxs",
-        ".bif",
-        ".biff",
-        ".dcm",
-        ".dicom",
-        ".png",
-        ".jpg",
-        ".jpeg",
-        ".bmp",
-        ".webp",
-        ".gif",
-    }
-    path_obj = Path(path)
-
-    if path_obj.is_file():
-        if path_obj.suffix.lower() not in supported_exts:
-            logger.warning(f"File may not be a supported WSI format: {path_obj.name}")
-        return [str(path_obj)]
-
-    # Directory: collect all supported files
-    files: list[Path] = []
-    for ext in supported_exts:
-        files.extend(path_obj.glob(f"*{ext}"))
-        files.extend(path_obj.glob(f"*{ext.upper()}"))
-
-    if not files:
-        raise click.ClickException(
-            f"No WSI files found in directory: {path}\n"
-            f"Supported formats: SVS, TIF, TIFF, NDPI, PNG, JPG, etc."
-        )
-
-    return sorted([str(f) for f in files])
 
 
 @click.group()
@@ -333,13 +267,8 @@ def process(
     effective_step_size = step_size if step_size is not None else patch_size
 
     # Create segmentation and patchification parameters
-    default_cfg = Path(__file__).resolve().parent / "configs" / "sam2.1_hiera_t.yaml"
-    if not default_cfg.exists():
-        raise click.ClickException(f"Built-in SAM2 config not found: {default_cfg}")
-
     seg_params = SegmentParams(
         checkpoint_path=Path(checkpoint),
-        config_file=default_cfg,
         device=device.lower(),
         thumbnail_max=1024,
     )
@@ -488,138 +417,103 @@ def process(
             except Exception:
                 failed += 1
     else:
-        start_time = time.monotonic()
+        reporter = ProgressReporter(num_files)
 
-        def _fmt_duration(s: float) -> str:
-            s = max(0.0, float(s))
-            m, sec = divmod(int(s + 0.5), 60)
-            h, min_ = divmod(m, 60)
-            if h > 0:
-                return f"{h:02d}:{min_:02d}:{sec:02d}"
-            return f"{min_:02d}:{sec:02d}"
+        with reporter.progress_bar("Processing WSI files") as pbar:
+            pending = []
+            for wsi_file in wsi_files:
+                stem = Path(wsi_file).stem
+                existing_h5 = output_path / "patches" / f"{stem}.h5"
+                if existing_h5.exists():
+                    reporter.update(success=True)
+                    reporter.update_progress_bar(pbar)
+                    continue
 
-        def _status(done: int) -> str:
-            left = max(0, num_files - done)
-            now = time.monotonic()
-            if done > 0:
-                elapsed = now - start_time
-                avg = elapsed / done
-                eta = avg * left
-                avg_str = f"{avg:.2f}s/it"
-                eta_str = _fmt_duration(eta)
-                elapsed_str = _fmt_duration(elapsed)
-            else:
-                avg_str = "– s/it"
-                eta_str = "--:--"
-                elapsed_str = "00:00"
-            return f"{done}/{num_files} [{elapsed_str}<{eta_str}, {avg_str}]  S:{successful} F:{failed}"
+                pending.append(wsi_file)
+                if seg_batch_size > 1 and len(pending) < seg_batch_size:
+                    continue
 
-        processed = 0
-        interactive = sys.stderr.isatty()
-        stream = sys.stderr if interactive else open(os.devnull, "w")
-        try:
-            with click.progressbar(
-                length=num_files,
-                label=f"Processing WSI files  {_status(0)}",
-                file=stream,
-            ) as pbar:
+                # Process current pending batch
+                batch_files = pending
                 pending = []
-                for wsi_file in wsi_files:
-                    stem = Path(wsi_file).stem
-                    existing_h5 = output_path / "patches" / f"{stem}.h5"
-                    if existing_h5.exists():
-                        processed += 1
-                        pbar.label = f"Processing WSI files  {_status(processed)}"
-                        pbar.update(1)
-                        continue
 
-                    pending.append(wsi_file)
-                    if seg_batch_size > 1 and len(pending) < seg_batch_size:
-                        continue
-
-                    # Process current pending batch
-                    batch_files = pending
-                    pending = []
-
-                    # Build thumbnails
-                    thumbs = []
-                    for f in batch_files:
-                        wsi_tmp = WSIFactory.load(f)
-                        try:
-                            thumbs.append(wsi_tmp.get_thumb((thumb_max, thumb_max)))
-                        finally:
-                            try:
-                                wsi_tmp.cleanup()
-                            except Exception:
-                                pass
-
+                # Build thumbnails
+                thumbs = []
+                for f in batch_files:
+                    wsi_tmp = WSIFactory.load(f)
                     try:
-                        if seg_batch_size > 1:
-                            masks = sam2_model.predict_batch(thumbs, resize_to_input=True)
-                        else:
-                            masks = [predict_fn(t) for t in thumbs]
-                    except Exception:
-                        # Fallback to per-image segmentation if batch failed
-                        masks = []
-                        for t in thumbs:
-                            try:
-                                masks.append(predict_fn(t))
-                            except Exception:
-                                masks.append(None)  # type: ignore
-
-                    # Patchify each file
-                    for f, m in zip(batch_files, masks):
+                        thumbs.append(wsi_tmp.get_thumb((thumb_max, thumb_max)))
+                    finally:
                         try:
-                            result_h5 = segment_and_patchify(
-                                wsi_path=f,
-                                output_dir=str(output_path),
-                                seg=seg_params,
-                                patch=patch_params,
-                                save_images=save_images,
-                                fast_mode=fast_mode,
-                                predict_fn=predict_fn,
-                                thumb_max=thumb_max,
-                                mask_override=m if m is not None else None,
-                                write_batch=write_batch,
-                            )
-
-                            if result_h5:
-                                successful += 1
-                            else:
-                                failed += 1
-
-                            if visualize and result_h5:
-                                vis_output_dir = output_path / "visualization"
-                                vis_output_dir.mkdir(parents=True, exist_ok=True)
-
-                                cli_args_dict = {
-                                    "patch_size": patch_size,
-                                    "step_size": effective_step_size,
-                                    "thumbnail_size": 1024,
-                                    "device": device,
-                                    "tissue_thresh": tissue_thresh,
-                                    "white_thresh": white_thresh,
-                                    "black_thresh": black_thresh,
-                                    "fast_mode": fast_mode,
-                                    "save_images": save_images,
-                                    "target_mag": int(target_mag),
-                                }
-                                try:
-                                    _ = visualize_patches_on_thumbnail(
-                                        hdf5_path=result_h5,
-                                        wsi_path=f,
-                                        output_dir=str(vis_output_dir),
-                                        cli_args=cli_args_dict,
-                                    )
-                                except Exception as ve:
-                                    # Visualization failure should not mark the slide as failed processing
-                                    logger.warning(f"Visualization failed for {Path(f).name}: {ve}")
+                            wsi_tmp.cleanup()
                         except Exception:
-                            failed += 1
-                        finally:
-                            processed += 1
-                            pbar.label = f"Processing WSI files  {_status(processed)}"
-                            pbar.update(1)
+                            pass
+
+                try:
+                    if seg_batch_size > 1:
+                        masks = sam2_model.predict_batch(thumbs, resize_to_input=True)
+                    else:
+                        masks = [predict_fn(t) for t in thumbs]
+                except Exception:
+                    # Fallback to per-image segmentation if batch failed
+                    masks = []
+                    for t in thumbs:
+                        try:
+                            masks.append(predict_fn(t))
+                        except Exception:
+                            masks.append(None)  # type: ignore
+
+                # Patchify each file
+                for f, m in zip(batch_files, masks):
+                    try:
+                        result_h5 = segment_and_patchify(
+                            wsi_path=f,
+                            output_dir=str(output_path),
+                            seg=seg_params,
+                            patch=patch_params,
+                            save_images=save_images,
+                            fast_mode=fast_mode,
+                            predict_fn=predict_fn,
+                            thumb_max=thumb_max,
+                            mask_override=m if m is not None else None,
+                            write_batch=write_batch,
+                        )
+
+                        if result_h5:
+                            reporter.update(success=True)
+                        else:
+                            reporter.update(success=False)
+
+                        if visualize and result_h5:
+                            vis_output_dir = output_path / "visualization"
+                            vis_output_dir.mkdir(parents=True, exist_ok=True)
+
+                            cli_args_dict = {
+                                "patch_size": patch_size,
+                                "step_size": effective_step_size,
+                                "thumbnail_size": 1024,
+                                "device": device,
+                                "tissue_thresh": tissue_thresh,
+                                "white_thresh": white_thresh,
+                                "black_thresh": black_thresh,
+                                "fast_mode": fast_mode,
+                                "save_images": save_images,
+                                "target_mag": int(target_mag),
+                            }
+                            try:
+                                _ = visualize_patches_on_thumbnail(
+                                    hdf5_path=result_h5,
+                                    wsi_path=f,
+                                    output_dir=str(vis_output_dir),
+                                    cli_args=cli_args_dict,
+                                )
+                            except Exception as ve:
+                                # Visualization failure should not mark the slide as failed processing
+                                logger.warning(f"Visualization failed for {Path(f).name}: {ve}")
+                    except Exception:
+                        reporter.update(success=False)
+                    finally:
+                        reporter.update_progress_bar(pbar)
 
             # Process any remaining pending files
             if pending:
@@ -662,9 +556,9 @@ def process(
                             write_batch=write_batch,
                         )
                         if result_h5:
-                            successful += 1
+                            reporter.update(success=True)
                         else:
-                            failed += 1
+                            reporter.update(success=False)
                         if visualize and result_h5:
                             vis_output_dir = output_path / "visualization"
                             vis_output_dir.mkdir(parents=True, exist_ok=True)
@@ -690,17 +584,15 @@ def process(
                             except Exception as ve:
                                 logger.warning(f"Visualization failed for {Path(f).name}: {ve}")
                     except Exception:
-                        failed += 1
+                        reporter.update(success=False)
                     finally:
-                        processed += 1
-                        pbar.label = f"Processing WSI files  {_status(processed)}"
-                        pbar.update(1)
-        finally:
-            if not interactive:
-                try:
-                    stream.close()
-                except Exception:
-                    pass
+                        reporter.update_progress_bar(pbar)
+
+        # Check if all files failed in non-verbose mode
+        if reporter.failed > 0 and reporter.failed == num_files:
+            raise click.ClickException("All files failed to process. Check logs for details.")
+
+    # Check if all files failed in verbose mode
     if failed > 0 and failed == num_files:
         raise click.ClickException("All files failed to process. Check logs for details.")
 
