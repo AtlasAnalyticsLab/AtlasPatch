@@ -85,7 +85,7 @@ slideproc process ./wsi_folder/ --checkpoint model.pt \
 slideproc process sample.svs \
     --checkpoint model.pt \
     --patch-size 512 --step-size 256 --target-mag 20 \
-    --output ./output --save-images --visualize
+    --output ./output --save-images --visualize-grids
 ```
 
 ### Commands
@@ -116,7 +116,10 @@ Main command for processing whole slide images with tissue segmentation and patc
 | `--black-thresh` | int | `50` | No | RGB threshold for filtering black patches |
 | `--save-images` | flag | False | No | Export individual patch images as PNG files under `images/<stem>/` |
 | `--fast-mode` | flag | False | No | Skip per-patch content filtering for faster extraction (may include background patches) |
-| `--visualize` | flag | False | No | Generate visualization of patches overlaid on WSI thumbnail with processing info |
+| `--visualize-grids` | flag | False | No | Generate patch grid overlay on WSI thumbnail |
+| `--visualize-mask` | flag | False | No | Generate predicted tissue mask overlay visualization on thumbnail |
+| `--visualize-contours` | flag | False | No | Generate tissue contour overlay visualization on thumbnail |
+| `--recursive` | flag | False | No | Recursively search directories for WSI files |
 | `--verbose/-v` | flag | False | No | Enable verbose logging output |
 | `--seg-batch-size` | int | 1 | No | Batch size for SAM2 thumbnail segmentation when processing a folder; set >1 to enable batched inference |
 | `--workers` | int | 1 | No | CPU workers for processing multiple WSIs in parallel (per-WSI) |
@@ -212,19 +215,18 @@ slideproc process sample.svs \
 #### Generate Visualizations
 
 ```bash
-# Generate patch overlay visualization on thumbnail
+# Generate visualizations on thumbnail
 slideproc process sample.svs \
     --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
-    --visualize
+    --visualize-grids --visualize-mask --visualize-contours
 
 ```
 
-The `--visualize` flag creates a visualization showing:
-- WSI thumbnail with patch locations overlaid as green rectangles
-- Information panel with extraction statistics and parameters used
-
-The visualization is saved in the output directory: `output/visualization/<wsi_stem>.png`.
+The visualization flags create the following images under `output/visualization/`:
+- `<wsi_stem>.png`: patch grid overlay (`--visualize-grids`)
+- `<wsi_stem>_mask.png`: mask overlay (`--visualize-mask`)
+- `<wsi_stem>_contours.png`: contour overlay (`--visualize-contours`)
 
 #### `slideproc info`
 

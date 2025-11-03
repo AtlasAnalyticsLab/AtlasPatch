@@ -23,7 +23,7 @@ def validate_positive_int(ctx, param, value):
     return value
 
 
-def get_wsi_files(path: str) -> list[str]:
+def get_wsi_files(path: str, *, recursive: bool = False) -> list[str]:
     """Get list of WSI files from path (file or directory).
 
     Supported formats:
@@ -58,15 +58,23 @@ def get_wsi_files(path: str) -> list[str]:
         return [str(path_obj)]
 
     # Directory: collect all supported files
-    files: list[Path] = []
-    for ext in supported_exts:
-        files.extend(path_obj.glob(f"*{ext}"))
-        files.extend(path_obj.glob(f"*{ext.upper()}"))
+    files_set: set[Path] = set()
+    if recursive:
+        # Recursive search using rglob
+        for ext in supported_exts:
+            files_set.update(path_obj.rglob(f"*{ext}"))
+            files_set.update(path_obj.rglob(f"*{ext.upper()}"))
+    else:
+        # Non-recursive (current directory only)
+        for ext in supported_exts:
+            files_set.update(path_obj.glob(f"*{ext}"))
+            files_set.update(path_obj.glob(f"*{ext.upper()}"))
 
+    files = sorted(files_set)
     if not files:
         raise click.ClickException(
             f"No WSI files found in directory: {path}\n"
             f"Supported formats: SVS, TIF, TIFF, NDPI, PNG, JPG, etc."
         )
 
-    return sorted([str(f) for f in files])
+    return [str(f) for f in files]

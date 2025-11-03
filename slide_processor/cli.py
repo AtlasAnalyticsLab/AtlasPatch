@@ -22,6 +22,8 @@ from slide_processor.utils.params import (
 )
 from slide_processor.utils.progress import ProgressReporter
 from slide_processor.visualization import (
+    visualize_contours_on_thumbnail,
+    visualize_mask_on_thumbnail,
     visualize_patches_on_thumbnail,
 )
 from slide_processor.wsi import WSIFactory
@@ -79,7 +81,9 @@ def _build_wsi_task(
     save_images: bool,
     fast_mode: bool,
     write_batch: int,
-    visualize: bool,
+    visualize_grids: bool,
+    visualize_mask: bool,
+    visualize_contours: bool,
     device: str,
     patch_size: int,
     tissue_thresh: float,
@@ -108,7 +112,9 @@ def _build_wsi_task(
             "save_images": bool(save_images),
             "fast_mode": bool(fast_mode),
             "write_batch": int(write_batch),
-            "visualize": bool(visualize),
+            "visualize_grids": bool(visualize_grids),
+            "visualize_mask": bool(visualize_mask),
+            "visualize_contours": bool(visualize_contours),
             "device": device,
             "patch_size": int(patch_size),
             "step_size": int(effective_step_size),
@@ -162,7 +168,9 @@ def _process_files_batch(
     fast_mode: bool,
     thumb_max: int,
     write_batch: int,
-    visualize: bool,
+    visualize_grids: bool,
+    visualize_mask: bool,
+    visualize_contours: bool,
     patch_size: int,
     effective_step_size: int,
     device: str,
@@ -190,7 +198,9 @@ def _process_files_batch(
                 save_images=save_images,
                 fast_mode=fast_mode,
                 write_batch=write_batch,
-                visualize=visualize,
+                visualize_grids=visualize_grids,
+                visualize_mask=visualize_mask,
+                visualize_contours=visualize_contours,
                 device=device,
                 patch_size=patch_size,
                 tissue_thresh=tissue_thresh,
@@ -233,7 +243,7 @@ def _process_files_batch(
                         logger.info(f"Saved patches to: {result_h5}")
                     elif reporter:
                         reporter.update(success=True)
-                    if visualize:
+                    if visualize_grids or visualize_mask or visualize_contours:
                         _visualize_result(
                             result_h5,
                             wsi,
@@ -247,6 +257,10 @@ def _process_files_batch(
                             fast_mode,
                             save_images,
                             target_mag,
+                            mask=m,
+                            do_grids=visualize_grids,
+                            do_mask=visualize_mask,
+                            do_contours=visualize_contours,
                         )
                         if verbose:
                             logger.info(f"Visualization saved to: {result_h5}")
@@ -288,8 +302,13 @@ def _visualize_result(
     fast_mode: bool,
     save_images: bool,
     target_mag: int,
+    *,
+    mask,
+    do_grids: bool,
+    do_mask: bool,
+    do_contours: bool,
 ) -> None:
-    """Visualize patches on thumbnail."""
+    """Visualize outputs on thumbnail based on requested types."""
     vis_output_dir = output_path / "visualization"
     vis_output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -306,12 +325,39 @@ def _visualize_result(
         "target_mag": target_mag,
     }
     try:
-        visualize_patches_on_thumbnail(
-            hdf5_path=result_h5,
-            wsi=wsi,
-            output_dir=str(vis_output_dir),
-            cli_args=cli_args_dict,
-        )
+        if do_grids:
+            visualize_patches_on_thumbnail(
+                hdf5_path=result_h5,
+                wsi=wsi,
+                output_dir=str(vis_output_dir),
+                cli_args=cli_args_dict,
+            )
+        if do_mask and mask is not None:
+            visualize_mask_on_thumbnail(
+                mask=mask,
+                wsi=wsi,
+                output_dir=str(vis_output_dir),
+            )
+        if do_contours and mask is not None:
+            # Compute contours once for visualization
+            from slide_processor.utils.contours import mask_to_contours as _mask_to_contours
+            from slide_processor.utils.contours import scale_contours as _scale_contours
+
+            # mask is in thumbnail space; scale contours to level-0
+            W0, H0 = wsi.get_size(lv=0)
+            mh, mw = mask.shape[:2]
+            sx = W0 / float(mw)
+            sy = H0 / float(mh)
+            tcs_t, hcs_t = _mask_to_contours(mask, tissue_area_thresh=float(tissue_thresh))
+            tcs = _scale_contours(tcs_t, sx, sy)
+            hcs = [_scale_contours(hs, sx, sy) for hs in hcs_t]
+
+            visualize_contours_on_thumbnail(
+                tissue_contours=tcs,
+                holes_contours=hcs,
+                wsi=wsi,
+                output_dir=str(vis_output_dir),
+            )
     except Exception as e:
         logger.warning(f"Visualization failed for {Path(wsi.path).name}: {e}")
 
@@ -392,7 +438,18 @@ def _process_wsi_worker(task: dict) -> tuple[bool, str]:
                 return False, "No patches extracted"
 
             # Visualize if requested
-            if bool(task["opts"]["visualize"]):
+            if (
+                bool(task["opts"].get("visualize_grids"))
+                or bool(task["opts"].get("visualize_mask"))
+                or bool(task["opts"].get("visualize_contours"))
+            ):
+                from slide_processor.visualization import (
+                    visualize_contours_on_thumbnail as _viz_contours,
+                )
+                from slide_processor.visualization import (
+                    visualize_mask_on_thumbnail as _viz_mask,
+                )
+
                 cli_args_dict = {
                     "patch_size": int(task["opts"]["patch_size"]),
                     "step_size": int(task["opts"]["step_size"]),
@@ -405,12 +462,23 @@ def _process_wsi_worker(task: dict) -> tuple[bool, str]:
                     "save_images": bool(task["opts"]["save_images"]),
                     "target_mag": int(task["opts"]["target_mag"]),
                 }
-                _viz(
-                    hdf5_path=result_path,
-                    wsi=wsi,
-                    output_dir=str(_Path(task["output_dir"]) / "visualization"),
-                    cli_args=cli_args_dict,
-                )
+                out_dir = str(_Path(task["output_dir"]) / "visualization")
+                if bool(task["opts"].get("visualize_grids")):
+                    _viz(
+                        hdf5_path=result_path,
+                        wsi=wsi,
+                        output_dir=out_dir,
+                        cli_args=cli_args_dict,
+                    )
+                if bool(task["opts"].get("visualize_mask")) and mask is not None:
+                    _viz_mask(mask=mask, wsi=wsi, output_dir=out_dir)
+                if bool(task["opts"].get("visualize_contours")) and mask is not None:
+                    _viz_contours(
+                        tissue_contours=tissue_contours,
+                        holes_contours=holes_contours,
+                        wsi=wsi,
+                        output_dir=out_dir,
+                    )
 
             return True, result_path
         finally:
@@ -544,10 +612,22 @@ def cli():
     ),
 )
 @click.option(
-    "--visualize",
+    "--visualize-grids",
     is_flag=True,
     default=False,
-    help="Generate visualization of patches overlaid on WSI thumbnail with processing info.",
+    help="Generate patch grid overlay visualization on WSI thumbnail.",
+)
+@click.option(
+    "--visualize-mask",
+    is_flag=True,
+    default=False,
+    help="Generate predicted tissue mask overlay visualization on thumbnail.",
+)
+@click.option(
+    "--visualize-contours",
+    is_flag=True,
+    default=False,
+    help="Generate tissue contours overlay visualization on thumbnail.",
 )
 @click.option(
     "--seg-batch-size",
@@ -576,6 +656,12 @@ def cli():
     callback=validate_positive_int,
     help=("CPU workers for processing multiple WSIs in parallel (per-WSI). [default: 1]"),
 )
+@click.option(
+    "--recursive",
+    is_flag=True,
+    default=False,
+    help="Recursively search for WSI files in directories.",
+)
 def process(
     wsi_path: str,
     checkpoint: str,
@@ -589,11 +675,14 @@ def process(
     save_images: bool,
     verbose: bool,
     fast_mode: bool,
-    visualize: bool,
+    visualize_grids: bool,
+    visualize_mask: bool,
+    visualize_contours: bool,
     target_mag: str,
     seg_batch_size: int,
     write_batch: int,
     workers: int,
+    recursive: bool,
 ):
     """Process whole slide image(s) with tissue segmentation and patch extraction.
 
@@ -647,7 +736,7 @@ def process(
 
     # Get list of WSI files to process
     try:
-        wsi_files = get_wsi_files(wsi_path)
+        wsi_files = get_wsi_files(wsi_path, recursive=recursive)
     except click.ClickException:
         raise
     except Exception as e:
@@ -691,10 +780,12 @@ def process(
     # Setup progress reporter or simple counters
     reporter = None if verbose else ProgressReporter(num_files)
     pbar = None
+    pbar_cm = None
 
     try:
         if not verbose and reporter is not None:
-            pbar = reporter.progress_bar("Processing WSI files").__enter__()
+            pbar_cm = reporter.progress_bar("Processing WSI files")
+            pbar = pbar_cm.__enter__()
 
         pending: list[str] = []
         for wsi_file in wsi_files:
@@ -736,7 +827,9 @@ def process(
                 fast_mode,
                 thumb_max,
                 write_batch,
-                visualize,
+                visualize_grids,
+                visualize_mask,
+                visualize_contours,
                 patch_size,
                 effective_step_size,
                 device,
@@ -774,7 +867,9 @@ def process(
                 fast_mode,
                 thumb_max,
                 write_batch,
-                visualize,
+                visualize_grids,
+                visualize_mask,
+                visualize_contours,
                 patch_size,
                 effective_step_size,
                 device,
@@ -798,8 +893,8 @@ def process(
                 _torch.cuda.empty_cache()
 
     finally:
-        if pbar and reporter is not None:
-            reporter.progress_bar("Processing WSI files").__exit__(None, None, None)
+        if pbar_cm is not None and reporter is not None:
+            pbar_cm.__exit__(None, None, None)
 
     # Check if all files failed
     if (reporter and reporter.failed > 0 and reporter.failed == num_files) or (
@@ -845,7 +940,10 @@ def info():
     )
     click.echo("  • HDF5 per WSI under 'patches/<stem>.h5'")
     click.echo("  • Optional per-patch PNGs under 'images/<stem>/' when '--save-images' is used")
-    click.echo("  • Visualization PNG under 'visualization/<stem>.png' when '--visualize' is used")
+    click.echo("  • Visualizations under 'visualization/':")
+    click.echo("    - '<stem>.png' for --visualize-grids (patch grids)")
+    click.echo("    - '<stem>_mask.png' for --visualize-mask (mask overlay)")
+    click.echo("    - '<stem>_contours.png' for --visualize-contours (contour overlay)")
 
     click.echo("\n" + "=" * 70 + "\n")
 

@@ -170,3 +170,119 @@ def _draw_info_box(image: Image.Image, text: str, padding: int = 10) -> None:
     text_y = y1 + padding
     for i, line in enumerate(lines):
         draw.text((text_x, text_y + i * line_height), line, fill=(0, 0, 0, 255), font=font)
+
+
+def visualize_mask_on_thumbnail(
+    *,
+    mask: np.ndarray,
+    wsi,
+    output_dir: str,
+) -> str:
+    """
+    Visualize the predicted mask as a semi-transparent overlay on the WSI thumbnail.
+
+    Saves to '<stem>_mask.png' in the given output directory.
+    """
+    logger.info("Creating mask overlay visualization on thumbnail...")
+
+    # Prepare thumbnail
+    thumb = wsi.get_thumb((1024, 1024))
+    thumbnail_image = thumb.convert("RGB")
+
+    # Ensure mask is HxW in [0, 1]
+    if mask.dtype != np.float32 and mask.dtype != np.float64:
+        mask_float = (mask.astype(np.float32) > 0.5).astype(np.float32)
+    else:
+        mask_float = (mask > 0.5).astype(np.float32)
+
+    # Resize mask to thumbnail size if needed
+    mh, mw = mask_float.shape[:2]
+    if (mw, mh) != (thumbnail_image.width, thumbnail_image.height):
+        from PIL import Image as _PILImage
+
+        m_img = _PILImage.fromarray((mask_float * 255).astype(np.uint8), mode="L")
+        m_img = m_img.resize(
+            (thumbnail_image.width, thumbnail_image.height),
+            resample=_PILImage.Resampling.NEAREST,
+        )
+        mask_float = np.asarray(m_img, dtype=np.float32) / 255.0
+
+    # Build RGBA overlay (red)
+    alpha = 90  # transparency for mask regions
+    mask_rgba = Image.fromarray((mask_float * alpha).astype(np.uint8), mode="L")
+    red_layer = Image.new("RGBA", thumbnail_image.size, (255, 0, 0, 0))
+    red_layer.putalpha(mask_rgba)
+
+    out_img = thumbnail_image.convert("RGBA")
+    out_img = Image.alpha_composite(out_img, red_layer)
+
+    # Save image
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stem = Path(wsi.path).stem
+    out_path = out_dir / f"{stem}_mask.png"
+    out_img.convert("RGB").save(out_path, quality=95)
+    logger.info(f"Saved mask overlay visualization: {out_path}")
+    return str(out_path)
+
+
+def visualize_contours_on_thumbnail(
+    *,
+    tissue_contours,
+    holes_contours,
+    wsi,
+    output_dir: str,
+) -> str:
+    """
+    Visualize tissue contours on the WSI thumbnail.
+
+    Expects contours at level-0 coordinates. Scales to thumbnail and draws:
+    - Tissue contours in red
+    - Hole contours in blue
+
+    Saves to '<stem>_contours.png' in the given output directory.
+    """
+    logger.info("Creating contour overlay visualization on thumbnail...")
+
+    # Prepare thumbnail and compute scale from level-0 to thumbnail
+    thumb = wsi.get_thumb((1024, 1024))
+    thumbnail_image = thumb.convert("RGB")
+    W0, H0 = wsi.get_size(lv=0)
+    tw, th = thumbnail_image.width, thumbnail_image.height
+
+    # Flatten holes: accept list[np.ndarray] or list[list[np.ndarray]]
+    import numpy as _np
+
+    holes_in = list(holes_contours)
+    if len(holes_in) > 0 and isinstance(holes_in[0], _np.ndarray):
+        holes_flat = holes_in
+    else:
+        holes_flat = [h for hs in holes_in for h in hs]
+
+    # Scale from level-0 to thumbnail: multiply by (thumb / level0)
+    sx = float(tw) / float(W0)
+    sy = float(th) / float(H0)
+
+    from slide_processor.utils.contours import scale_contours as _scale_contours
+
+    tcs = _scale_contours(list(tissue_contours), sx, sy)
+    hcs = _scale_contours(holes_flat, sx, sy)
+
+    # Draw with OpenCV
+    import cv2
+
+    canvas = _np.array(thumbnail_image.convert("RGB"))
+    if len(tcs) > 0:
+        cv2.polylines(canvas, tcs, isClosed=True, color=(255, 0, 0), thickness=2)
+    if len(hcs) > 0:
+        cv2.polylines(canvas, hcs, isClosed=True, color=(0, 0, 255), thickness=1)
+
+    out_img = Image.fromarray(canvas)
+
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stem = Path(wsi.path).stem
+    out_path = out_dir / f"{stem}_contours.png"
+    out_img.save(out_path, quality=95)
+    logger.info(f"Saved contour overlay visualization: {out_path}")
+    return str(out_path)
