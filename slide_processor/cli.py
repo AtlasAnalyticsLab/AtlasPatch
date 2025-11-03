@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import concurrent.futures as _fut
 import logging
+import multiprocessing as _mp
 import sys
 from pathlib import Path
 
@@ -73,9 +74,7 @@ def _build_wsi_task(
     file_path: str,
     mask_arr,
     output_dir: Path,
-    seg_params,
     patch_params,
-    thumb_max: int,
     effective_step_size: int,
     save_images: bool,
     fast_mode: bool,
@@ -88,16 +87,15 @@ def _build_wsi_task(
     black_thresh: int,
     target_mag: int,
 ):
-    """Build a serializable task payload for per-WSI worker processing."""
+    """Build a serializable task payload for per-WSI worker processing.
+
+    Workers receive ONLY patch extraction parameters and pre-computed masks.
+    Segmentation is performed exclusively in the main process.
+    """
     return {
         "wsi_path": file_path,
         "mask": _pack_mask(mask_arr),
         "output_dir": str(output_dir),
-        "seg": {
-            "checkpoint": str(seg_params.checkpoint_path),
-            "device": seg_params.device,
-            "thumb_max": int(thumb_max),
-        },
         "patch": {
             "patch_size": int(patch_params.patch_size),
             "step_size": int(effective_step_size),
@@ -125,7 +123,11 @@ def _build_wsi_task(
 def _run_wsi_tasks(tasks, *, max_workers: int, reporter, pbar, verbose: bool) -> tuple[int, int]:
     """Execute per-WSI tasks in a process pool and aggregate results."""
     successful, failed = 0, 0
-    with _fut.ProcessPoolExecutor(max_workers=max(1, int(max_workers))) as ex:
+    # Use 'spawn' to avoid inheriting CUDA contexts into workers if available.
+    ctx = _mp.get_context("spawn")
+    executor = _fut.ProcessPoolExecutor(max_workers=max(1, int(max_workers)), mp_context=ctx)
+
+    with executor as ex:
         fut_map = {ex.submit(_process_wsi_worker, t): t["wsi_path"] for t in tasks}
         for fut in _fut.as_completed(fut_map):
             fpath = fut_map[fut]
@@ -183,9 +185,7 @@ def _process_files_batch(
                 file_path=f,
                 mask_arr=m,
                 output_dir=output_path,
-                seg_params=seg_params,
                 patch_params=patch_params,
-                thumb_max=thumb_max,
                 effective_step_size=effective_step_size,
                 save_images=save_images,
                 fast_mode=fast_mode,
@@ -317,8 +317,7 @@ def _visualize_result(
 
 
 def _process_wsi_worker(task: dict) -> tuple[bool, str]:
-    """Worker: process one WSI end-to-end after mask is computed.
-
+    """Worker: perform patchification only (segmentation already done in main process).
     Returns (ok, message). On success, message is HDF5 path; on error, message is error str.
     """
     try:
@@ -326,52 +325,73 @@ def _process_wsi_worker(task: dict) -> tuple[bool, str]:
 
         import numpy as _np
 
-        from slide_processor.pipeline.patchify import (
-            PatchifyParams as _PatchifyParams,
+        from slide_processor.patch_extractor.patch_extractor import (
+            PatchExtractor as _PatchExtractor,
         )
-        from slide_processor.pipeline.patchify import (
-            SegmentParams as _SegmentParams,
-        )
-        from slide_processor.pipeline.patchify import (
-            segment_and_patchify as _segment_and_patchify,
-        )
+        from slide_processor.utils.contours import mask_to_contours as _mask_to_contours
+        from slide_processor.utils.contours import scale_contours as _scale_contours
         from slide_processor.visualization import visualize_patches_on_thumbnail as _viz
         from slide_processor.wsi import WSIFactory as _WSIFactory
 
+        # Load WSI for patchification only
         wsi = _WSIFactory.load(task["wsi_path"])
         try:
-            segp = _SegmentParams(
-                checkpoint_path=_Path(task["seg"]["checkpoint"]),
-                device=task["seg"]["device"],
-                thumbnail_max=int(task["seg"]["thumb_max"]),
-            )
-            patchp = _PatchifyParams(
-                patch_size=int(task["patch"]["patch_size"]),
-                step_size=int(task["patch"]["step_size"]),
-                target_magnification=int(task["patch"]["target_mag"]),
-                tissue_area_thresh=float(task["patch"]["tissue_thresh"]),
-                white_thresh=int(task["patch"]["white_thresh"]),
-                black_thresh=int(task["patch"]["black_thresh"]),
-            )
+            # Get mask from task (already computed in main process)
             mask = task["mask"]
             if mask is not None and isinstance(mask, _np.ndarray) and mask.dtype != _np.uint8:
                 mask = (mask > 0.5).astype(_np.uint8)
 
-            out_h5 = _segment_and_patchify(
-                wsi=wsi,
-                output_dir=task["output_dir"],
-                seg=segp,
-                patch=patchp,
-                save_images=bool(task["opts"]["save_images"]),
-                fast_mode=bool(task["opts"]["fast_mode"]),
-                thumb_max=int(task["seg"]["thumb_max"]),
-                mask_override=mask,
-                write_batch=int(task["opts"]["write_batch"]),
+            # Setup patchification dimensions
+            W, H = wsi.get_size(lv=0)
+            ht, wt = mask.shape[:2]
+
+            # Extract contours from pre-computed mask
+            tissue_contours_t, holes_contours_t = _mask_to_contours(
+                mask, tissue_area_thresh=float(task["patch"]["tissue_thresh"])
             )
 
-            if not out_h5:
+            # Scale contours to level 0
+            sx = W / float(wt)
+            sy = H / float(ht)
+            tissue_contours = _scale_contours(tissue_contours_t, sx, sy)
+            holes_contours = [_scale_contours(hs, sx, sy) for hs in holes_contours_t]
+
+            # Create patch extractor
+            extractor = _PatchExtractor(
+                patch_size=int(task["patch"]["patch_size"]),
+                step_size=int(task["patch"]["step_size"]),
+                target_mag=int(task["patch"]["target_mag"]),
+                white_thresh=int(task["patch"]["white_thresh"]),
+                black_thresh=int(task["patch"]["black_thresh"]),
+            )
+
+            # Setup output paths
+            stem = _Path(wsi.path).stem
+            patches_root = _Path(task["output_dir"]) / "patches"
+            patches_root.mkdir(parents=True, exist_ok=True)
+            out_h5 = str(patches_root / f"{stem}.h5")
+
+            img_dir = (
+                str(_Path(task["output_dir"]) / "images" / stem)
+                if bool(task["opts"]["save_images"])
+                else None
+            )
+
+            # Extract patches to HDF5
+            result_path = extractor.extract_to_h5(
+                wsi,
+                tissue_contours,
+                holes_contours,
+                out_h5,
+                image_output_dir=img_dir,
+                fast_mode=bool(task["opts"]["fast_mode"]),
+                batch=int(task["opts"]["write_batch"]),
+            )
+
+            if not result_path:
                 return False, "No patches extracted"
 
+            # Visualize if requested
             if bool(task["opts"]["visualize"]):
                 cli_args_dict = {
                     "patch_size": int(task["opts"]["patch_size"]),
@@ -386,12 +406,13 @@ def _process_wsi_worker(task: dict) -> tuple[bool, str]:
                     "target_mag": int(task["opts"]["target_mag"]),
                 }
                 _viz(
-                    hdf5_path=out_h5,
+                    hdf5_path=result_path,
                     wsi=wsi,
                     output_dir=str(_Path(task["output_dir"]) / "visualization"),
                     cli_args=cli_args_dict,
                 )
-            return True, out_h5
+
+            return True, result_path
         finally:
             try:
                 wsi.cleanup()
@@ -731,6 +752,13 @@ def process(
             successful += s
             failed += f
 
+            # Cleanup GPU memory after batch
+            del thumbs, masks
+            if device.lower() == "cuda":
+                import torch as _torch
+
+                _torch.cuda.empty_cache()
+
         # Process any remaining pending files
         if pending:
             thumbs = _load_thumbnails(pending, thumb_max)
@@ -761,6 +789,13 @@ def process(
             )
             successful += s
             failed += f
+
+            # Cleanup GPU memory after final batch
+            del thumbs, masks
+            if device.lower() == "cuda":
+                import torch as _torch
+
+                _torch.cuda.empty_cache()
 
     finally:
         if pbar and reporter is not None:
