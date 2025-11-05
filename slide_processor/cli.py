@@ -19,6 +19,7 @@ from slide_processor.pipeline.patchify import (
 from slide_processor.segmentation.sam2_segmentation import SAM2SegmentationModel
 from slide_processor.utils.params import (
     get_wsi_files,
+    load_mpp_csv,
     validate_path,
     validate_positive_int,
 )
@@ -214,6 +215,13 @@ def cli():
     help="Recursively search for WSI files in directories.",
 )
 @click.option(
+    "--mpp-csv",
+    type=click.Path(exists=True),
+    default=None,
+    callback=validate_path,
+    help="Path to CSV file with custom MPP values. CSV must have 'wsi' and 'mpp' columns.",
+)
+@click.option(
     "--pipeline",
     is_flag=True,
     default=False,
@@ -243,6 +251,7 @@ def process(
     write_batch: int,
     workers: int,
     recursive: bool,
+    mpp_csv: str | None,
     pipeline: bool,
 ):
     """Process whole slide image(s) with tissue segmentation and patch extraction.
@@ -281,6 +290,14 @@ def process(
     """
     if verbose:
         logging.getLogger("slide_processor").setLevel(logging.DEBUG)
+
+    # Load MPP CSV if provided
+    mpp_dict = None
+    if mpp_csv is not None:
+        try:
+            mpp_dict = load_mpp_csv(mpp_csv)
+        except click.ClickException:
+            raise
 
     # Validate parameters
     if patch_size <= 0:
@@ -389,6 +406,7 @@ def process(
                 pbar=pbar,
                 wsi_workers=workers,
                 seg_batch_size=seg_batch_size,
+                mpp_dict=mpp_dict,
             )
             successful += s
             failed += f
@@ -411,11 +429,19 @@ def process(
                 batch_files = pending
                 pending = []
 
-                from slide_processor.pipeline.orchestrator import (
-                    load_thumbnails as _load_thumbnails,
-                )
+                # Open WSIs once with MPP override for thumbnails
+                wsi_objs = []
+                thumbs = []
+                for bf in batch_files:
+                    from slide_processor.utils.params import get_mpp_for_wsi as _get_mpp
+                    from slide_processor.wsi import WSIFactory as _WSIFactory
 
-                thumbs = _load_thumbnails(batch_files, thumb_max)
+                    mpp_value = _get_mpp(bf, mpp_dict)
+                    wsi_obj = _WSIFactory.load(bf, mpp=mpp_value)
+                    wsi_objs.append(wsi_obj)
+                    thumbs.append(
+                        wsi_obj.get_thumbnail_at_power(power=1.25, interpolation="optimise")
+                    )
                 masks = sam2_model.predict_batch(thumbs, resize_to_input=True)
 
                 s, f = _process_files_batch(
@@ -442,6 +468,8 @@ def process(
                     reporter,
                     pbar,
                     workers,
+                    mpp_dict=mpp_dict,
+                    wsis=wsi_objs,
                 )
                 successful += s
                 failed += f
@@ -455,11 +483,19 @@ def process(
 
             # Process any remaining pending files (shouldn't happen here)
             if pending:
-                from slide_processor.pipeline.orchestrator import (
-                    load_thumbnails as _load_thumbnails,
-                )
+                # Open WSIs once with MPP override for thumbnails
+                wsi_objs = []
+                thumbs = []
+                for pf in pending:
+                    from slide_processor.utils.params import get_mpp_for_wsi as _get_mpp
+                    from slide_processor.wsi import WSIFactory as _WSIFactory
 
-                thumbs = _load_thumbnails(pending, thumb_max)
+                    mpp_value = _get_mpp(pf, mpp_dict)
+                    wsi_obj = _WSIFactory.load(pf, mpp=mpp_value)
+                    wsi_objs.append(wsi_obj)
+                    thumbs.append(
+                        wsi_obj.get_thumbnail_at_power(power=1.25, interpolation="optimise")
+                    )
                 masks = sam2_model.predict_batch(thumbs, resize_to_input=True)
 
                 s, f = _process_files_batch(
@@ -486,6 +522,8 @@ def process(
                     reporter,
                     pbar,
                     workers,
+                    mpp_dict=mpp_dict,
+                    wsis=wsi_objs,
                 )
                 successful += s
                 failed += f

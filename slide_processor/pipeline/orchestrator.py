@@ -8,25 +8,11 @@ from pathlib import Path
 import numpy as _np
 
 from slide_processor.pipeline.patchify import PatchifyParams, SegmentParams, segment_and_patchify
+from slide_processor.utils.params import get_mpp_for_wsi
 from slide_processor.utils.progress import ProgressReporter
 from slide_processor.wsi import WSIFactory
 
 logger = logging.getLogger("slide_processor.pipeline")
-
-
-def load_thumbnails(batch_files: list[str], thumb_max: int) -> list:
-    """Load thumbnails for a batch of WSI files (aspect-preserving)."""
-    thumbs = []
-    for f in batch_files:
-        wsi_tmp = WSIFactory.load(f)
-        try:
-            thumbs.append(wsi_tmp.get_thumb((thumb_max, thumb_max)))
-        finally:
-            try:
-                wsi_tmp.cleanup()
-            except Exception:
-                pass
-    return thumbs
 
 
 def pack_mask(mask_arr):
@@ -57,12 +43,14 @@ def build_wsi_task(
     white_thresh: int,
     black_thresh: int,
     target_mag: int,
+    mpp: float | None = None,
 ):
     """Build a serializable task payload for per-WSI worker processing."""
     return {
         "wsi_path": file_path,
         "mask": pack_mask(mask_arr),
         "output_dir": str(output_dir),
+        "mpp": mpp,
         "patch": {
             "patch_size": int(patch_params.patch_size),
             "step_size": int(effective_step_size),
@@ -219,7 +207,8 @@ def process_wsi_worker(task: dict) -> tuple[bool, str]:
         from slide_processor.wsi import WSIFactory as _WSIFactory
 
         # Load WSI for patchification only
-        wsi = _WSIFactory.load(task["wsi_path"])
+        mpp_value = task.get("mpp")
+        wsi = _WSIFactory.load(task["wsi_path"], mpp=mpp_value)
         try:
             # Get mask from task (already computed in main process)
             mask = task["mask"]
@@ -353,6 +342,8 @@ def process_files_batch(
     reporter: ProgressReporter | None = None,
     pbar=None,
     wsi_workers: int = 1,
+    mpp_dict=None,
+    wsis: list | None = None,
 ) -> tuple[int, int]:
     """Process a batch of files. Returns (successful, failed) counts."""
     successful, failed = 0, 0
@@ -378,6 +369,7 @@ def process_files_batch(
                 white_thresh=white_thresh,
                 black_thresh=black_thresh,
                 target_mag=target_mag,
+                mpp=get_mpp_for_wsi(f, mpp_dict),
             )
             for f, m in zip(batch_files, masks)
         ]
@@ -392,9 +384,13 @@ def process_files_batch(
         failed += f_delta
         return successful, failed
 
-    for f, m in zip(batch_files, masks):
+    for idx, (f, m) in enumerate(zip(batch_files, masks)):
         try:
-            wsi = WSIFactory.load(f)
+            if wsis is not None:
+                wsi = wsis[idx]
+            else:
+                mpp_value = get_mpp_for_wsi(f, mpp_dict)
+                wsi = WSIFactory.load(f, mpp=mpp_value)
             try:
                 result_h5 = segment_and_patchify(
                     wsi=wsi,
@@ -486,6 +482,7 @@ def process_files_pipeline(
     pbar=None,
     wsi_workers: int = 1,
     seg_batch_size: int = 1,
+    mpp_dict=None,
 ) -> tuple[int, int]:
     """Pipeline GPU segmentation with CPU patchification using a bounded queue."""
     import queue as _q
@@ -516,6 +513,7 @@ def process_files_pipeline(
             white_thresh=white_thresh,
             black_thresh=black_thresh,
             target_mag=target_mag,
+            mpp=get_mpp_for_wsi(file_path, mpp_dict),
         )
 
     # Producer: segment thumbnails and enqueue results
@@ -531,7 +529,19 @@ def process_files_pipeline(
                 # Process batch
                 batch_files = pending
                 pending = []
-                thumbs = load_thumbnails(batch_files, thumb_max)
+                thumbs = []
+                for f in batch_files:
+                    mpp_value = get_mpp_for_wsi(f, mpp_dict)
+                    wsi_tmp = WSIFactory.load(f, mpp=mpp_value)
+                    try:
+                        thumbs.append(
+                            wsi_tmp.get_thumbnail_at_power(power=1.25, interpolation="optimise")
+                        )
+                    finally:
+                        try:
+                            wsi_tmp.cleanup()
+                        except Exception:
+                            pass
                 masks = sam2_model.predict_batch(thumbs, resize_to_input=True)
                 # Enqueue items (blocking if queue is full)
                 for f, m in zip(batch_files, masks):
@@ -548,7 +558,19 @@ def process_files_pipeline(
 
             # Flush any remaining
             if pending:
-                thumbs = load_thumbnails(pending, thumb_max)
+                thumbs = []
+                for f in pending:
+                    mpp_value = get_mpp_for_wsi(f, mpp_dict)
+                    wsi_tmp = WSIFactory.load(f, mpp=mpp_value)
+                    try:
+                        thumbs.append(
+                            wsi_tmp.get_thumbnail_at_power(power=1.25, interpolation="optimise")
+                        )
+                    finally:
+                        try:
+                            wsi_tmp.cleanup()
+                        except Exception:
+                            pass
                 masks = sam2_model.predict_batch(thumbs, resize_to_input=True)
                 for f, m in zip(pending, masks):
                     q.put((f, m))

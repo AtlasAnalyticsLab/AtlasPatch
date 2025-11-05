@@ -190,6 +190,32 @@ slideproc process sample.svs \
     --device cpu
 ```
 
+#### Custom MPP Values via CSV
+
+When WSI files don't have MPP (microns per pixel) metadata or the metadata is incorrect, you can provide custom MPP values via a CSV file.
+
+**CSV Format (required columns: `wsi` and `mpp`):**
+
+```csv
+wsi,mpp
+slide1.svs,0.5
+slide2.svs,0.25
+sample.png,0.4
+```
+
+**Usage:**
+
+```bash
+slideproc process ./wsi_folder/ \
+    --checkpoint model.pt \
+    --patch-size 256 --target-mag 20 \
+    --mpp-csv mpp_values.csv
+```
+
+**CSV Specifications:**
+- **Required columns**: `wsi` (filename with or without path) and `mpp` (float value)
+- **WSI names**: Can use just the filename (e.g., `slide1.svs`) or full path; only the stem (filename without extension) is matched
+
 #### Custom Filtering Thresholds
 
 ```bash
