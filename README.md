@@ -106,10 +106,10 @@ Main command for processing whole slide images with tissue segmentation and patc
 
 | Option | Type | Default | Required? | Description |
 |--------|------|---------|-----------|-------------|
-| `--output/-o` | Path | `./output` | No | Output directory root for results (contains `patches/`, `visualization/`, and `images/`) |
 | `--patch-size` | int | — | Yes | Target size of extracted patches in pixels (final patch dimensions) |
-| `--step-size` | int | patch-size | No | Step size for patch extraction (stride) at the target magnification. Defaults to patch-size if not set |
 | `--target-mag` | choice | — | Yes | Target magnification for extraction: one of 5, 10, 20, 40, 60, 80 |
+| `--step-size` | int | patch-size | No | Step size for patch extraction (stride) at the target magnification. Defaults to patch-size if not set |
+| `--output/-o` | Path | `./output` | No | Output directory root for results (contains `patches/`, `visualization/`, and `images/`) |
 | `--device` | choice | `cuda` | No | Device for inference: `cuda` or `cpu` |
 | `--tissue-thresh` | float | `0.01` | No | Minimum tissue area threshold as fraction of image (0–1) |
 | `--white-thresh` | int | `15` | No | Saturation threshold for filtering white patches |
@@ -123,11 +123,7 @@ Main command for processing whole slide images with tissue segmentation and patc
 | `--verbose/-v` | flag | False | No | Enable verbose logging output |
 | `--seg-batch-size` | int | 1 | No | Batch size for SAM2 thumbnail segmentation when processing a folder; set >1 to enable batched inference |
 | `--workers` | int | 1 | No | CPU workers for processing multiple WSIs in parallel (per-WSI) |
-
-SAM2 Config
-
-- Uses the built-in Tiny SAM2 config at `slide_processor/configs/sam2.1_hiera_t.yaml`.
-  If you need a different config, change the `default_cfg` path in `slide_processor/cli.py`.
+| `--pipeline` | flag | False | No | Concurrent GPU segmentation with CPU patchification for multi-file processing |
 
 **Supported WSI Formats:**
 - **OpenSlide formats**: .svs, .tif, .tiff, .ndpi, .vms, .vmu, .scn, .mrxs, .bif, .dcm
@@ -149,6 +145,13 @@ slideproc process sample.svs --checkpoint model.pt \
 slideproc process ./slides/ \
     --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
+    --output ./processed_slides
+
+# Concurrent GPU segmentation with CPU patchification
+slideproc process ./slides/ \
+    --checkpoint model.pt \
+    --patch-size 256 --target-mag 20 \
+    --workers 4 --seg-batch-size 8 --pipeline \
     --output ./processed_slides
 ```
 
@@ -210,7 +213,6 @@ slideproc process sample.svs \
 ```
 
 - Default (no --verbose): quiet mode with a progress bar and minimal output.
-- With --verbose: shows detailed logs (no progress bar).
 
 #### Generate Visualizations
 
@@ -238,7 +240,7 @@ slideproc info
 
 ## HDF5 Output Structure
 
-Each processed slide produces a single HDF5 file under `<output>/patches/<stem>.h5`.
+Each processed slide produces a single HDF5 file under `<output>/patches/<stem>.h5`. Each file adopt similar structure to [TRIDENT](https://github.com/mahmoodlab/TRIDENT) to maintain compatability
 
 - Datasets
   - `coords`: int32 shape `(N, 2)` containing `(x, y)` at level 0
@@ -249,19 +251,8 @@ Each processed slide produces a single HDF5 file under `<output>/patches/<stem>.
   - `num_patches`: total number of patches
   - `level0_magnification`: magnification of the highest-resolution level (if known)
   - `target_magnification`: magnification used for extraction
-  - `patch_size_level0`: size of the patch footprint at level 0 in pixels. Used by visualizations and downstream tooling.
+  - `patch_size_level0`: size of the patch footprint at level 0 in pixels. Used by some slide encoders which uses it for positional encoding module (e.g., [ALiBi](https://arxiv.org/pdf/2108.12409) in [TITAN](https://arxiv.org/abs/2411.19666))
 
-
-### Performance Notes
-
-- The SAM2 predictor is now initialized once and reused across files to reduce per-slide overhead.
-- Enable `--fast-mode` to skip per-patch white/black filtering. This can substantially reduce I/O.
-- When processing a directory, you can enable batched SAM2 thumbnail segmentation via `--seg-batch-size <N>`. This runs SAM2 on N thumbnails at once to improve throughput (GPU memory dependent).
-
-Shows:
-- Supported WSI formats
-- Supported image formats
-- Output format details
 
 ### Output
 
@@ -305,22 +296,17 @@ Each file represents a single extracted patch with its coordinates in the filena
   - Lower values = more aggressively filter white regions (HSV saturation)
   - Filtering uses majority rule: a patch is considered white if ≥70% of pixels have
     saturation below this threshold AND brightness/value ≥ 200.
-  - Useful for filtering background and faint areas
 
 - **`--black-thresh`**: RGB threshold for black patches
   - Lower values = filter darker regions
   - Filtering uses majority rule: a patch is considered black if ≥70% of grayscale
     pixels are below this threshold.
-  - Useful for filtering shadows and staining artifacts
 
-- **`--tissue-thresh`**: Minimum tissue area as fraction of image
+- **`--tissue-thresh`**: Minimum tissue area as fraction of input image which is of size 1024x1024
   - Filters out very small tissue regions
   - Range: 0.0–1.0
   - Unit: fraction (0–1)
 
 **Parallelism:**
 
-- **`--workers`**: Number of CPU workers for per-WSI parallelism
-  - Processes multiple WSIs simultaneously (after thumbnail segmentation)
-  - Each worker writes its own HDF5 file; no contention
-  - Overlaps GPU segmentation (main process) with CPU extraction (workers) for throughput
+- **`--workers`**: Number of CPU workers for WSI parallelism (aka how many WSI are patchified at a time)
