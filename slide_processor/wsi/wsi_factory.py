@@ -59,7 +59,9 @@ class WSIFactory:
         return cls._formats.get(ext)
 
     @classmethod
-    def load(cls, path: str, backend: Optional[str] = None, **kwargs) -> IWSI:
+    def load(
+        cls, path: str, backend: Optional[str] = None, mpp: Optional[float] = None, **kwargs
+    ) -> IWSI:
         """Load WSI with specified or detected backend.
 
         Parameters
@@ -68,6 +70,8 @@ class WSIFactory:
             Path to WSI file.
         backend : str, optional
             Backend name. If None, auto-detect from extension.
+        mpp : float, optional
+            Custom microns per pixel value to override metadata extraction.
         **kwargs
             Arguments passed to backend constructor.
 
@@ -87,10 +91,12 @@ class WSIFactory:
             raise ValueError(f"Unknown backend: {backend}")
 
         impl = cls._registry[backend]
-        return impl(path=path, **kwargs)
+        return impl(path=path, mpp=mpp, **kwargs)
 
     @classmethod
-    def try_load(cls, path: str, backends: Optional[list] = None, **kwargs) -> IWSI:
+    def try_load(
+        cls, path: str, backends: Optional[list] = None, mpp: Optional[float] = None, **kwargs
+    ) -> IWSI:
         """Try multiple backends until one succeeds.
 
         Parameters
@@ -99,6 +105,8 @@ class WSIFactory:
             Path to WSI file.
         backends : list, optional
             List of backends to try in order.
+        mpp : float, optional
+            Custom microns per pixel value to override metadata extraction.
         **kwargs
             Arguments passed to backend constructor.
 
@@ -125,7 +133,7 @@ class WSIFactory:
                 continue
 
             try:
-                return cls.load(path, backend=b, **kwargs)
+                return cls.load(path, backend=b, mpp=mpp, **kwargs)
             except Exception as e:
                 errors.append(f"{b}: {str(e)}")
 

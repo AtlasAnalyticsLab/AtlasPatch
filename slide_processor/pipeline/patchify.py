@@ -95,12 +95,10 @@ def segment_and_patchify(
         mask = mask_override
         ht, wt = mask.shape[:2]
     else:
-        if predict_fn is None or thumb_max is None:
-            predict_fn, thumb_max = _build_segmentation_predictor(seg)
-        # ensure non-None after lazy init
-        assert predict_fn is not None and thumb_max is not None
-        thumb = wsi.get_thumb((thumb_max, thumb_max))
-        mask = predict_fn(thumb)
+        if predict_fn is None:
+            predict_fn, _ = _build_segmentation_predictor(seg)
+        thumb_img = wsi.get_thumbnail_at_power(power=1.25, interpolation="optimise")
+        mask = predict_fn(thumb_img)
         ht, wt = mask.shape[:2]
 
     # Extract contours on thumbnail

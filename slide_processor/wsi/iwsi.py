@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Literal, Optional, Tuple, Union
 
+import cv2
 import numpy as np
 from PIL import Image
 
@@ -117,6 +118,85 @@ class IWSI(ABC):
     def cleanup(self) -> None:
         """Release resources."""
         pass
+
+    def get_thumbnail_at_power(
+        self,
+        *,
+        power: float = 1.25,
+        interpolation: str = "optimise",
+    ) -> Image.Image:
+        """Create a full-slide thumbnail at a fixed objective power.
+
+        - Uses base magnification (self.mag) to compute target downsample ds = base_mag / power.
+        - Selects an optimal pyramid level and resizes to exact output size.
+
+        Parameters
+        ----------
+        power : float, default 1.25
+            Objective power for thumbnail generation.
+        interpolation : str, default "optimise"
+            Interpolation policy: "optimise" uses AREA (downscale) or CUBIC (upscale).
+
+        Returns
+        -------
+        PIL.Image.Image
+            RGB thumbnail at approximately (W0/ds, H0/ds).
+        """
+        self._ensure_loaded()
+
+        if self.mag is None:
+            raise ValueError(
+                "WSI base magnification is unknown; cannot generate power-based thumbnail."
+            )
+
+        W0, H0 = self.get_size(lv=0)
+        if W0 <= 0 or H0 <= 0:
+            raise ValueError("Invalid WSI dimensions.")
+
+        base_mag = float(self.mag)
+        tgt_power = float(power)
+        if tgt_power <= 0:
+            raise ValueError("thumbnail power must be positive")
+
+        # Target downsample factor at level 0
+        ds_target = max(1e-6, base_mag / tgt_power)
+
+        # Choose pyramid level closest to ds_target
+        level, _ = self.optimal_level(ds_target)
+        downsamples = self.ds or [1.0]
+        ds_lvl = float(downsamples[level])
+
+        # Read entire slide at computed level
+        read_w = max(1, int(round(W0 / ds_lvl)))
+        read_h = max(1, int(round(H0 / ds_lvl)))
+        arr_any = self.extract((0, 0), lv=level, wh=(read_w, read_h), mode="array")
+        if not isinstance(arr_any, np.ndarray):
+            raise RuntimeError("Failed to read thumbnail region as array")
+        arr = arr_any
+
+        # Compute exact output size for ds_target
+        out_w = max(1, int(round(W0 / ds_target)))
+        out_h = max(1, int(round(H0 / ds_target)))
+
+        if arr.shape[1] != out_w or arr.shape[0] != out_h:
+            if interpolation == "optimise":
+                # Downscale → area; upscale → cubic
+                if out_w < arr.shape[1] or out_h < arr.shape[0]:
+                    interp = cv2.INTER_AREA
+                else:
+                    interp = cv2.INTER_CUBIC
+            elif interpolation == "area":
+                interp = cv2.INTER_AREA
+            elif interpolation == "cubic":
+                interp = cv2.INTER_CUBIC
+            elif interpolation == "linear":
+                interp = cv2.INTER_LINEAR
+            else:
+                interp = cv2.INTER_LINEAR
+
+            arr = cv2.resize(arr, (out_w, out_h), interpolation=interp)
+
+        return Image.fromarray(arr)
 
     def optimal_level(self, target_ds: float) -> Tuple[int, float]:
         """Find optimal pyramid level for target downsample.
