@@ -52,6 +52,7 @@ class SAM2SegmentationModel:
             dev_str = "cpu"
         self.device = torch.device(dev_str)
         self.mask_threshold = mask_threshold
+        self.input_size: int = 1024
 
         if not self.checkpoint_path.exists():
             raise FileNotFoundError(f"Checkpoint not found: {self.checkpoint_path}")
@@ -145,6 +146,19 @@ class SAM2SegmentationModel:
         else:
             raise TypeError(f"Unsupported input type: {type(image)}")
 
+    def _resize_input_for_sam(self, image: np.ndarray) -> tuple[np.ndarray, tuple[int, int]]:
+        """
+        Resize input image to fixed size (1024x1024) for SAM inference and
+        return resized image along with the original (H, W) shape for later resizing back.
+        """
+        original_shape = image.shape[:2]
+        if original_shape[0] == self.input_size and original_shape[1] == self.input_size:
+            return image, original_shape
+
+        pil = Image.fromarray(image)
+        resized = pil.resize((self.input_size, self.input_size), Image.Resampling.BILINEAR)
+        return np.array(resized, copy=True), original_shape
+
     def _resize_mask(self, mask: np.ndarray, target_shape: tuple) -> np.ndarray:
         """
         Resize mask to target shape using nearest neighbor interpolation.
@@ -194,7 +208,7 @@ class SAM2SegmentationModel:
         """
         # Normalize input to numpy array
         image_array = self._normalize_input(image)
-        original_shape = image_array.shape[:2]
+        image_array, original_shape = self._resize_input_for_sam(image_array)
 
         # Set the image in the predictor
         self.predictor.set_image(image_array)
@@ -244,8 +258,13 @@ class SAM2SegmentationModel:
             raise ValueError("images must be a non-empty list")
 
         # Normalize all inputs to numpy arrays
-        np_images: list[np.ndarray] = [self._normalize_input(img) for img in images]
-        orig_shapes = [im.shape[:2] for im in np_images]
+        np_images_raw: list[np.ndarray] = [self._normalize_input(img) for img in images]
+        np_images: list[np.ndarray] = []
+        orig_shapes: list[tuple[int, int]] = []
+        for im in np_images_raw:
+            resized, orig_shape = self._resize_input_for_sam(im)
+            np_images.append(resized)
+            orig_shapes.append(orig_shape)
 
         # Set batch into predictor
         self.predictor.set_image_batch(np_images)
