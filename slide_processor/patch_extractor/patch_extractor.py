@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Sequence, cast
+from typing import Any, Iterable, Mapping, Sequence, cast
 
 import cv2
 import numpy as np
@@ -143,8 +143,23 @@ class PatchExtractor:
         # Create empty datasets so file exists even if no patches are written
         empty_coords = np.empty((0, 2), dtype=np.int32)
         empty_coords_ext = np.empty((0, 5), dtype=np.int32)
-        dset_attrs = {
-            "coords": {"description": "(x, y) coordinates at level 0"},
+        level0_width, level0_height = wsi.get_size(lv=0)
+        step = self.step_size if self.step_size else self.patch_size
+        overlap = max(0, int(self.patch_size) - int(step))
+        coords_metadata: dict[str, Any] = {
+            "description": "(x, y) coordinates at level 0",
+            "patch_size": int(self.patch_size),
+            "patch_size_level0": int(patch_size_level0),
+            "level0_magnification": int(src_mag),
+            "target_magnification": int(tgt_mag),
+            "overlap": int(overlap),
+            "name": Path(wsi.path).stem,
+            "savetodir": str(Path(output_path).resolve().parent),
+            "level0_width": int(level0_width),
+            "level0_height": int(level0_height),
+        }
+        dset_attrs: dict[str, Mapping[str, Any]] = {
+            "coords": coords_metadata,
             "coords_ext": {
                 "description": "(x, y, w, h, level) at extraction",
             },
@@ -156,11 +171,14 @@ class PatchExtractor:
         # File-level attributes
         writer.update_file_attrs(
             {
-                "patch_size": int(self.patch_size),
+                "patch_size": coords_metadata["patch_size"],
+                "patch_size_level0": coords_metadata["patch_size_level0"],
+                "level0_magnification": coords_metadata["level0_magnification"],
+                "target_magnification": coords_metadata["target_magnification"],
+                "overlap": coords_metadata["overlap"],
+                "level0_width": coords_metadata["level0_width"],
+                "level0_height": coords_metadata["level0_height"],
                 "wsi_path": wsi.path,
-                "level0_magnification": int(src_mag),
-                "target_magnification": int(tgt_mag),
-                "patch_size_level0": int(patch_size_level0),
             }
         )
         return writer
