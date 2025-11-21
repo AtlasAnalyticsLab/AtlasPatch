@@ -112,7 +112,12 @@ def cli():
     show_default=True,
     help="Upper bound on simultaneously open slides (segmentation + extraction).",
 )
-@click.option("--fast-mode", is_flag=True, help="Skip per-patch content filtering.")
+@click.option(
+    "--fast-mode/--no-fast-mode",
+    default=True,
+    show_default=True,
+    help="fast-mode skips per-patch content filtering; use --no-fast-mode to enable filtering.",
+)
 @click.option("--save-images", is_flag=True, help="Export individual patch PNGs.")
 @click.option("--visualize-grids", is_flag=True, help="Render patch grid overlay.")
 @click.option("--visualize-mask", is_flag=True, help="Render predicted mask overlay.")

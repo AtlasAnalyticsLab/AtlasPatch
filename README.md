@@ -25,6 +25,7 @@ A Python package for processing and handling whole slide images (WSI).
 - [Using TRIDENT for feature extraction](#using-trident-for-feature-extraction)
   - [Setup TRIDENT](#setup-trident)
   - [Extract patch features from SlideProcessor outputs](#extract-patch-features-from-slideprocessor-outputs)
+- [SLURM job scripts](#slurm-job-scripts)
 
 ## Installation
 
@@ -141,7 +142,7 @@ Main command for processing whole slide images with tissue segmentation and patc
 | `--max-open-slides` | int | 200 | No | Cap on simultaneous open WSIs across segmentation + extraction |
 | `--write-batch` | int | 8192 | No | Rows per HDF5 flush when writing coordinates |
 | `--save-images` | flag | False | No | Export individual patch images as PNG files under `images/<stem>/` |
-| `--fast-mode` | flag | False | No | Skip per-patch content filtering for faster extraction (may include background patches) |
+| `--fast-mode/--no-fast-mode` | flag | True | No | `--fast-mode` skips per-patch content filtering (default); use `--no-fast-mode` to enable filtering |
 | `--visualize-grids` | flag | False | No | Generate patch grid overlay on WSI thumbnail |
 | `--visualize-mask` | flag | False | No | Generate predicted tissue mask overlay visualization on thumbnail |
 | `--visualize-contours` | flag | False | No | Generate tissue contour overlay visualization on thumbnail |
@@ -394,3 +395,18 @@ python run_batch_of_slides.py \
 
 - `--patch_encoder` supports the full TRIDENT patch model list (examples: `uni_v1`, `uni_v2`, `conch_v15`, `virchow`, `phikon`, `gigapath`, `hoptimus0/1`, `musk`, `midnight12k`, `kaiko-*`, `lunit-*`, `dino_vit_small_p8/p16`, `hibou_l`, `ctranspath`, `resnet50`, etc.). Check [TRIDENT’s README](https://github.com/mahmoodlab/TRIDENT) for the complete table and any extra dependencies for specific encoders.
 - For slide-level embeddings instead of patch-only, use `--slide_encoder` (e.g., `titan`, `prism`, `gigapath`, `chief`, `madeleine`, `feather`) and TRIDENT will perform patch encoding + slide pooling automatically.
+
+## SLURM job scripts
+
+We prepared ready-to-run SLURM templates are under `jobs/`:
+
+- Patch extraction (SAM2 + H5/PNG): `jobs/slideproc_patch.slurm.sh`. Edits to make:
+  - Set `WSI_ROOT`, `OUTPUT_ROOT`, `SAM_CHECKPOINT`, `PATCH_SIZE`, `TARGET_MAG`, `SEG_BATCH`.
+  - Ensure `--cpus-per-task` matches the CPU you want; the script passes `--patch-workers ${SLURM_CPUS_PER_TASK}` and caps `--max-open-slides` at 200.
+  - `--fast-mode` is on by default; append `--no-fast-mode` to enable content filtering.
+  - Submit with `sbatch jobs/slideproc_patch.slurm.sh`.
+
+- TRIDENT feature extraction: `jobs/trident_features.slurm.sh`.
+  - Set `WSI_ROOT`, `PATCH_OUTPUT` (same as SlideProcessor `--output`), `PATCH_ENCODER`, `MAG`, `PATCH_SIZE`, `BATCH_SIZE`.
+  - Activate your TRIDENT env and set `PYTHONPATH` to the TRIDENT repo if needed.
+  - Submit with `sbatch jobs/trident_features.slurm.sh`.

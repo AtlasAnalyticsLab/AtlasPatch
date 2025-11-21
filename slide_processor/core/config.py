@@ -48,7 +48,7 @@ class ExtractionConfig:
     tissue_threshold: float = 0.01
     white_threshold: int = 15
     black_threshold: int = 50
-    fast_mode: bool = False
+    fast_mode: bool = True
     write_batch: int = 8192
 
     def validated(self) -> ExtractionConfig:
