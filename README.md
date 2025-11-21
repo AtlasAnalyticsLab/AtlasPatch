@@ -2,6 +2,30 @@
 
 A Python package for processing and handling whole slide images (WSI).
 
+## Table of Contents
+- [Installation](#installation)
+- [Development Setup](#development-setup)
+- [CLI Usage](#cli-usage)
+  - [Quick Start](#quick-start)
+  - [Commands](#commands)
+  - [Usage Examples](#usage-examples)
+    - [Basic Single File Processing](#basic-single-file-processing)
+    - [Batch Processing Multiple Files](#batch-processing-multiple-files)
+    - [Custom Patch Extraction Parameters](#custom-patch-extraction-parameters)
+    - [Export Individual Patch Images](#export-individual-patch-images)
+    - [CPU Inference](#cpu-inference)
+    - [Custom MPP Values via CSV](#custom-mpp-values-via-csv)
+    - [Custom Filtering Thresholds](#custom-filtering-thresholds)
+    - [Verbose Output](#verbose-output)
+    - [Generate Visualizations](#generate-visualizations)
+    - [`slideproc info`](#slideproc-info)
+  - [Parameter Guide](#parameter-guide)
+- [HDF5 Output Structure](#hdf5-output-structure)
+  - [Output](#output)
+- [Using TRIDENT for feature extraction](#using-trident-for-feature-extraction)
+  - [Setup TRIDENT](#setup-trident)
+  - [Extract patch features from SlideProcessor outputs](#extract-patch-features-from-slideprocessor-outputs)
+
 ## Installation
 
 ### Using Conda (Recommended)
@@ -262,6 +286,38 @@ Display information about supported formats and features.
 slideproc info
 ```
 
+### Parameter Guide
+
+**Patch Extraction Parameters:**
+
+- **`--patch-size`**: Target size of extracted patches (e.g., 256 = 256x256 pixels) at the chosen magnification (`--target-mag`). Coordinates in the H5 are always at level 0.
+  - Larger values reduce number of patches but capture more context
+  - Common values: 256, 512
+
+- **`--step-size`**: Sliding window stride during patch extraction, defined in target-magnification pixels. Internally converted to a level-0 stride.
+  - If equal to patch-size: non-overlapping patches
+  - If smaller: overlapping patches (more patches)
+  - Default behavior: uses patch-size (non-overlapping)
+
+- **`--target-mag`**: Target magnification for extraction (40, 20, 10, etc.). Must be less than or equal to the WSI's native magnification. If a higher magnification is requested than available, the CLI exits with an error.
+
+**Filtering Parameters:**
+
+- **`--white-thresh`**: Saturation threshold for white patches
+  - Lower values = more aggressively filter white regions (HSV saturation)
+  - Filtering uses majority rule: a patch is considered white if ≥70% of pixels have
+    saturation below this threshold AND brightness/value ≥ 200.
+
+- **`--black-thresh`**: RGB threshold for black patches
+  - Lower values = filter darker regions
+  - Filtering uses majority rule: a patch is considered black if ≥70% of grayscale
+    pixels are below this threshold.
+
+- **`--tissue-thresh`**: Minimum tissue area as fraction of input image which is of size 1024x1024
+  - Filters out very small tissue regions
+  - Range: 0.0–1.0
+  - Unit: fraction (0–1)
+
 ## HDF5 Output Structure
 
 Each processed slide produces a single HDF5 file under `<output>/<mag>x_<patch>px_<overlap>px_overlap/patches/<stem>_patches.h5`. Each file adopts a structure similar to [TRIDENT](https://github.com/mahmoodlab/TRIDENT) to maintain compatability
@@ -303,38 +359,34 @@ Contains:
 
 Each file represents a single extracted patch with its coordinates in the filename.
 
-### Parameter Guide
+## Using TRIDENT for feature extraction
 
-**Patch Extraction Parameters:**
+SlideProcessor writes HDF5 patch coordinate files in the same structure that [TRIDENT](https://github.com/mahmoodlab/TRIDENT) consumes (`coords`/`coords_ext` plus patch metadata), so you can run TRIDENT feature extraction directly on our outputs without conversion.
 
-- **`--patch-size`**: Target size of extracted patches (e.g., 256 = 256x256 pixels) at the chosen magnification (`--target-mag`). Coordinates in the H5 are always at level 0.
-  - Larger values reduce number of patches but capture more context
-  - Common values: 256, 512
+### Setup TRIDENT
 
-- **`--step-size`**: Sliding window stride during patch extraction, defined in target-magnification pixels. Internally converted to a level-0 stride.
-  - If equal to patch-size: non-overlapping patches
-  - If smaller: overlapping patches (more patches)
-  - Default behavior: uses patch-size (non-overlapping)
+```bash
+git clone https://github.com/mahmoodlab/TRIDENT.git
+cd TRIDENT
+conda create -n trident python=3.10  # or use your preferred env
+conda activate trident
+pip install -e .
+```
 
-- **`--target-mag`**: Target magnification for extraction (40, 20, 10, etc.). Must be less than or equal to the WSI's native magnification. If a higher magnification is requested than available, the CLI exits with an error.
+### Extract patch features from SlideProcessor outputs
 
-**Filtering Parameters:**
+Point `--job_dir` to the `--output` you used with `slideproc process` (TRIDENT will pick up the run folder such as `20x_256px_0px_overlap/patches/*.h5`):
 
-- **`--white-thresh`**: Saturation threshold for white patches
-  - Lower values = more aggressively filter white regions (HSV saturation)
-  - Filtering uses majority rule: a patch is considered white if ≥70% of pixels have
-    saturation below this threshold AND brightness/value ≥ 200.
+```bash
+python run_batch_of_slides.py \
+    --task feat \
+    --wsi_dir <source directory for whole slide image> \
+    --job_dir <output directory> \
+    --batch_size 64 \
+    --patch_encoder uni_v1 \
+    --mag 20 \
+    --patch_size 256
+```
 
-- **`--black-thresh`**: RGB threshold for black patches
-  - Lower values = filter darker regions
-  - Filtering uses majority rule: a patch is considered black if ≥70% of grayscale
-    pixels are below this threshold.
-
-- **`--tissue-thresh`**: Minimum tissue area as fraction of input image which is of size 1024x1024
-  - Filters out very small tissue regions
-  - Range: 0.0–1.0
-  - Unit: fraction (0–1)
-
-**Parallelism:**
-
-- **`--workers`**: Number of CPU workers for WSI parallelism (aka how many WSI are patchified at a time)
+- `--patch_encoder` supports the full TRIDENT patch model list (examples: `uni_v1`, `uni_v2`, `conch_v15`, `virchow`, `phikon`, `gigapath`, `hoptimus0/1`, `musk`, `midnight12k`, `kaiko-*`, `lunit-*`, `dino_vit_small_p8/p16`, `hibou_l`, `ctranspath`, `resnet50`, etc.). Check [TRIDENT’s README](https://github.com/mahmoodlab/TRIDENT) for the complete table and any extra dependencies for specific encoders.
+- For slide-level embeddings instead of patch-only, use `--slide_encoder` (e.g., `titan`, `prism`, `gigapath`, `chief`, `madeleine`, `feather`) and TRIDENT will perform patch encoding + slide pooling automatically.
