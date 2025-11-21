@@ -1,4 +1,4 @@
-"""WSI module for slide processing."""
+"""WSI module for slide processing (core)."""
 
 from .image_wsi import ImageWSI
 from .iwsi import IWSI

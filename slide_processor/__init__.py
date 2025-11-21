@@ -1,5 +1,5 @@
 """SlideProcessor module."""
 
-from . import patch_extractor, pipeline, wsi
+from . import core, services
 
-__all__ = ["wsi", "patch_extractor", "pipeline"]
+__all__ = ["core", "services"]
