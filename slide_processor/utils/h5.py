@@ -10,12 +10,7 @@ import numpy as np
 
 @dataclass
 class H5AppendWriter:
-    """Incremental HDF5 writer with a single open/close and efficient chunking.
-
-    - Creates datasets lazily on first append with resizable leading dimension.
-    - Uses row-chunks matching `chunk_rows` for faster appends.
-    - Always writes to a temporary file and atomically renames on close.
-    """
+    """Incremental HDF5 writer with a single open/close and efficient chunking."""
 
     path: str
     chunk_rows: int = 8192
@@ -40,9 +35,7 @@ class H5AppendWriter:
             return
         data_shape = sample.shape
         data_type = sample.dtype
-        # Leading dimension is resizable
         maxshape = (None,) + data_shape[1:]
-        # Chunk rows tuned to batch size
         chunk_shape = (max(1, int(self.chunk_rows)),) + data_shape[1:]
         dset = self._f.create_dataset(
             key,
@@ -63,11 +56,6 @@ class H5AppendWriter:
         assets: Mapping[str, np.ndarray],
         attributes: Optional[Mapping[str, Mapping[str, Any]]] = None,
     ) -> None:
-        """Append rows to datasets given by `assets` mapping.
-
-        On first call per dataset, the dataset is created with attributes from
-        `attributes.get(key)` if provided.
-        """
         for key, val in assets.items():
             self._ensure_dataset(key, val, attributes.get(key) if attributes else None)
             dset = self._f[key]
@@ -96,13 +84,11 @@ class H5AppendWriter:
             self._closed = True
 
     def abort(self) -> None:
-        """Abort writing and remove temporary file (no rename)."""
         if self._closed:
             return
         try:
             self._f.close()
         finally:
-            # Remove temporary file if present
             if self._tmp_path and os.path.exists(self._tmp_path):
                 try:
                     os.remove(self._tmp_path)

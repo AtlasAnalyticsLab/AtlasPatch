@@ -100,30 +100,29 @@ Main command for processing whole slide images with tissue segmentation and patc
 **Required Options:**
 - `--checkpoint/-c` **(required)**: Path to SAM2 model checkpoint file (.pt)
 - `--patch-size` **(required)**: Target size of extracted patches in pixels (final patch dimensions)
-- `--target-mag` **(required)**: Target magnification for extraction: one of 1, 2, 4, 5, 10, 20, 40, 60, 80
+- `--target-mag` **(required)**: Target magnification for extraction (e.g., 10, 20, 40)
 
 **Optional Parameters:**
 
 | Option | Type | Default | Required? | Description |
 |--------|------|---------|-----------|-------------|
-| `--patch-size` | int | — | Yes | Target size of extracted patches in pixels (final patch dimensions) |
-| `--target-mag` | choice | — | Yes | Target magnification for extraction: one of 5, 10, 20, 40, 60, 80 |
-| `--step-size` | int | patch-size | No | Step size for patch extraction (stride) at the target magnification. Defaults to patch-size if not set |
+| `--step-size` | int | patch-size | No | Stride between patches at target magnification; defaults to patch size |
 | `--output/-o` | Path | `./output` | No | Output directory root for results (contains `patches/`, `visualization/`, and `images/`) |
 | `--device` | choice | `cuda` | No | Device for inference: `cuda` or `cpu` |
 | `--tissue-thresh` | float | `0.01` | No | Minimum tissue area threshold as fraction of image (0–1) |
 | `--white-thresh` | int | `15` | No | Saturation threshold for filtering white patches |
 | `--black-thresh` | int | `50` | No | RGB threshold for filtering black patches |
+| `--seg-batch-size` | int | 1 | No | Batch size for SAM2 thumbnail segmentation |
+| `--write-batch` | int | 8192 | No | Rows per HDF5 flush when writing coordinates |
 | `--save-images` | flag | False | No | Export individual patch images as PNG files under `images/<stem>/` |
 | `--fast-mode` | flag | False | No | Skip per-patch content filtering for faster extraction (may include background patches) |
 | `--visualize-grids` | flag | False | No | Generate patch grid overlay on WSI thumbnail |
 | `--visualize-mask` | flag | False | No | Generate predicted tissue mask overlay visualization on thumbnail |
 | `--visualize-contours` | flag | False | No | Generate tissue contour overlay visualization on thumbnail |
 | `--recursive` | flag | False | No | Recursively search directories for WSI files |
-| `--verbose/-v` | flag | False | No | Enable verbose logging output |
-| `--seg-batch-size` | int | 1 | No | Batch size for SAM2 thumbnail segmentation when processing a folder; set >1 to enable batched inference |
-| `--workers` | int | 1 | No | CPU workers for processing multiple WSIs in parallel (per-WSI) |
-| `--pipeline` | flag | False | No | Concurrent GPU segmentation with CPU patchification for multi-file processing |
+| `--mpp-csv` | Path | None | No | CSV with custom MPP values (`wsi,mpp`) |
+| `--skip-existing/--force` | flag | Skip existing | No | Skip existing outputs by default; pass `--force` to reprocess |
+| `--verbose/-v` | flag | False | No | Enable verbose logging output (disables progress bar) |
 
 **Supported WSI Formats:**
 - **OpenSlide formats**: .svs, .tif, .tiff, .ndpi, .vms, .vmu, .scn, .mrxs, .bif, .dcm
@@ -146,12 +145,11 @@ slideproc process ./slides/ \
     --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
     --output ./processed_slides
-
-# Concurrent GPU segmentation with CPU patchification
+# Batch thumbnails for segmentation
 slideproc process ./slides/ \
     --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
-    --workers 4 --seg-batch-size 8 --pipeline \
+    --seg-batch-size 8 \
     --output ./processed_slides
 ```
 
@@ -251,7 +249,7 @@ slideproc process sample.svs \
 
 ```
 
-The visualization flags create the following images under `output/visualization/`:
+The visualization flags create the following images under `output/<mag>x_<patch>px_<overlap>px_overlap/visualization/`:
 - `<wsi_stem>.png`: patch grid overlay (`--visualize-grids`)
 - `<wsi_stem>_mask.png`: mask overlay (`--visualize-mask`)
 - `<wsi_stem>_contours.png`: contour overlay (`--visualize-contours`)
@@ -266,7 +264,7 @@ slideproc info
 
 ## HDF5 Output Structure
 
-Each processed slide produces a single HDF5 file under `<output>/patches/<stem>.h5`. Each file adopt similar structure to [TRIDENT](https://github.com/mahmoodlab/TRIDENT) to maintain compatability
+Each processed slide produces a single HDF5 file under `<output>/<mag>x_<patch>px_<overlap>px_overlap/patches/<stem>_patches.h5`. Each file adopts a structure similar to [TRIDENT](https://github.com/mahmoodlab/TRIDENT) to maintain compatability
 
 - Datasets
   - `coords`: int32 shape `(N, 2)` containing `(x, y)` at level 0
@@ -282,11 +280,15 @@ Each processed slide produces a single HDF5 file under `<output>/patches/<stem>.
 
 ### Output
 
-The CLI generates the following outputs:
+Results are written under a run-specific subdirectory named `<mag>x_<patch>px_<overlap>px_overlap` (where `overlap = patch_size - step_size`). Inside this directory:
+
+- `patches/` contains the HDF5 outputs (`<stem>_patches.h5`).
+- `images/` contains optional per-patch PNGs when `--save-images` is set.
+- `visualization/` contains optional overlays for grids, masks, and contours.
 
 **HDF5 Files** (per input WSI):
 ```
-output/patches/<wsi_stem>.h5
+<output>/<mag>x_<patch>px_<overlap>px_overlap/patches/<wsi_stem>_patches.h5
 ```
 
 Contains:
@@ -296,7 +298,7 @@ Contains:
 
 **Optional PNG Images** (if `--save-images` is used):
 ```
-output/images/<wsi_stem>/<wsi_stem>_x<x>_y<y>.png
+<output>/<mag>x_<patch>px_<overlap>px_overlap/images/<wsi_stem>/<wsi_stem>_x<x>_y<y>.png
 ```
 
 Each file represents a single extracted patch with its coordinates in the filename.

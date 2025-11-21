@@ -1,0 +1,43 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Sequence
+
+import cv2
+import numpy as np
+from PIL import Image
+
+from slide_processor.utils.contours import scale_contours
+from slide_processor.core.wsi.iwsi import IWSI
+
+
+def visualize_contours_on_thumbnail(
+    *,
+    tissue_contours: Sequence[np.ndarray],
+    holes_contours: Sequence[Sequence[np.ndarray]],
+    wsi: IWSI,
+    output_dir: Path,
+    thumbnail_size: int,
+) -> Path:
+    """Visualize tissue and hole contours on a thumbnail."""
+    thumb = wsi.get_thumb((thumbnail_size, thumbnail_size)).convert("RGB")
+    W0, H0 = wsi.get_size(lv=0)
+    tw, th = thumb.width, thumb.height
+    sx = float(tw) / float(W0)
+    sy = float(th) / float(H0)
+
+    tcs = scale_contours(list(tissue_contours), sx, sy)
+    holes_flat = [h for hs in holes_contours for h in hs]
+    hcs = scale_contours(holes_flat, sx, sy)
+
+    canvas = np.array(thumb.convert("RGB"))
+    if len(tcs) > 0:
+        cv2.polylines(canvas, tcs, isClosed=True, color=(255, 0, 0), thickness=2)
+    if len(hcs) > 0:
+        cv2.polylines(canvas, hcs, isClosed=True, color=(0, 0, 255), thickness=1)
+
+    out_img = Image.fromarray(canvas)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_path = output_dir / f"{Path(wsi.path).stem}_contours.png"
+    out_img.save(out_path, quality=95)
+    return out_path
