@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import os
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from typing import Any, Sequence, Union
 
 import numpy as np
@@ -12,8 +14,9 @@ from sam2.sam2_image_predictor import SAM2ImagePredictor
 
 from slide_processor.core.config import SegmentationConfig
 from slide_processor.core.models import Mask
-from slide_processor.services.interfaces import SegmentationService
+from slide_processor.core.wsi import WSIFactory
 from slide_processor.core.wsi.iwsi import IWSI
+from slide_processor.services.interfaces import SegmentationService
 
 logger = logging.getLogger("slide_processor.segmentation_service")
 
@@ -36,8 +39,7 @@ class _SAM2Predictor:
     def _build_predictor(self) -> SAM2ImagePredictor:
         try:
             conf = OmegaConf.load(str(self.cfg.config_path))
-            cfg_dict: Any = conf
-            model_cfg = cfg_dict["model"] if isinstance(cfg_dict, dict) and "model" in cfg_dict else cfg_dict
+            model_cfg: Any = conf.get("model", conf)
             model = instantiate(model_cfg)
             predictor = SAM2ImagePredictor(model, mask_threshold=self.cfg.mask_threshold)
             checkpoint = torch.load(self.cfg.checkpoint_path, map_location=self.device)
@@ -179,7 +181,11 @@ class SAM2SegmentationService(SegmentationService):
         )
 
     def segment_batch(self, wsis: Sequence[IWSI]) -> list[Mask]:
-        thumbs = [self._prepare_thumbnail(w) for w in wsis]
+        """Default batch segmenter; parallel thumbnail creation with threads."""
+        max_workers = min(8, len(wsis), os.cpu_count() or 8)
+        with ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="thumb") as ex:
+            thumbs = list(ex.map(self._prepare_thumbnail, wsis))
+
         masks = self.predictor.predict_batch(thumbs, resize_to_input=True)
         return [
             Mask(

@@ -137,6 +137,8 @@ Main command for processing whole slide images with tissue segmentation and patc
 | `--white-thresh` | int | `15` | No | Saturation threshold for filtering white patches |
 | `--black-thresh` | int | `50` | No | RGB threshold for filtering black patches |
 | `--seg-batch-size` | int | 1 | No | Batch size for SAM2 thumbnail segmentation |
+| `--patch-workers` | int | CPU count | No | Parallel threads for per-slide patch extraction/H5 writing |
+| `--max-open-slides` | int | 200 | No | Cap on simultaneous open WSIs across segmentation + extraction |
 | `--write-batch` | int | 8192 | No | Rows per HDF5 flush when writing coordinates |
 | `--save-images` | flag | False | No | Export individual patch images as PNG files under `images/<stem>/` |
 | `--fast-mode` | flag | False | No | Skip per-patch content filtering for faster extraction (may include background patches) |
@@ -174,6 +176,8 @@ slideproc process ./slides/ \
     --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
     --seg-batch-size 8 \
+    --patch-workers 4 \
+    --max-open-slides 12 \
     --output ./processed_slides
 ```
 

@@ -43,6 +43,8 @@ class ExtractionConfig:
     patch_size: int
     target_magnification: int
     step_size: int | None = None
+    workers: int | None = None
+    max_open_slides: int | None = None
     tissue_threshold: float = 0.01
     white_threshold: int = 15
     black_threshold: int = 50
@@ -59,6 +61,11 @@ class ExtractionConfig:
         _ensure_positive(self.white_threshold, "white_threshold")
         _ensure_positive(self.black_threshold, "black_threshold")
         _ensure_positive(self.write_batch, "write_batch")
+        if self.workers is not None:
+            _ensure_positive(self.workers, "workers")
+        if self.max_open_slides is None:
+            self.max_open_slides = 200
+        _ensure_positive(self.max_open_slides, "max_open_slides")
         return self
 
 

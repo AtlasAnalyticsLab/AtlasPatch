@@ -10,8 +10,13 @@ from tqdm import tqdm
 
 from slide_processor.core.config import AppConfig
 from slide_processor.core.models import ExtractionResult, Slide
-from slide_processor.core.paths import find_existing_patch, patch_h5_path, patch_lock_path
+from slide_processor.core.paths import find_existing_patch, patch_lock_path
 from slide_processor.core.wsi.iwsi import IWSI
+from slide_processor.orchestration.parallel import (
+    ExtractionTask,
+    InflightTracker,
+    PatchExtractionExecutor,
+)
 from slide_processor.services.interfaces import (
     ExtractionService,
     MPPResolver,
@@ -103,6 +108,18 @@ class ProcessingRunner:
             resolved.append(Slide(path=s.path, mpp=mpp_value, backend=s.backend))
         return resolved
 
+    def _resolve_patch_workers(self) -> int:
+        workers_cfg = self.config.extraction.workers
+        if workers_cfg is not None:
+            return max(1, int(workers_cfg))
+        return max(1, int(os.cpu_count() or 4))
+
+    def _resolve_max_open_slides(self, patch_workers: int, batch_size: int) -> int:
+        cfg_val = self.config.extraction.max_open_slides
+        if cfg_val is None:
+            raise ValueError("max_open_slides must be defined")
+        return max(1, int(cfg_val))
+
     def run(self) -> tuple[list[ExtractionResult], list[Tuple[Slide, Exception | str]]]:
         slides = self.discover_slides()
         slides = self._attach_mpp(slides)
@@ -115,84 +132,108 @@ class ProcessingRunner:
         failures: list[Tuple[Slide, Exception | str]] = []
 
         progress = tqdm(total=len(slides), disable=not self.show_progress, desc="Processing slides")
+        progress_bar = progress if self.show_progress else None
+        patch_workers = self._resolve_patch_workers()
         batch_size = max(1, self.config.segmentation.batch_size)
-        for batch in _chunked(slides, batch_size):
-            opened: list[tuple[Slide, IWSI, int | None, Path]] = []
+        max_open_slides = self._resolve_max_open_slides(patch_workers, batch_size=batch_size)
+        with PatchExtractionExecutor(
+            extractor=self.extractor,
+            visualizer=self.visualizer,
+            release_lock=self._release_lock,
+            max_workers=patch_workers,
+        ) as executor:
+            tracker = InflightTracker(results=results, failures=failures, progress=progress_bar)
 
-            # Skip check and open WSIs once with lock acquisition
-            for slide in batch:
-                if self._should_skip(slide):
-                    logger.info("Skipping %s (already processed).", slide.path.name)
-                    if self.show_progress:
-                        progress.update(1)
+            for batch in _chunked(slides, batch_size):
+                # Ensure capacity for new openings before starting next batch.
+                allow_inflight = max(0, max_open_slides - batch_size)
+                tracker.wait_until_at_most(limit=allow_inflight if allow_inflight > 0 else 0)
+
+                opened: list[tuple[Slide, IWSI, int | None, Path]] = []
+
+                # Skip check and open WSIs once with lock acquisition
+                for slide in batch:
+                    if self._should_skip(slide):
+                        logger.info("Skipping %s (already processed).", slide.path.name)
+                        if progress_bar:
+                            progress_bar.update(1)
+                        continue
+                    fd, lock_path = self._acquire_lock(slide)
+                    if fd is None:
+                        logger.info("Skipping %s (locked by another process).", slide.path.name)
+                        if progress_bar:
+                            progress_bar.update(1)
+                        continue
+                    try:
+                        opened.append((slide, self.wsi_loader.open(slide), fd, lock_path))
+                    except Exception as e:  # noqa: BLE001
+                        failures.append((slide, e))
+                        logger.error("Failed to open %s: %s", slide.path.name, e)
+                        self._release_lock(fd, lock_path)
+                        if progress_bar:
+                            progress_bar.update(1)
+
+                if not opened:
                     continue
-                fd, lock_path = self._acquire_lock(slide)
-                if fd is None:
-                    logger.info("Skipping %s (locked by another process).", slide.path.name)
-                    if self.show_progress:
-                        progress.update(1)
-                    continue
-                try:
-                    opened.append((slide, self.wsi_loader.open(slide), fd, lock_path))
-                except Exception as e:  # noqa: BLE001
-                    failures.append((slide, e))
-                    logger.error("Failed to open %s: %s", slide.path.name, e)
-                    self._release_lock(fd, lock_path)
-                    if self.show_progress:
-                        progress.update(1)
 
-            if not opened:
-                continue
-
-            try:
-                wsis_only = [w for _, w, _, _ in opened]
+                submitted_wsis: set[IWSI] = set()
+                masks = None
                 try:
+                    wsis_only = [w for _, w, _, _ in opened]
                     masks = (
                         self.segmentation.segment_batch(wsis_only)
                         if len(wsis_only) > 1
                         else [self.segmentation.segment_thumbnail(wsis_only[0])]
                     )
                 except Exception as e:  # noqa: BLE001
-                    for slide, _, fd, path in opened:
+                    for slide, wsi, fd, path in opened:
                         failures.append((slide, e))
+                        logger.error("Segmentation failed for %s: %s", slide.path.name, e)
+                        try:
+                            wsi.cleanup()
+                        except Exception:
+                            pass
                         self._release_lock(fd, path)
-                    logger.error("Segmentation failed for batch: %s", e)
-                    continue
-
-                for (slide, wsi, lock_fd, lock_path), mask in zip(opened, masks):
-                    if self._should_skip(slide):
-                        logger.info("Skipping %s (already processed).", slide.path.name)
-                        self._release_lock(lock_fd, lock_path)
-                        if self.show_progress:
-                            progress.update(1)
-                        continue
-                    try:
-                        result = self.extractor.extract(wsi, mask.data, slide=slide)
-                        if self.visualizer:
-                            self.visualizer.visualize(result, wsi=wsi, mask=mask.data)
-                        results.append(result)
-                        logger.info(
-                            "Processed %s -> %s (patches=%s)",
-                            slide.path.name,
-                            result.h5_path,
-                            result.num_patches,
+                        if progress_bar:
+                            progress_bar.update(1)
+                else:
+                    for (slide, wsi, lock_fd, lock_path), mask in zip(opened, masks):
+                        if self._should_skip(slide):
+                            logger.info("Skipping %s (already processed).", slide.path.name)
+                            try:
+                                wsi.cleanup()
+                            except Exception:
+                                pass
+                            self._release_lock(lock_fd, lock_path)
+                            if progress_bar:
+                                progress_bar.update(1)
+                            continue
+                        task = ExtractionTask(
+                            slide=slide,
+                            wsi=wsi,
+                            mask=mask.data,
+                            lock_fd=lock_fd,
+                            lock_path=lock_path,
                         )
-                        if self.show_progress:
-                            progress.update(1)
-                    except Exception as e:  # noqa: BLE001
-                        failures.append((slide, e))
-                        logger.error("Failed to process %s: %s", slide.path.name, e)
-                        if self.show_progress:
-                            progress.update(1)
-                    finally:
+                        fut = executor.submit(task)
+                        tracker.add(fut, slide)
+                        submitted_wsis.add(wsi)
+                finally:
+                    # Clean up WSIs that were not submitted (e.g., skipped or segmentation failed).
+                    for slide, wsi, lock_fd, lock_path in opened:
+                        if wsi in submitted_wsis:
+                            continue
+                        try:
+                            wsi.cleanup()
+                        except Exception:
+                            pass
                         self._release_lock(lock_fd, lock_path)
-            finally:
-                for _, wsi, lock_fd, lock_path in opened:
-                    try:
-                        wsi.cleanup()
-                    except Exception:
-                        pass
-                    self._release_lock(lock_fd, lock_path)
+
+                # Respect global cap on open slides after submissions.
+                tracker.wait_until_at_most(limit=max_open_slides)
+
+            # Drain any remaining in-flight tasks.
+            tracker.wait_until_at_most(limit=0)
 
         if self.show_progress:
             progress.close()

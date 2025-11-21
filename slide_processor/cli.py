@@ -98,6 +98,20 @@ def cli():
     "--seg-batch-size", type=int, default=1, show_default=True, help="Segmentation batch."
 )
 @click.option("--write-batch", type=int, default=8192, show_default=True, help="HDF5 write batch.")
+@click.option(
+    "--patch-workers",
+    type=int,
+    default=None,
+    show_default=True,
+    help="Parallel worker threads for per-slide patch extraction; defaults to CPU count.",
+)
+@click.option(
+    "--max-open-slides",
+    type=int,
+    default=200,
+    show_default=True,
+    help="Upper bound on simultaneously open slides (segmentation + extraction).",
+)
 @click.option("--fast-mode", is_flag=True, help="Skip per-patch content filtering.")
 @click.option("--save-images", is_flag=True, help="Export individual patch PNGs.")
 @click.option("--visualize-grids", is_flag=True, help="Render patch grid overlay.")
@@ -120,6 +134,8 @@ def process(
     black_thresh: int,
     seg_batch_size: int,
     write_batch: int,
+    patch_workers: int | None,
+    max_open_slides: int | None,
     fast_mode: bool,
     save_images: bool,
     visualize_grids: bool,
@@ -158,6 +174,8 @@ def process(
         black_threshold=black_thresh,
         fast_mode=fast_mode,
         write_batch=write_batch,
+        workers=patch_workers,
+        max_open_slides=max_open_slides,
     )
     output_cfg = OutputConfig(
         output_root=Path(output),
