@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import os
 import logging
+import os
 import threading
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, as_completed, wait
 from dataclasses import dataclass
@@ -159,7 +159,7 @@ class PatchExtractionExecutor:
                 pass
             self.release_lock(task.lock_fd, task.lock_path)
 
-    def __enter__(self) -> "PatchExtractionExecutor":
+    def __enter__(self) -> PatchExtractionExecutor:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:

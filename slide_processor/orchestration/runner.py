@@ -4,7 +4,7 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Iterable, List, Sequence, Tuple
+from typing import Iterable, Sequence, Tuple
 
 from tqdm import tqdm
 

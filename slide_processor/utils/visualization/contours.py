@@ -7,8 +7,8 @@ import cv2
 import numpy as np
 from PIL import Image
 
-from slide_processor.utils.contours import scale_contours
 from slide_processor.core.wsi.iwsi import IWSI
+from slide_processor.utils.contours import scale_contours
 
 
 def visualize_contours_on_thumbnail(

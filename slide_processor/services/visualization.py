@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 import h5py
 import numpy as np
@@ -9,14 +8,14 @@ import numpy as np
 from slide_processor.core.config import ExtractionConfig, OutputConfig, VisualizationConfig
 from slide_processor.core.models import ExtractionResult
 from slide_processor.core.paths import build_run_root
+from slide_processor.core.wsi.iwsi import IWSI
 from slide_processor.services.interfaces import VisualizationService
+from slide_processor.utils.contours import mask_to_contours
 from slide_processor.utils.visualization import (
     visualize_contours_on_thumbnail,
     visualize_mask_on_thumbnail,
     visualize_patches_on_thumbnail,
 )
-from slide_processor.utils.contours import mask_to_contours
-from slide_processor.core.wsi.iwsi import IWSI
 
 logger = logging.getLogger("slide_processor.visualization_service")
 

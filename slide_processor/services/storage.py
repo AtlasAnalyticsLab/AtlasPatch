@@ -4,7 +4,7 @@ import concurrent.futures as _fut
 import os
 from collections import deque
 from pathlib import Path
-from typing import Callable, Iterable, Sequence
+from typing import Callable, Iterable
 
 import numpy as np
 from PIL import Image

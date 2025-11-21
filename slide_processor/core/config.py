@@ -26,7 +26,7 @@ class SegmentationConfig:
     batch_size: int = 1
     mask_threshold: float = 0.0
 
-    def validated(self) -> "SegmentationConfig":
+    def validated(self) -> SegmentationConfig:
         if not self.checkpoint_path.exists():
             raise FileNotFoundError(f"Checkpoint not found: {self.checkpoint_path}")
         if not self.config_path.exists():
@@ -51,7 +51,7 @@ class ExtractionConfig:
     fast_mode: bool = False
     write_batch: int = 8192
 
-    def validated(self) -> "ExtractionConfig":
+    def validated(self) -> ExtractionConfig:
         _ensure_positive(self.patch_size, "patch_size")
         _ensure_positive(self.target_magnification, "target_magnification")
         if self.step_size is None:
@@ -78,7 +78,7 @@ class OutputConfig:
     visualize_contours: bool = False
     skip_existing: bool = True
 
-    def validated(self) -> "OutputConfig":
+    def validated(self) -> OutputConfig:
         self.output_root.mkdir(parents=True, exist_ok=True)
         return self
 
@@ -89,7 +89,7 @@ class ProcessingConfig:
     recursive: bool = False
     mpp_csv: Path | None = None
 
-    def validated(self) -> "ProcessingConfig":
+    def validated(self) -> ProcessingConfig:
         if not self.input_path.exists():
             raise FileNotFoundError(f"Input path not found: {self.input_path}")
         if self.mpp_csv is not None and not self.mpp_csv.exists():
@@ -101,7 +101,7 @@ class ProcessingConfig:
 class VisualizationConfig:
     thumbnail_size: int = 1024
 
-    def validated(self) -> "VisualizationConfig":
+    def validated(self) -> VisualizationConfig:
         _ensure_positive(self.thumbnail_size, "thumbnail_size")
         return self
 
@@ -115,7 +115,7 @@ class AppConfig:
     visualization: VisualizationConfig = field(default_factory=VisualizationConfig)
     device: str = "cuda"
 
-    def validated(self) -> "AppConfig":
+    def validated(self) -> AppConfig:
         self.processing = self.processing.validated()
         self.segmentation = self.segmentation.validated()
         self.extraction = self.extraction.validated()

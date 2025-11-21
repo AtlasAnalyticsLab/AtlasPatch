@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Sequence, Union
 
 import numpy as np
@@ -14,7 +14,6 @@ from sam2.sam2_image_predictor import SAM2ImagePredictor
 
 from slide_processor.core.config import SegmentationConfig
 from slide_processor.core.models import Mask
-from slide_processor.core.wsi import WSIFactory
 from slide_processor.core.wsi.iwsi import IWSI
 from slide_processor.services.interfaces import SegmentationService
 
