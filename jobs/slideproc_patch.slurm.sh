@@ -31,7 +31,7 @@ MAX_OPEN_SLIDES=200
 
 mkdir -p logs
 
-slideproc process "${WSI_ROOT}" \
+slideproc segment-and-get-coords "${WSI_ROOT}" \
     --checkpoint "${SAM_CHECKPOINT}" \
     --patch-size "${PATCH_SIZE}" \
     --target-mag "${TARGET_MAG}" \

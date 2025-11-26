@@ -126,7 +126,7 @@ def cli():
 @click.option("--mpp-csv", type=click.Path(exists=True), default=None, help="CSV with custom MPP.")
 @click.option("--skip-existing/--force", default=True, show_default=True, help="Skip existing H5.")
 @click.option("--verbose", "-v", is_flag=True, help="Enable debug logging.")
-def process(
+def segment_and_get_coords(
     wsi_path: str,
     checkpoint: str,
     output: str,

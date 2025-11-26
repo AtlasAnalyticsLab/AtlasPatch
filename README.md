@@ -22,9 +22,6 @@ A Python package for processing and handling whole slide images (WSI).
   - [Parameter Guide](#parameter-guide)
 - [HDF5 Output Structure](#hdf5-output-structure)
   - [Output](#output)
-- [Using TRIDENT for feature extraction](#using-trident-for-feature-extraction)
-  - [Setup TRIDENT](#setup-trident)
-  - [Extract patch features from SlideProcessor outputs](#extract-patch-features-from-slideprocessor-outputs)
 - [SLURM job scripts](#slurm-job-scripts)
 - [Feedback](#feedback)
 - [License](#license)
@@ -101,15 +98,15 @@ SlideProcessor provides an intuitive command-line interface for processing whole
 
 ```bash
 # Process a single WSI file (uses built-in Tiny SAM2 config)
-slideproc process sample.svs --checkpoint model.pt \
+slideproc segment-and-get-coords sample.svs --checkpoint model.pt \
     --patch-size 256 --target-mag 20
 
 # Process all WSI files in a directory
-slideproc process ./wsi_folder/ --checkpoint model.pt \
+slideproc segment-and-get-coords ./wsi_folder/ --checkpoint model.pt \
     --patch-size 256 --target-mag 20 --output ./results
 
 # With custom patch settings and visualization
-slideproc process sample.svs \
+slideproc segment-and-get-coords sample.svs \
     --checkpoint model.pt \
     --patch-size 512 --step-size 256 --target-mag 20 \
     --output ./output --save-images --visualize-grids
@@ -117,7 +114,7 @@ slideproc process sample.svs \
 
 ### Commands
 
-#### `slideproc process`
+#### `slideproc segment-and-get-coords`
 
 Main command for processing whole slide images with tissue segmentation and patch extraction.
 
@@ -162,7 +159,7 @@ Main command for processing whole slide images with tissue segmentation and patc
 #### Basic Single File Processing
 
 ```bash
-slideproc process sample.svs --checkpoint model.pt \
+slideproc segment-and-get-coords sample.svs --checkpoint model.pt \
     --patch-size 256 --target-mag 20
 ```
 
@@ -170,12 +167,12 @@ slideproc process sample.svs --checkpoint model.pt \
 
 ```bash
 # Process all .svs files in a directory
-slideproc process ./slides/ \
+slideproc segment-and-get-coords ./slides/ \
     --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
     --output ./processed_slides
 # Batch thumbnails for segmentation
-slideproc process ./slides/ \
+slideproc segment-and-get-coords ./slides/ \
     --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
     --seg-batch-size 8 \
@@ -188,7 +185,7 @@ slideproc process ./slides/ \
 
 ```bash
 # Extract larger patches with different stride and magnification
-slideproc process sample.svs \
+slideproc segment-and-get-coords sample.svs \
     --checkpoint model.pt \
     --patch-size 512 \
     --step-size 256 \
@@ -200,7 +197,7 @@ slideproc process sample.svs \
 
 ```bash
 # Generate individual PNG files for each patch
-slideproc process sample.svs \
+slideproc segment-and-get-coords sample.svs \
     --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
     --save-images \
@@ -213,7 +210,7 @@ slideproc process sample.svs \
 
 ```bash
 # Use CPU instead of GPU (slower but no GPU required)
-slideproc process sample.svs \
+slideproc segment-and-get-coords sample.svs \
     --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
     --device cpu
@@ -235,7 +232,7 @@ sample.png,0.4
 **Usage:**
 
 ```bash
-slideproc process ./wsi_folder/ \
+slideproc segment-and-get-coords ./wsi_folder/ \
     --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
     --mpp-csv mpp_values.csv
@@ -249,7 +246,7 @@ slideproc process ./wsi_folder/ \
 
 ```bash
 # Adjust thresholds for different tissue characteristics
-slideproc process sample.svs \
+slideproc segment-and-get-coords sample.svs \
     --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
     --white-thresh 20 \
@@ -261,7 +258,7 @@ slideproc process sample.svs \
 
 ```bash
 # Enable detailed logging for debugging
-slideproc process sample.svs \
+slideproc segment-and-get-coords sample.svs \
     --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
     --verbose
@@ -273,7 +270,7 @@ slideproc process sample.svs \
 
 ```bash
 # Generate visualizations on thumbnail
-slideproc process sample.svs \
+slideproc segment-and-get-coords sample.svs \
     --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
     --visualize-grids --visualize-mask --visualize-contours
@@ -327,7 +324,7 @@ slideproc info
 
 ## HDF5 Output Structure
 
-Each processed slide produces a single HDF5 file under `<output>/<mag>x_<patch>px_<overlap>px_overlap/patches/<stem>_patches.h5`. Each file adopts a structure similar to [TRIDENT](https://github.com/mahmoodlab/TRIDENT) to maintain compatability
+Each processed slide produces a single HDF5 file under `<output>/<mag>x_<patch>px_<overlap>px_overlap/patches/<stem>_patches.h5`.
 
 - Datasets
   - `coords`: int32 shape `(N, 2)` containing `(x, y)` at level 0
@@ -366,41 +363,9 @@ Contains:
 
 Each file represents a single extracted patch with its coordinates in the filename.
 
-## Using TRIDENT for feature extraction
-
-SlideProcessor writes HDF5 patch coordinate files in the same structure that [TRIDENT](https://github.com/mahmoodlab/TRIDENT) consumes (`coords`/`coords_ext` plus patch metadata), so you can run TRIDENT feature extraction directly on our outputs without conversion.
-
-### Setup TRIDENT
-
-```bash
-git clone https://github.com/mahmoodlab/TRIDENT.git
-cd TRIDENT
-conda create -n trident python=3.10  # or use your preferred env
-conda activate trident
-pip install -e .
-```
-
-### Extract patch features from SlideProcessor outputs
-
-Point `--job_dir` to the `--output` you used with `slideproc process` (TRIDENT will pick up the run folder such as `20x_256px_0px_overlap/patches/*.h5`):
-
-```bash
-python run_batch_of_slides.py \
-    --task feat \
-    --wsi_dir <source directory for whole slide image> \
-    --job_dir <output directory> \
-    --batch_size 64 \
-    --patch_encoder uni_v1 \
-    --mag 20 \
-    --patch_size 256
-```
-
-- `--patch_encoder` supports the full TRIDENT patch model list (examples: `uni_v1`, `uni_v2`, `conch_v15`, `virchow`, `phikon`, `gigapath`, `hoptimus0/1`, `musk`, `midnight12k`, `kaiko-*`, `lunit-*`, `dino_vit_small_p8/p16`, `hibou_l`, `ctranspath`, `resnet50`, etc.). Check [TRIDENT’s README](https://github.com/mahmoodlab/TRIDENT) for the complete table and any extra dependencies for specific encoders.
-- For slide-level embeddings instead of patch-only, use `--slide_encoder` (e.g., `titan`, `prism`, `gigapath`, `chief`, `madeleine`, `feather`) and TRIDENT will perform patch encoding + slide pooling automatically.
-
 ## SLURM job scripts
 
-We prepared ready-to-run SLURM templates are under `jobs/`:
+We prepared ready-to-run SLURM templates under `jobs/`:
 
 - Patch extraction (SAM2 + H5/PNG): `jobs/slideproc_patch.slurm.sh`. Edits to make:
   - Set `WSI_ROOT`, `OUTPUT_ROOT`, `SAM_CHECKPOINT`, `PATCH_SIZE`, `TARGET_MAG`, `SEG_BATCH`.
