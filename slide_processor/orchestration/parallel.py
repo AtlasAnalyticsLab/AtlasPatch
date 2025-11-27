@@ -6,7 +6,7 @@ import threading
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, as_completed, wait
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Sequence, Tuple
+from typing import Callable, Sequence
 
 import numpy as np
 
@@ -35,7 +35,7 @@ class InflightTracker:
         self,
         *,
         results: list[ExtractionResult],
-        failures: list[Tuple[Slide, Exception | str]],
+        failures: list[tuple[Slide, Exception | str]],
         progress,
     ) -> None:
         self._results = results
@@ -120,14 +120,14 @@ class PatchExtractionExecutor:
         tasks: Sequence[ExtractionTask],
         *,
         progress=None,
-    ) -> Tuple[list[ExtractionResult], list[Tuple[Slide, Exception]]]:
+    ) -> tuple[list[ExtractionResult], list[tuple[Slide, Exception]]]:
         """Submit tasks and collect completed results/failures."""
         if not tasks:
             return [], []
 
         futures = {self._executor.submit(self._run_task, task): task for task in tasks}
         results: list[ExtractionResult] = []
-        failures: list[Tuple[Slide, Exception]] = []
+        failures: list[tuple[Slide, Exception]] = []
 
         for fut in as_completed(futures):
             task = futures[fut]

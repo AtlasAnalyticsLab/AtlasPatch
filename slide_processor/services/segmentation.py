@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Sequence, Union
+from typing import Any, Sequence
 
 import numpy as np
 import torch
@@ -26,12 +26,14 @@ class _SAM2Predictor:
     def __init__(self, cfg: SegmentationConfig):
         self.cfg = cfg
 
-        dev_str = str(cfg.device).lower()
+        requested_dev = str(cfg.device).lower()
+        dev_str = requested_dev
         if dev_str == "cuda" and not torch.cuda.is_available():
             logger.warning("CUDA requested but unavailable; falling back to CPU.")
             dev_str = "cpu"
         self.device = torch.device(dev_str)
         self.input_size = 1024
+        logger.info("SAM2 predictor device: %s (requested=%s)", self.device, requested_dev)
 
         self.predictor = self._build_predictor()
 
@@ -48,7 +50,7 @@ class _SAM2Predictor:
         except Exception as e:  # noqa: BLE001
             raise RuntimeError(f"Failed to build SAM2 predictor: {e}") from e
 
-    def _normalize_input(self, image: Union[np.ndarray, Image.Image, torch.Tensor]) -> np.ndarray:
+    def _normalize_input(self, image: np.ndarray | Image.Image | torch.Tensor) -> np.ndarray:
         if isinstance(image, Image.Image):
             if image.mode != "RGB":
                 image = image.convert("RGB")
@@ -97,7 +99,7 @@ class _SAM2Predictor:
 
     @torch.inference_mode()
     def predict_image(
-        self, image: Union[np.ndarray, Image.Image, torch.Tensor], *, resize_to_input: bool = True
+        self, image: np.ndarray | Image.Image | torch.Tensor, *, resize_to_input: bool = True
     ) -> np.ndarray:
         arr = self._normalize_input(image)
         arr_resized, orig_shape = self._resize_input_for_sam(arr)
@@ -120,7 +122,7 @@ class _SAM2Predictor:
     @torch.inference_mode()
     def predict_batch(
         self,
-        images: Sequence[Union[np.ndarray, Image.Image, torch.Tensor]],
+        images: Sequence[np.ndarray | Image.Image | torch.Tensor],
         *,
         resize_to_input: bool = True,
     ) -> list[np.ndarray]:
@@ -156,6 +158,18 @@ class _SAM2Predictor:
                 mask = self._resize_mask(mask, orig_shapes[i])
             out_masks.append(mask.astype(np.float32))
         return out_masks
+
+    def close(self) -> None:
+        """Release GPU memory held by the SAM2 model."""
+        try:
+            self.predictor.model.cpu()
+        except Exception:
+            pass
+        if self.device.type == "cuda":
+            try:
+                torch.cuda.empty_cache()
+            except Exception:
+                pass
 
 
 class SAM2SegmentationService(SegmentationService):
@@ -193,3 +207,10 @@ class SAM2SegmentationService(SegmentationService):
             )
             for m in masks
         ]
+
+    def close(self) -> None:
+        """Free underlying SAM2 resources (notably GPU memory)."""
+        try:
+            self.predictor.close()
+        except Exception:
+            pass
