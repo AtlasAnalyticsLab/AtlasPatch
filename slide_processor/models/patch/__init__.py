@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import torch
 
+from slide_processor.models.patch.biomedclip import register_biomedclip_model
 from slide_processor.models.patch.clip import register_openai_clip_models
 from slide_processor.models.patch.convnext import register_convnexts
 from slide_processor.models.patch.medsiglip import register_medsiglip_model
@@ -32,4 +33,5 @@ def build_default_registry(
     register_uni_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_plip_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_medsiglip_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
+    register_biomedclip_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
     return registry

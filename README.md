@@ -168,13 +168,13 @@ End-to-end command that runs SAM2 segmentation, patch extraction, and feature em
 - `--checkpoint/-c` **(required)**: Path to SAM2 model checkpoint file (.pt)
 - `--patch-size` **(required)**: Target size of extracted patches in pixels
 - `--target-mag` **(required)**: Target magnification for extraction (e.g., 10, 20, 40)
-- `--feature-extractors` **(required)**: Space/comma separated feature extractors to run. Built-ins: `resnet18`, `resnet34`, `resnet50`, `resnet101`, `resnet152`, `convnext_tiny`, `convnext_small`, `convnext_base`, `convnext_large`, `vit_b_16`, `vit_b_32`, `vit_l_16`, `vit_l_32`, `vit_h_14`, `uni`, `uni2_h`, `clip_rn50`, `clip_rn101`, `clip_rn50x4`, `clip_rn50x16`, `clip_rn50x64`, `clip_vit_b_32`, `clip_vit_b_16`, `clip_vit_l_14`, `clip_vit_l_14_336`, `plip`, `medsiglip`, `quilt_b_32`, `quilt_b_16`, `quilt_b_16_pmb`.
+- `--feature-extractors` **(required)**: Space/comma separated feature extractors to run. Built-ins: `resnet18`, `resnet34`, `resnet50`, `resnet101`, `resnet152`, `convnext_tiny`, `convnext_small`, `convnext_base`, `convnext_large`, `vit_b_16`, `vit_b_32`, `vit_l_16`, `vit_l_32`, `vit_h_14`, `uni`, `uni2_h`, `biomedclip`, `clip_rn50`, `clip_rn101`, `clip_rn50x4`, `clip_rn50x16`, `clip_rn50x64`, `clip_vit_b_32`, `clip_vit_b_16`, `clip_vit_l_14`, `clip_vit_l_14_336`, `plip`, `medsiglip`, `quilt_b_32`, `quilt_b_16`, `quilt_b_16_pmb`.
 
 **Feature Options:**
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `--feature-extractors` | comma/space separated | — | Models to embed patches with (built-ins: resnet18/34/50/101/152, convnext_tiny/small/base/large, vit_b_16/b_32/l_16/l_32/h_14, uni, uni2_h, clip_rn50, clip_rn101, clip_rn50x4, clip_rn50x16, clip_rn50x64, clip_vit_b_32, clip_vit_b_16, clip_vit_l_14, clip_vit_l_14_336, plip, medsiglip, quilt_b_32, quilt_b_16, quilt_b_16_pmb) |
+| `--feature-extractors` | comma/space separated | — | Models to embed patches with (built-ins: resnet18/34/50/101/152, convnext_tiny/small/base/large, vit_b_16/b_32/l_16/l_32/h_14, uni, uni2_h, biomedclip, clip_rn50, clip_rn101, clip_rn50x4, clip_rn50x16, clip_rn50x64, clip_vit_b_32, clip_vit_b_16, clip_vit_l_14, clip_vit_l_14_336, plip, medsiglip, quilt_b_32, quilt_b_16, quilt_b_16_pmb) |
 | `--feature-batch-size` | int | 32 | Batch size for feature forward passes |
 | `--feature-device` | choice | inherits `--device` | Device for feature extraction (cpu/cuda/cuda:<idx>) |
 | `--feature-num-workers` | int | 4 | DataLoader worker count for feature extraction |
@@ -392,6 +392,7 @@ slideproc info
 ### Medical- and Pathology-Specific Vision Encoders
 | Name | Output Dim |
 | --- | --- |
+| [`biomedclip`](https://huggingface.co/microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224) ([BiomedCLIP: a multimodal biomedical foundation model pretrained from fifteen million scientific image-text pairs](https://aka.ms/biomedclip-paper)) | 512 |
 | [`uni`](https://huggingface.co/MahmoodLab/UNI) | 1024 |
 | [`uni2_h`](https://huggingface.co/MahmoodLab/UNI2-h) | 1536 |
 
