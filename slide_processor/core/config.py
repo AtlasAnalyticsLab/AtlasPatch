@@ -10,10 +10,31 @@ def _ensure_positive(value: int, name: str) -> int:
     return value
 
 
+def _ensure_non_negative(value: int, name: str) -> int:
+    if value < 0:
+        raise ValueError(f"{name} must be >= 0, got {value}")
+    return value
+
+
 def _ensure_fraction(value: float, name: str) -> float:
     if value < 0 or value > 1:
         raise ValueError(f"{name} must be between 0 and 1, got {value}")
     return value
+
+
+def _validate_device(device: str) -> str:
+    dev = device.strip().lower()
+    if dev == "cpu":
+        return dev
+    if dev == "cuda" or dev.startswith("cuda:"):
+        if dev.startswith("cuda:"):
+            suffix = dev.split("cuda:", 1)[1]
+            if suffix and not suffix.isdigit():
+                raise ValueError(
+                    f"Invalid CUDA device specification '{device}'. Use 'cuda' or 'cuda:<index>'."
+                )
+        return dev
+    raise ValueError(f"device must be 'cpu', 'cuda', or 'cuda:<index>', got {device}")
 
 
 @dataclass
@@ -31,8 +52,7 @@ class SegmentationConfig:
             raise FileNotFoundError(f"Checkpoint not found: {self.checkpoint_path}")
         if not self.config_path.exists():
             raise FileNotFoundError(f"SAM2 config not found: {self.config_path}")
-        if str(self.device).lower() not in {"cuda", "cpu"}:
-            raise ValueError(f"device must be one of ['cuda', 'cpu'], got {self.device}")
+        self.device = _validate_device(str(self.device))
         _ensure_positive(self.thumbnail_max, "thumbnail_max")
         _ensure_positive(self.batch_size, "segmentation batch_size")
         return self
@@ -66,6 +86,30 @@ class ExtractionConfig:
         if self.max_open_slides is None:
             self.max_open_slides = 200
         _ensure_positive(self.max_open_slides, "max_open_slides")
+        return self
+
+
+@dataclass
+class FeatureExtractionConfig:
+    extractors: list[str]
+    batch_size: int = 32
+    device: str = "cuda"
+    num_workers: int = 4
+    precision: str = "float32"
+
+    def validated(self) -> FeatureExtractionConfig:
+        if not self.extractors:
+            raise ValueError("At least one feature extractor must be provided.")
+        _ensure_positive(self.batch_size, "feature batch_size")
+        _ensure_non_negative(self.num_workers, "feature num_workers")
+        self.device = _validate_device(str(self.device))
+        allowed_prec = {"float32", "float16", "bfloat16"}
+        prec = str(self.precision).lower()
+        if prec not in allowed_prec:
+            raise ValueError(
+                f"precision must be one of {sorted(allowed_prec)}, got {self.precision}"
+            )
+        self.precision = prec
         return self
 
 
@@ -112,6 +156,7 @@ class AppConfig:
     segmentation: SegmentationConfig
     extraction: ExtractionConfig
     output: OutputConfig
+    features: FeatureExtractionConfig | None = None
     visualization: VisualizationConfig = field(default_factory=VisualizationConfig)
     device: str = "cuda"
 
@@ -120,5 +165,7 @@ class AppConfig:
         self.segmentation = self.segmentation.validated()
         self.extraction = self.extraction.validated()
         self.output = self.output.validated()
+        if self.features is not None:
+            self.features = self.features.validated()
         self.visualization = self.visualization.validated()
         return self

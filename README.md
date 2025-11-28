@@ -10,6 +10,7 @@ A Python package for processing and handling whole slide images (WSI).
   - [Commands](#commands)
   - [Usage Examples](#usage-examples)
     - [Basic Single File Processing](#basic-single-file-processing)
+    - [Full Processing with Feature Extraction](#full-processing-with-feature-extraction)
     - [Batch Processing Multiple Files](#batch-processing-multiple-files)
     - [Custom Patch Extraction Parameters](#custom-patch-extraction-parameters)
     - [Export Individual Patch Images](#export-individual-patch-images)
@@ -20,6 +21,7 @@ A Python package for processing and handling whole slide images (WSI).
     - [Generate Visualizations](#generate-visualizations)
     - [`slideproc info`](#slideproc-info)
   - [Parameter Guide](#parameter-guide)
+- [Available Feature Extractors](#available-feature-extractors)
 - [HDF5 Output Structure](#hdf5-output-structure)
   - [Output](#output)
 - [SLURM job scripts](#slurm-job-scripts)
@@ -101,6 +103,11 @@ SlideProcessor provides an intuitive command-line interface for processing whole
 slideproc segment-and-get-coords sample.svs --checkpoint model.pt \
     --patch-size 256 --target-mag 20
 
+# Segment, extract patches, and embed features (stores features in the patch H5)
+slideproc process sample.svs --checkpoint model.pt \
+    --patch-size 256 --target-mag 20 \
+    --feature-extractors resnet18,resnet50
+
 # Process all WSI files in a directory
 slideproc segment-and-get-coords ./wsi_folder/ --checkpoint model.pt \
     --patch-size 256 --target-mag 20 --output ./results
@@ -132,7 +139,7 @@ Main command for processing whole slide images with tissue segmentation and patc
 |--------|------|---------|-----------|-------------|
 | `--step-size` | int | patch-size | No | Stride between patches at target magnification; defaults to patch size |
 | `--output/-o` | Path | `./output` | No | Output directory root for results (contains `patches/`, `visualization/`, and `images/`) |
-| `--device` | choice | `cuda` | No | Device for inference: `cuda` or `cpu` |
+| `--device` | string | `cuda` | No | Segmentation device: `cuda`, `cuda:<idx>`, or `cpu` |
 | `--tissue-thresh` | float | `0.01` | No | Minimum tissue area threshold as fraction of image (0–1) |
 | `--white-thresh` | int | `15` | No | Saturation threshold for filtering white patches |
 | `--black-thresh` | int | `50` | No | RGB threshold for filtering black patches |
@@ -150,6 +157,34 @@ Main command for processing whole slide images with tissue segmentation and patc
 | `--skip-existing/--force` | flag | Skip existing | No | Skip existing outputs by default; pass `--force` to reprocess |
 | `--verbose/-v` | flag | False | No | Enable verbose logging output (disables progress bar) |
 
+#### `slideproc process`
+
+End-to-end command that runs SAM2 segmentation, patch extraction, and feature embedding into a single HDF5. Feature matrices are stored under `features/<extractor_name>` alongside coordinates.
+
+**Required Arguments:**
+- `WSI_PATH` **(required)**: Path to a single WSI file or directory containing multiple WSI files
+
+**Required Options:**
+- `--checkpoint/-c` **(required)**: Path to SAM2 model checkpoint file (.pt)
+- `--patch-size` **(required)**: Target size of extracted patches in pixels
+- `--target-mag` **(required)**: Target magnification for extraction (e.g., 10, 20, 40)
+- `--feature-extractors` **(required)**: Space/comma separated feature extractors to run. Built-ins: `resnet18`, `resnet34`, `resnet50`, `resnet101`, `resnet152`, `convnext_tiny`, `convnext_small`, `convnext_base`, `convnext_large`, `vit_b_16`, `vit_b_32`, `vit_l_16`, `vit_l_32`, `vit_h_14`, `uni`, `uni2_h`, `clip_rn50`, `clip_rn101`, `clip_rn50x4`, `clip_rn50x16`, `clip_rn50x64`, `clip_vit_b_32`, `clip_vit_b_16`, `clip_vit_l_14`, `clip_vit_l_14_336`, `plip`, `medsiglip`, `quilt_b_32`, `quilt_b_16`, `quilt_b_16_pmb`.
+
+**Feature Options:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--feature-extractors` | comma/space separated | — | Models to embed patches with (built-ins: resnet18/34/50/101/152, convnext_tiny/small/base/large, vit_b_16/b_32/l_16/l_32/h_14, uni, uni2_h, clip_rn50, clip_rn101, clip_rn50x4, clip_rn50x16, clip_rn50x64, clip_vit_b_32, clip_vit_b_16, clip_vit_l_14, clip_vit_l_14_336, plip, medsiglip, quilt_b_32, quilt_b_16, quilt_b_16_pmb) |
+| `--feature-batch-size` | int | 32 | Batch size for feature forward passes |
+| `--feature-device` | choice | inherits `--device` | Device for feature extraction (cpu/cuda/cuda:<idx>) |
+| `--feature-num-workers` | int | 4 | DataLoader worker count for feature extraction |
+| `--feature-precision` | choice | float32 | Compute precision for feature forward passes (`float32`, `float16`, `bfloat16`) |
+
+Feature embedding runs as a deferred pass over saved coordinates for each slide.
+
+All other parameters mirror `segment-and-get-coords` (stride, thresholds, workers, visualization flags, etc.).
+This command respects `--skip-existing`; rerun with `--force` when you need to regenerate features with a different extractor set.
+
 **Supported WSI Formats:**
 - **OpenSlide formats**: .svs, .tif, .tiff, .ndpi, .vms, .vmu, .scn, .mrxs, .bif, .dcm
 - **Image formats**: .png, .jpg, .jpeg, .bmp, .webp, .gif
@@ -162,6 +197,17 @@ Main command for processing whole slide images with tissue segmentation and patc
 slideproc segment-and-get-coords sample.svs --checkpoint model.pt \
     --patch-size 256 --target-mag 20
 ```
+
+#### Full Processing with Feature Extraction
+
+```bash
+slideproc process sample.svs --checkpoint model.pt \
+    --patch-size 256 --target-mag 20 \
+    --feature-extractors resnet18,resnet50 \
+    --feature-batch-size 32
+```
+
+This produces a single H5 file containing coordinates plus two feature matrices under `features/resnet18` and `features/resnet50`.
 
 #### Batch Processing Multiple Files
 
@@ -322,6 +368,61 @@ slideproc info
   - Range: 0.0–1.0
   - Unit: fraction (0–1)
 
+## Available Feature Extractors
+
+### Core vision backbones on Natural Images
+
+| Name | Output Dim |
+| --- | --- |
+| `resnet18` | 512 |
+| `resnet34` | 512 |
+| `resnet50` | 2048 |
+| `resnet101` | 2048 |
+| `resnet152` | 2048 |
+| `convnext_tiny` | 768 |
+| `convnext_small` | 768 |
+| `convnext_base` | 1024 |
+| `convnext_large` | 1536 |
+| `vit_b_16` | 768 |
+| `vit_b_32` | 768 |
+| `vit_l_16` | 1024 |
+| `vit_l_32` | 1024 |
+| `vit_h_14` | 1280 |
+
+### Medical- and Pathology-Specific Vision Encoders
+| Name | Output Dim |
+| --- | --- |
+| [`uni`](https://huggingface.co/MahmoodLab/UNI) | 1024 |
+| [`uni2_h`](https://huggingface.co/MahmoodLab/UNI2-h) | 1536 |
+
+### CLIP-like models
+
+#### Natural Images
+
+Requires `pip install -e ".[clip]"` to install `open-clip-torch` (OpenAI pretrained weights).
+
+| Name | Output Dim |
+| --- | --- |
+| `clip_rn50` | 1024 |
+| `clip_rn101` | 512 |
+| `clip_rn50x4` | 640 |
+| `clip_rn50x16` | 768 |
+| `clip_rn50x64` | 1024 |
+| `clip_vit_b_32` | 512 |
+| `clip_vit_b_16` | 512 |
+| `clip_vit_l_14` | 768 |
+| `clip_vit_l_14_336` | 768 |
+
+#### Medical- and Pathology-Specific CLIP
+
+| Name | Output Dim |
+| --- | --- |
+| [`plip`](https://github.com/PathologyFoundation/plip) | 512 (projection dim) |
+| [`medsiglip`](https://huggingface.co/google/medsiglip-448) ([paper](https://arxiv.org/abs/2507.05201)) | 1152 |
+| [`quilt_b_32`](https://quilt1m.github.io/) | 512 |
+| [`quilt_b_16`](https://quilt1m.github.io/) | 512 |
+| [`quilt_b_16_pmb`](https://quilt1m.github.io/) | 512 |
+
 ## HDF5 Output Structure
 
 Each processed slide produces a single HDF5 file under `<output>/<mag>x_<patch>px_<overlap>px_overlap/patches/<stem>_patches.h5`.
@@ -329,6 +430,7 @@ Each processed slide produces a single HDF5 file under `<output>/<mag>x_<patch>p
 - Datasets
   - `coords`: int32 shape `(N, 2)` containing `(x, y)` at level 0
   - `coords_ext`: int32 shape `(N, 5)` containing `(x, y, w, h, level)` for reliable re-reading
+  - `features/<extractor>`: float32 shape `(N, D)` feature matrix for each requested extractor (e.g., `features/resnet18`, `features/resnet50`)
 - File attributes
   - `patch_size`: int (target patch size)
   - `wsi_path`: original WSI path
@@ -336,6 +438,7 @@ Each processed slide produces a single HDF5 file under `<output>/<mag>x_<patch>p
   - `level0_magnification`: magnification of the highest-resolution level (if known)
   - `target_magnification`: magnification used for extraction
   - `patch_size_level0`: size of the patch footprint at level 0 in pixels. Used by some slide encoders which uses it for positional encoding module (e.g., [ALiBi](https://arxiv.org/pdf/2108.12409) in [TITAN](https://arxiv.org/abs/2411.19666))
+  - `feature_sets`: JSON metadata describing each extractor stored in the file (name, embedding_dim, dataset path)
 
 
 ### Output
@@ -345,6 +448,7 @@ Results are written under a run-specific subdirectory named `<mag>x_<patch>px_<o
 - `patches/` contains the HDF5 outputs (`<stem>_patches.h5`).
 - `images/` contains optional per-patch PNGs when `--save-images` is set.
 - `visualization/` contains optional overlays for grids, masks, and contours.
+- Feature matrices live inside each slide's H5 under `features/<extractor>` when `slideproc process` is used.
 
 **HDF5 Files** (per input WSI):
 ```

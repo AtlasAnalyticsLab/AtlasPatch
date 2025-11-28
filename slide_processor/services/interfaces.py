@@ -22,6 +22,11 @@ class ExtractionService(ABC):
     def extract(self, wsi: IWSI, mask: np.ndarray, *, slide: Slide) -> ExtractionResult: ...
 
 
+class FeatureEmbeddingService(ABC):
+    @abstractmethod
+    def embed_features(self, result: ExtractionResult, *, wsi: IWSI) -> ExtractionResult: ...
+
+
 class VisualizationService(ABC):
     @abstractmethod
     def visualize(self, result: ExtractionResult, *, wsi: IWSI, mask: np.ndarray) -> None: ...
