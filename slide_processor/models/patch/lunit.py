@@ -56,7 +56,7 @@ class LunitEncoder(PatchFeatureExtractor):
 
         model = model.to(device=self.device, dtype=self.dtype).eval()
         data_config = timm.data.resolve_model_data_config(model)
-        transforms = timm.data.create_transform(**data_config, is_training=False)
+        transform = timm.data.create_transform(**data_config, is_training=False)
         emb_dim = int(getattr(model, "num_features", fallback_dim))
 
         super().__init__(

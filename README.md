@@ -168,13 +168,13 @@ End-to-end command that runs SAM2 segmentation, patch extraction, and feature em
 - `--checkpoint/-c` **(required)**: Path to SAM2 model checkpoint file (.pt)
 - `--patch-size` **(required)**: Target size of extracted patches in pixels
 - `--target-mag` **(required)**: Target magnification for extraction (e.g., 10, 20, 40)
-- `--feature-extractors` **(required)**: Space/comma separated feature extractors to run. Built-ins: `resnet18`, `resnet34`, `resnet50`, `resnet101`, `resnet152`, `convnext_tiny`, `convnext_small`, `convnext_base`, `convnext_large`, `vit_b_16`, `vit_b_32`, `vit_l_16`, `vit_l_32`, `vit_h_14`, `uni`, `uni2_h`, `biomedclip`, `clip_rn50`, `clip_rn101`, `clip_rn50x4`, `clip_rn50x16`, `clip_rn50x64`, `clip_vit_b_32`, `clip_vit_b_16`, `clip_vit_l_14`, `clip_vit_l_14_336`, `plip`, `medsiglip`, `quilt_b_32`, `quilt_b_16`, `quilt_b_16_pmb`.
+- `--feature-extractors` **(required)**: Space/comma separated feature extractors to run. Built-ins: `resnet18`, `resnet34`, `resnet50`, `resnet101`, `resnet152`, `convnext_tiny`, `convnext_small`, `convnext_base`, `convnext_large`, `vit_b_16`, `vit_b_32`, `vit_l_16`, `vit_l_32`, `vit_h_14`, `uni`, `uni2_h`, `biomedclip`, `clip_rn50`, `clip_rn101`, `clip_rn50x4`, `clip_rn50x16`, `clip_rn50x64`, `clip_vit_b_32`, `clip_vit_b_16`, `clip_vit_l_14`, `clip_vit_l_14_336`, `plip`, `medsiglip`, `pathorchestra`, `h_optimus_0`, `h_optimus_1`, `h0_mini`, `hibou_b`, `hibou_l`, `quilt_b_32`, `quilt_b_16`, `quilt_b_16_pmb`.
 
 **Feature Options:**
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `--feature-extractors` | comma/space separated | — | Models to embed patches with (built-ins: resnet18/34/50/101/152, convnext_tiny/small/base/large, vit_b_16/b_32/l_16/l_32/h_14, uni, uni2_h, lunit_resnet50_bt, lunit_resnet50_swav, lunit_resnet50_mocov2, lunit_vit_small_patch16_dino, lunit_vit_small_patch8_dino, biomedclip, clip_rn50, clip_rn101, clip_rn50x4, clip_rn50x16, clip_rn50x64, clip_vit_b_32, clip_vit_b_16, clip_vit_l_14, clip_vit_l_14_336, plip, medsiglip, quilt_b_32, quilt_b_16, quilt_b_16_pmb) |
+| `--feature-extractors` | comma/space separated | — | Models to embed patches with (built-ins: resnet18/34/50/101/152, convnext_tiny/small/base/large, vit_b_16/b_32/l_16/l_32/h_14, uni, uni2_h, lunit_resnet50_bt, lunit_resnet50_swav, lunit_resnet50_mocov2, lunit_vit_small_patch16_dino, lunit_vit_small_patch8_dino, biomedclip, clip_rn50, clip_rn101, clip_rn50x4, clip_rn50x16, clip_rn50x64, clip_vit_b_32, clip_vit_b_16, clip_vit_l_14, clip_vit_l_14_336, plip, medsiglip, pathorchestra, h_optimus_0, h_optimus_1, h0_mini, hibou_b, hibou_l, quilt_b_32, quilt_b_16, quilt_b_16_pmb) |
 | `--feature-batch-size` | int | 32 | Batch size for feature forward passes |
 | `--feature-device` | choice | inherits `--device` | Device for feature extraction (cpu/cuda/cuda:<idx>) |
 | `--feature-num-workers` | int | 4 | DataLoader worker count for feature extraction |
@@ -390,12 +390,17 @@ slideproc info
 | `vit_h_14` | 1280 |
 
 ### Medical- and Pathology-Specific Vision Encoders
-Pathology-specific encoders from **Lunit Inc.** ("Benchmarking Self-Supervised Learning on Diverse Pathology Datasets") include self-supervised ResNet-50 checkpoints (Barlow Twins, SwAV, MoCo v2) and ViT-Small DINOv2 models (patch16/patch8) hosted on Hugging Face (`hf-hub:1aurent/*`) and loaded via timm.
 
 | Name | Output Dim |
 | --- | --- |
 | [`uni`](https://huggingface.co/MahmoodLab/UNI) | 1024 |
 | [`uni2_h`](https://huggingface.co/MahmoodLab/UNI2-h) | 1536 |
+| [`pathorchestra`](https://huggingface.co/AI4Pathology/PathOrchestra) ([paper](https://arxiv.org/abs/2503.24345)) | 512 |
+| [`h_optimus_0`](https://huggingface.co/bioptimus/H-optimus-0) | 1536 |
+| [`h_optimus_1`](https://huggingface.co/bioptimus/H-optimus-1) | 1536 |
+| [`h0_mini`](https://huggingface.co/bioptimus/H0-mini) ([paper](https://doi.org/10.48550/arXiv.2501.16239)) | 1536 |
+| [`hibou_b`](https://huggingface.co/histai/hibou-B) ([paper](https://arxiv.org/abs/2406.05074)) | 768 |
+| [`hibou_l`](https://huggingface.co/histai/hibou-L) ([paper](https://arxiv.org/abs/2406.05074)) | 1024 |
 | [`lunit_resnet50_bt`](https://huggingface.co/1aurent/resnet50.lunit_bt) (ResNet-50 Barlow Twins) | 2048 |
 | [`lunit_resnet50_swav`](https://huggingface.co/1aurent/resnet50.lunit_swav) (ResNet-50 SwAV) | 2048 |
 | [`lunit_resnet50_mocov2`](https://huggingface.co/1aurent/resnet50.lunit_mocov2) (ResNet-50 MoCo v2) | 2048 |

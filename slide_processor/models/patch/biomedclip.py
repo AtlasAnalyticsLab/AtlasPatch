@@ -36,7 +36,7 @@ class BioMedCLIPExtractor(PatchFeatureExtractor):
 
         try:
             model, preprocess = open_clip.create_model_from_pretrained(_MODEL_NAME)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             msg = (
                 "Failed to load BioMedCLIP "
                 f"({_MODEL_ID}). Ensure HuggingFace access and cache permissions."

@@ -5,8 +5,11 @@ import torch
 from slide_processor.models.patch.biomedclip import register_biomedclip_model
 from slide_processor.models.patch.clip import register_openai_clip_models
 from slide_processor.models.patch.convnext import register_convnexts
-from slide_processor.models.patch.medsiglip import register_medsiglip_model
+from slide_processor.models.patch.hibou import register_hibou_models
+from slide_processor.models.patch.hoptimus import register_hoptimus_models
 from slide_processor.models.patch.lunit import register_lunit_models
+from slide_processor.models.patch.medsiglip import register_medsiglip_model
+from slide_processor.models.patch.pathorchestra import register_pathorchestra_model
 from slide_processor.models.patch.plip import register_plip_model
 from slide_processor.models.patch.quilt import register_quilt_models
 from slide_processor.models.patch.registry import PatchFeatureExtractorRegistry
@@ -35,5 +38,8 @@ def build_default_registry(
     register_lunit_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_plip_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_medsiglip_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
+    register_pathorchestra_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
+    register_hoptimus_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
+    register_hibou_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_biomedclip_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
     return registry
