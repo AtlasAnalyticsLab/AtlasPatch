@@ -5,6 +5,7 @@ import torch
 from slide_processor.models.patch.biomedclip import register_biomedclip_model
 from slide_processor.models.patch.clip import register_openai_clip_models
 from slide_processor.models.patch.convnext import register_convnexts
+from slide_processor.models.patch.gigapath import register_prov_gigapath_model
 from slide_processor.models.patch.hibou import register_hibou_models
 from slide_processor.models.patch.hoptimus import register_hoptimus_models
 from slide_processor.models.patch.lunit import register_lunit_models
@@ -46,4 +47,5 @@ def build_default_registry(
     register_biomedclip_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_phikon_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_virchow_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
+    register_prov_gigapath_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
     return registry
