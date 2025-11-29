@@ -36,7 +36,7 @@ class UNIV1(PatchFeatureExtractor):
                 dynamic_img_size=True,
                 num_classes=0,
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             msg = (
                 "Failed to load UNI (MahmoodLab/uni) via timm. "
                 "Ensure you have access (HuggingFace token) and internet/cache permissions."
@@ -49,7 +49,7 @@ class UNIV1(PatchFeatureExtractor):
         emb_dim = 1024
 
         super().__init__(
-            name="uni",
+            name="uni_v1",
             model=model,
             embedding_dim=emb_dim,
             preprocess=transform,
@@ -114,7 +114,7 @@ class UNIV2(PatchFeatureExtractor):
         emb_dim = 1536
 
         super().__init__(
-            name="uni2_h",
+            name="uni_v2",
             model=model,
             embedding_dim=emb_dim,
             preprocess=transform,
@@ -133,10 +133,10 @@ def register_uni_models(
     num_workers: int = 0,
 ) -> None:
     registry.register(
-        "uni",
+        "uni_v1",
         lambda: UNIV1(device=device, dtype=dtype, num_workers=num_workers),
     )
     registry.register(
-        "uni2_h",
+        "uni_v2",
         lambda: UNIV2(device=device, dtype=dtype, num_workers=num_workers),
     )

@@ -10,11 +10,13 @@ from slide_processor.models.patch.hoptimus import register_hoptimus_models
 from slide_processor.models.patch.lunit import register_lunit_models
 from slide_processor.models.patch.medsiglip import register_medsiglip_model
 from slide_processor.models.patch.pathorchestra import register_pathorchestra_model
+from slide_processor.models.patch.phikon import register_phikon_models
 from slide_processor.models.patch.plip import register_plip_model
 from slide_processor.models.patch.quilt import register_quilt_models
 from slide_processor.models.patch.registry import PatchFeatureExtractorRegistry
 from slide_processor.models.patch.resnet import register_resnets
 from slide_processor.models.patch.uni import register_uni_models
+from slide_processor.models.patch.virchow import register_virchow_models
 from slide_processor.models.patch.vit import register_vits
 
 __all__ = ["PatchFeatureExtractorRegistry", "build_default_registry"]
@@ -42,4 +44,6 @@ def build_default_registry(
     register_hoptimus_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_hibou_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_biomedclip_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
+    register_phikon_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
+    register_virchow_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
     return registry
