@@ -174,7 +174,7 @@ End-to-end command that runs SAM2 segmentation, patch extraction, and feature em
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `--feature-extractors` | comma/space separated | — | Models to embed patches with (built-ins: resnet18/34/50/101/152, convnext_tiny/small/base/large, vit_b_16/b_32/l_16/l_32/h_14, uni, uni2_h, biomedclip, clip_rn50, clip_rn101, clip_rn50x4, clip_rn50x16, clip_rn50x64, clip_vit_b_32, clip_vit_b_16, clip_vit_l_14, clip_vit_l_14_336, plip, medsiglip, quilt_b_32, quilt_b_16, quilt_b_16_pmb) |
+| `--feature-extractors` | comma/space separated | — | Models to embed patches with (built-ins: resnet18/34/50/101/152, convnext_tiny/small/base/large, vit_b_16/b_32/l_16/l_32/h_14, uni, uni2_h, lunit_resnet50_bt, lunit_resnet50_swav, lunit_resnet50_mocov2, lunit_vit_small_patch16_dino, lunit_vit_small_patch8_dino, biomedclip, clip_rn50, clip_rn101, clip_rn50x4, clip_rn50x16, clip_rn50x64, clip_vit_b_32, clip_vit_b_16, clip_vit_l_14, clip_vit_l_14_336, plip, medsiglip, quilt_b_32, quilt_b_16, quilt_b_16_pmb) |
 | `--feature-batch-size` | int | 32 | Batch size for feature forward passes |
 | `--feature-device` | choice | inherits `--device` | Device for feature extraction (cpu/cuda/cuda:<idx>) |
 | `--feature-num-workers` | int | 4 | DataLoader worker count for feature extraction |
@@ -390,11 +390,17 @@ slideproc info
 | `vit_h_14` | 1280 |
 
 ### Medical- and Pathology-Specific Vision Encoders
+Pathology-specific encoders from **Lunit Inc.** ("Benchmarking Self-Supervised Learning on Diverse Pathology Datasets") include self-supervised ResNet-50 checkpoints (Barlow Twins, SwAV, MoCo v2) and ViT-Small DINOv2 models (patch16/patch8) hosted on Hugging Face (`hf-hub:1aurent/*`) and loaded via timm.
+
 | Name | Output Dim |
 | --- | --- |
-| [`biomedclip`](https://huggingface.co/microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224) ([BiomedCLIP: a multimodal biomedical foundation model pretrained from fifteen million scientific image-text pairs](https://aka.ms/biomedclip-paper)) | 512 |
 | [`uni`](https://huggingface.co/MahmoodLab/UNI) | 1024 |
 | [`uni2_h`](https://huggingface.co/MahmoodLab/UNI2-h) | 1536 |
+| [`lunit_resnet50_bt`](https://huggingface.co/1aurent/resnet50.lunit_bt) (ResNet-50 Barlow Twins) | 2048 |
+| [`lunit_resnet50_swav`](https://huggingface.co/1aurent/resnet50.lunit_swav) (ResNet-50 SwAV) | 2048 |
+| [`lunit_resnet50_mocov2`](https://huggingface.co/1aurent/resnet50.lunit_mocov2) (ResNet-50 MoCo v2) | 2048 |
+| [`lunit_vit_small_patch16_dino`](https://huggingface.co/1aurent/vit_small_patch16_224.lunit_dino) (ViT-Small DINOv2 patch16) | 384 |
+| [`lunit_vit_small_patch8_dino`](https://huggingface.co/1aurent/vit_small_patch8_224.lunit_dino) (ViT-Small DINOv2 patch8) | 384 |
 
 ### CLIP-like models
 
@@ -423,6 +429,7 @@ Requires `pip install -e ".[clip]"` to install `open-clip-torch` (OpenAI pretrai
 | [`quilt_b_32`](https://quilt1m.github.io/) | 512 |
 | [`quilt_b_16`](https://quilt1m.github.io/) | 512 |
 | [`quilt_b_16_pmb`](https://quilt1m.github.io/) | 512 |
+| [`biomedclip`](https://huggingface.co/microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224) ([BiomedCLIP: a multimodal biomedical foundation model pretrained from fifteen million scientific image-text pairs](https://aka.ms/biomedclip-paper)) | 512 |
 
 ## HDF5 Output Structure
 

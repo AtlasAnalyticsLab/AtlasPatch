@@ -6,6 +6,7 @@ from slide_processor.models.patch.biomedclip import register_biomedclip_model
 from slide_processor.models.patch.clip import register_openai_clip_models
 from slide_processor.models.patch.convnext import register_convnexts
 from slide_processor.models.patch.medsiglip import register_medsiglip_model
+from slide_processor.models.patch.lunit import register_lunit_models
 from slide_processor.models.patch.plip import register_plip_model
 from slide_processor.models.patch.quilt import register_quilt_models
 from slide_processor.models.patch.registry import PatchFeatureExtractorRegistry
@@ -31,6 +32,7 @@ def build_default_registry(
     register_openai_clip_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_quilt_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_uni_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
+    register_lunit_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_plip_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_medsiglip_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_biomedclip_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
