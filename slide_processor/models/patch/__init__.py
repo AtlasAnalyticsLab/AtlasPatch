@@ -8,6 +8,7 @@ from slide_processor.models.patch.convnext import register_convnexts
 from slide_processor.models.patch.gigapath import register_prov_gigapath_model
 from slide_processor.models.patch.hibou import register_hibou_models
 from slide_processor.models.patch.hoptimus import register_hoptimus_models
+from slide_processor.models.patch.midnight import register_midnight_model
 from slide_processor.models.patch.lunit import register_lunit_models
 from slide_processor.models.patch.medsiglip import register_medsiglip_model
 from slide_processor.models.patch.pathorchestra import register_pathorchestra_model
@@ -48,4 +49,5 @@ def build_default_registry(
     register_phikon_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_virchow_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_prov_gigapath_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
+    register_midnight_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
     return registry
