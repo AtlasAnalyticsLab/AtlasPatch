@@ -403,12 +403,12 @@ slideproc info
 | [`midnight`](https://huggingface.co/kaiko-ai/midnight) ([Training state-of-the-art pathology foundation models with orders of magnitude less data](https://arxiv.org/abs/2504.05186)) | 3072 |
 | [`musk`](https://github.com/lilab-stanford/MUSK) ([MUSK: A Vision-Language Foundation Model for Precision Oncology](https://www.nature.com/articles/s41586-024-08378-w)) | 1024 |
 | [`openmidnight`](https://sophontai.com/blog/openmidnight) ([How to Train a State-of-the-Art Pathology Foundation Model with $1.6k](https://sophontai.com/blog/openmidnight)) | 1536 |
-| [`pathorchestra`](https://huggingface.co/AI4Pathology/PathOrchestra) ([paper](https://arxiv.org/abs/2503.24345)) | 512 |
+| [`pathorchestra`](https://huggingface.co/AI4Pathology/PathOrchestra) ([PathOrchestra: A Comprehensive Foundation Model for Computational Pathology with Over 100 Diverse Clinical-Grade Tasks](https://arxiv.org/abs/2503.24345)) | 512 |
 | [`h_optimus_0`](https://huggingface.co/bioptimus/H-optimus-0) | 1536 |
 | [`h_optimus_1`](https://huggingface.co/bioptimus/H-optimus-1) | 1536 |
-| [`h0_mini`](https://huggingface.co/bioptimus/H0-mini) ([paper](https://doi.org/10.48550/arXiv.2501.16239)) | 1536 |
-| [`hibou_b`](https://huggingface.co/histai/hibou-B) ([paper](https://arxiv.org/abs/2406.05074)) | 768 |
-| [`hibou_l`](https://huggingface.co/histai/hibou-L) ([paper](https://arxiv.org/abs/2406.05074)) | 1024 |
+| [`h0_mini`](https://huggingface.co/bioptimus/H0-mini) ([Distilling foundation models for robust and efficient models in digital pathology](https://doi.org/10.48550/arXiv.2501.16239)) | 1536 |
+| [`hibou_b`](https://huggingface.co/histai/hibou-B) ([Hibou: A Family of Foundational Vision Transformers for Pathology](https://arxiv.org/abs/2406.05074)) | 768 |
+| [`hibou_l`](https://huggingface.co/histai/hibou-L) ([Hibou: A Family of Foundational Vision Transformers for Pathology](https://arxiv.org/abs/2406.05074)) | 1024 |
 | [`lunit_resnet50_bt`](https://huggingface.co/1aurent/resnet50.lunit_bt) (ResNet-50 Barlow Twins) | 2048 |
 | [`lunit_resnet50_swav`](https://huggingface.co/1aurent/resnet50.lunit_swav) (ResNet-50 SwAV) | 2048 |
 | [`lunit_resnet50_mocov2`](https://huggingface.co/1aurent/resnet50.lunit_mocov2) (ResNet-50 MoCo v2) | 2048 |
@@ -498,11 +498,6 @@ We prepared ready-to-run SLURM templates under `jobs/`:
   - `--fast-mode` is on by default; append `--no-fast-mode` to enable content filtering.
   - Submit with `sbatch jobs/slideproc_patch.slurm.sh`.
 
-- TRIDENT feature extraction: `jobs/trident_features.slurm.sh`.
-  - Set `WSI_ROOT`, `PATCH_OUTPUT` (same as SlideProcessor `--output`), `PATCH_ENCODER`, `MAG`, `PATCH_SIZE`, `BATCH_SIZE`.
-  - Activate your TRIDENT env and set `PYTHONPATH` to the TRIDENT repo if needed.
-  - Submit with `sbatch jobs/trident_features.slurm.sh`.
-
 ## Feedback
 
 - Report problems via the [bug report template](https://github.com/AtlasAnalyticsLab/SlideProcessor/issues/new?template=bug_report.md) so we can reproduce and fix them quickly.
@@ -512,3 +507,11 @@ We prepared ready-to-run SLURM templates under `jobs/`:
 ## License
 
 SlideProcessor is licensed under the **PolyForm Noncommercial License 1.0.0**, which strictly prohibits commercial use of this software or any derivative works. This applies to all forms of commercialization, including selling the software, offering it as a commercial service, using it in commercial products, or creating forked versions for commercial purposes. However, the license explicitly permits use for research, experimentation, and non-commercial purposes. Personal use for research, hobby projects, and educational purposes is allowed, as is use by academic institutions, educational organizations, public research organizations, and non-profit entities regardless of their funding sources. If you wish to use SlideProcessor commercially, you must obtain a separate commercial license from the authors. For the complete license text and detailed terms, see the [LICENSE](./LICENSE) file in this repository.
+
+# TODO
+
+- CONCH v1
+- CONCH v1.5
+- CHIEF
+- Omiclip
+- CTransPath
