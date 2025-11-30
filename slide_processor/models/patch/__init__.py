@@ -11,6 +11,7 @@ from slide_processor.models.patch.hoptimus import register_hoptimus_models
 from slide_processor.models.patch.midnight import register_midnight_model
 from slide_processor.models.patch.lunit import register_lunit_models
 from slide_processor.models.patch.medsiglip import register_medsiglip_model
+from slide_processor.models.patch.musk import register_musk_model
 from slide_processor.models.patch.pathorchestra import register_pathorchestra_model
 from slide_processor.models.patch.phikon import register_phikon_models
 from slide_processor.models.patch.plip import register_plip_model
@@ -42,6 +43,7 @@ def build_default_registry(
     register_lunit_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_plip_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_medsiglip_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
+    register_musk_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_pathorchestra_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_hoptimus_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_hibou_models(registry, device=dev, num_workers=num_workers, dtype=dtype)

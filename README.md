@@ -168,13 +168,13 @@ End-to-end command that runs SAM2 segmentation, patch extraction, and feature em
 - `--checkpoint/-c` **(required)**: Path to SAM2 model checkpoint file (.pt)
 - `--patch-size` **(required)**: Target size of extracted patches in pixels
 - `--target-mag` **(required)**: Target magnification for extraction (e.g., 10, 20, 40)
-- `--feature-extractors` **(required)**: Space/comma separated feature extractors to run. Built-ins: `resnet18`, `resnet34`, `resnet50`, `resnet101`, `resnet152`, `convnext_tiny`, `convnext_small`, `convnext_base`, `convnext_large`, `vit_b_16`, `vit_b_32`, `vit_l_16`, `vit_l_32`, `vit_h_14`, `uni_v1`, `uni_v2`, `biomedclip`, `clip_rn50`, `clip_rn101`, `clip_rn50x4`, `clip_rn50x16`, `clip_rn50x64`, `clip_vit_b_32`, `clip_vit_b_16`, `clip_vit_l_14`, `clip_vit_l_14_336`, `plip`, `medsiglip`, `phikon_v1`, `phikon_v2`, `virchow_v1`, `virchow_v2`, `prov_gigapath`, `midnight`, `pathorchestra`, `h_optimus_0`, `h_optimus_1`, `h0_mini`, `hibou_b`, `hibou_l`, `quilt_b_32`, `quilt_b_16`, `quilt_b_16_pmb`.
+- `--feature-extractors` **(required)**: Space/comma separated feature extractors to run. Built-ins: `resnet18`, `resnet34`, `resnet50`, `resnet101`, `resnet152`, `convnext_tiny`, `convnext_small`, `convnext_base`, `convnext_large`, `vit_b_16`, `vit_b_32`, `vit_l_16`, `vit_l_32`, `vit_h_14`, `uni_v1`, `uni_v2`, `biomedclip`, `clip_rn50`, `clip_rn101`, `clip_rn50x4`, `clip_rn50x16`, `clip_rn50x64`, `clip_vit_b_32`, `clip_vit_b_16`, `clip_vit_l_14`, `clip_vit_l_14_336`, `plip`, `medsiglip`, `phikon_v1`, `phikon_v2`, `virchow_v1`, `virchow_v2`, `prov_gigapath`, `midnight`, `musk`, `pathorchestra`, `h_optimus_0`, `h_optimus_1`, `h0_mini`, `hibou_b`, `hibou_l`, `quilt_b_32`, `quilt_b_16`, `quilt_b_16_pmb`.
 
 **Feature Options:**
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `--feature-extractors` | comma/space separated | — | Models to embed patches with (built-ins: resnet18/34/50/101/152, convnext_tiny/small/base/large, vit_b_16/b_32/l_16/l_32/h_14, uni_v1, uni_v2, lunit_resnet50_bt, lunit_resnet50_swav, lunit_resnet50_mocov2, lunit_vit_small_patch16_dino, lunit_vit_small_patch8_dino, biomedclip, clip_rn50, clip_rn101, clip_rn50x4, clip_rn50x16, clip_rn50x64, clip_vit_b_32, clip_vit_b_16, clip_vit_l_14, clip_vit_l_14_336, plip, medsiglip, phikon_v1, phikon_v2, virchow_v1, virchow_v2, prov_gigapath, midnight, pathorchestra, h_optimus_0, h_optimus_1, h0_mini, hibou_b, hibou_l, quilt_b_32, quilt_b_16, quilt_b_16_pmb) |
+| `--feature-extractors` | comma/space separated | — | Models to embed patches with (built-ins: resnet18/34/50/101/152, convnext_tiny/small/base/large, vit_b_16/b_32/l_16/l_32/h_14, uni_v1, uni_v2, lunit_resnet50_bt, lunit_resnet50_swav, lunit_resnet50_mocov2, lunit_vit_small_patch16_dino, lunit_vit_small_patch8_dino, biomedclip, clip_rn50, clip_rn101, clip_rn50x4, clip_rn50x16, clip_rn50x64, clip_vit_b_32, clip_vit_b_16, clip_vit_l_14, clip_vit_l_14_336, plip, medsiglip, phikon_v1, phikon_v2, virchow_v1, virchow_v2, prov_gigapath, midnight, musk, pathorchestra, h_optimus_0, h_optimus_1, h0_mini, hibou_b, hibou_l, quilt_b_32, quilt_b_16, quilt_b_16_pmb) |
 | `--feature-batch-size` | int | 32 | Batch size for feature forward passes |
 | `--feature-device` | choice | inherits `--device` | Device for feature extraction (cpu/cuda/cuda:<idx>) |
 | `--feature-num-workers` | int | 4 | DataLoader worker count for feature extraction |
@@ -401,6 +401,7 @@ slideproc info
 | [`virchow_v2`](https://huggingface.co/paige-ai/Virchow2) ([Virchow2: Scaling Self-Supervised Mixed Magnification Models in Pathology](https://arxiv.org/abs/2408.00738)) | 2560 |
 | [`prov_gigapath`](https://huggingface.co/prov-gigapath/prov-gigapath) ([A whole-slide foundation model for digital pathology from real-world data](https://www.nature.com/articles/s41586-024-07441-w)) | 1536 |
 | [`midnight`](https://huggingface.co/kaiko-ai/midnight) ([Training state-of-the-art pathology foundation models with orders of magnitude less data](https://arxiv.org/abs/2504.05186)) | 3072 |
+| [`musk`](https://github.com/lilab-stanford/MUSK) ([MUSK: A Vision-Language Foundation Model for Precision Oncology](https://www.nature.com/articles/s41586-024-08378-w)) | 1024 |
 | [`pathorchestra`](https://huggingface.co/AI4Pathology/PathOrchestra) ([paper](https://arxiv.org/abs/2503.24345)) | 512 |
 | [`h_optimus_0`](https://huggingface.co/bioptimus/H-optimus-0) | 1536 |
 | [`h_optimus_1`](https://huggingface.co/bioptimus/H-optimus-1) | 1536 |

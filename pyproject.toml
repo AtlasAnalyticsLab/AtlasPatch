@@ -35,6 +35,9 @@ dependencies = [
     "transformers>=4.41.0",
     "sentencepiece>=0.2.0",
     "open-clip-torch>=2.24.0",
+    "fairscale>=0.4.0",
+    "einops>=0.8.0",
+    "MUSK @ git+https://github.com/lilab-stanford/MUSK.git",
 ]
 
 [project.optional-dependencies]
