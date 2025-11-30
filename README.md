@@ -510,8 +510,54 @@ SlideProcessor is licensed under the **PolyForm Noncommercial License 1.0.0**, w
 
 # TODO
 
+## Refactor
+- Update name from Slide Processor to `Atlas Patch`
+
+## Patch Encoders
+- PathoOrchestra
 - CONCH v1
 - CONCH v1.5
 - CHIEF
 - Omiclip
 - CTransPath
+
+## Model loading
+- Add automatic model loading from Hugging Face
+
+## Saving to H5 file:
+- remove the duplication in coordinate attributes and the attributes in general
+```
+  level0_height: 12288
+  level0_magnification: 20
+  level0_width: 3584
+  num_patches: 79
+  overlap: 0
+  patch_size: 512
+  patch_size_level0: 512
+  target_magnification: 20
+  wsi_path: /home/mila/k/kotpy/scratch/datasets/PANDA/images/0a0f8e20b1222b69416301444b117678.tiff
+coords: shape=(79, 2), dtype=int32
+coords attrs:
+  description: (x, y) coordinates at level 0
+  level0_height: 12288
+  level0_magnification: 20
+  level0_width: 3584
+  name: 0a0f8e20b1222b69416301444b117678
+  overlap: 0
+  patch_size: 512
+  patch_size_level0: 512
+  savetodir: /network/scratch/k/kotpy/datasets/PANDA/slide_proc/20x_512px_0px_overlap/patches
+  target_magnification: 20
+```
+
+- Remove the feature set entry entirely
+
+## Shipping
+- Make `pip install atlas_patch`
+
+## Documentation
+- Update and decrease the README file size, make it more straight forward
+- Add part on how to use those extracted features
+
+## Fancy features
+- Support `bring your own encoder` functionality
