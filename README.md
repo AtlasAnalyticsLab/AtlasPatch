@@ -409,11 +409,11 @@ slideproc info
 | [`h0_mini`](https://huggingface.co/bioptimus/H0-mini) ([Distilling foundation models for robust and efficient models in digital pathology](https://doi.org/10.48550/arXiv.2501.16239)) | 1536 |
 | [`hibou_b`](https://huggingface.co/histai/hibou-B) ([Hibou: A Family of Foundational Vision Transformers for Pathology](https://arxiv.org/abs/2406.05074)) | 768 |
 | [`hibou_l`](https://huggingface.co/histai/hibou-L) ([Hibou: A Family of Foundational Vision Transformers for Pathology](https://arxiv.org/abs/2406.05074)) | 1024 |
-| [`lunit_resnet50_bt`](https://huggingface.co/1aurent/resnet50.lunit_bt) (ResNet-50 Barlow Twins) | 2048 |
-| [`lunit_resnet50_swav`](https://huggingface.co/1aurent/resnet50.lunit_swav) (ResNet-50 SwAV) | 2048 |
-| [`lunit_resnet50_mocov2`](https://huggingface.co/1aurent/resnet50.lunit_mocov2) (ResNet-50 MoCo v2) | 2048 |
-| [`lunit_vit_small_patch16_dino`](https://huggingface.co/1aurent/vit_small_patch16_224.lunit_dino) (ViT-Small DINOv2 patch16) | 384 |
-| [`lunit_vit_small_patch8_dino`](https://huggingface.co/1aurent/vit_small_patch8_224.lunit_dino) (ViT-Small DINOv2 patch8) | 384 |
+| [`lunit_resnet50_bt`](https://huggingface.co/1aurent/resnet50.lunit_bt) ([Benchmarking Self-Supervised Learning on Diverse Pathology Datasets](https://openaccess.thecvf.com/content/CVPR2023/papers/Kang_Benchmarking_Self-Supervised_Learning_on_Diverse_Pathology_Datasets_CVPR_2023_paper.pdf)) | 2048 |
+| [`lunit_resnet50_swav`](https://huggingface.co/1aurent/resnet50.lunit_swav) ([Benchmarking Self-Supervised Learning on Diverse Pathology Datasets](https://openaccess.thecvf.com/content/CVPR2023/papers/Kang_Benchmarking_Self-Supervised_Learning_on_Diverse_Pathology_Datasets_CVPR_2023_paper.pdf)) | 2048 |
+| [`lunit_resnet50_mocov2`](https://huggingface.co/1aurent/resnet50.lunit_mocov2) ([Benchmarking Self-Supervised Learning on Diverse Pathology Datasets](https://openaccess.thecvf.com/content/CVPR2023/papers/Kang_Benchmarking_Self-Supervised_Learning_on_Diverse_Pathology_Datasets_CVPR_2023_paper.pdf)) | 2048 |
+| [`lunit_vit_small_patch16_dino`](https://huggingface.co/1aurent/vit_small_patch16_224.lunit_dino) ([Benchmarking Self-Supervised Learning on Diverse Pathology Datasets](https://openaccess.thecvf.com/content/CVPR2023/papers/Kang_Benchmarking_Self-Supervised_Learning_on_Diverse_Pathology_Datasets_CVPR_2023_paper.pdf)) | 384 |
+| [`lunit_vit_small_patch8_dino`](https://huggingface.co/1aurent/vit_small_patch8_224.lunit_dino) ([Benchmarking Self-Supervised Learning on Diverse Pathology Datasets](https://openaccess.thecvf.com/content/CVPR2023/papers/Kang_Benchmarking_Self-Supervised_Learning_on_Diverse_Pathology_Datasets_CVPR_2023_paper.pdf)) | 384 |
 
 ### CLIP-like models
 
@@ -438,7 +438,7 @@ Requires `pip install -e ".[clip]"` to install `open-clip-torch` (OpenAI pretrai
 | Name | Output Dim |
 | --- | --- |
 | [`plip`](https://github.com/PathologyFoundation/plip) | 512 (projection dim) |
-| [`medsiglip`](https://huggingface.co/google/medsiglip-448) ([paper](https://arxiv.org/abs/2507.05201)) | 1152 |
+| [`medsiglip`](https://huggingface.co/google/medsiglip-448) ([MedGemma Technical Report](https://arxiv.org/abs/2507.05201)) | 1152 |
 | [`quilt_b_32`](https://quilt1m.github.io/) | 512 |
 | [`quilt_b_16`](https://quilt1m.github.io/) | 512 |
 | [`quilt_b_16_pmb`](https://quilt1m.github.io/) | 512 |
