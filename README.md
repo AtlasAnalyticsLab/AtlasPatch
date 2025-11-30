@@ -435,11 +435,11 @@ slideproc info
 
 | Name | Output Dim |
 | --- | --- |
-| [`plip`](https://github.com/PathologyFoundation/plip) | 512 (projection dim) |
+| [`plip`](https://github.com/PathologyFoundation/plip) ([Pathology Language and Image Pre-Training (PLIP)](https://www.nature.com/articles/s41591-023-02504-3)) | 512 (projection dim) |
 | [`medsiglip`](https://huggingface.co/google/medsiglip-448) ([MedGemma Technical Report](https://arxiv.org/abs/2507.05201)) | 1152 |
-| [`quilt_b_32`](https://quilt1m.github.io/) | 512 |
-| [`quilt_b_16`](https://quilt1m.github.io/) | 512 |
-| [`quilt_b_16_pmb`](https://quilt1m.github.io/) | 512 |
+| [`quilt_b_32`](https://quilt1m.github.io/) ([Quilt-1M: One Million Image-Text Pairs for Histopathology](https://arxiv.org/pdf/2306.11207)) | 512 |
+| [`quilt_b_16`](https://quilt1m.github.io/) ([Quilt-1M: One Million Image-Text Pairs for Histopathology](https://arxiv.org/pdf/2306.11207)) | 512 |
+| [`quilt_b_16_pmb`](https://quilt1m.github.io/) ([Quilt-1M: One Million Image-Text Pairs for Histopathology](https://arxiv.org/pdf/2306.11207)) | 512 |
 | [`biomedclip`](https://huggingface.co/microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224) ([BiomedCLIP: a multimodal biomedical foundation model pretrained from fifteen million scientific image-text pairs](https://aka.ms/biomedclip-paper)) | 512 |
 
 ## HDF5 Output Structure
