@@ -46,9 +46,7 @@ class OpenMidnight(PatchFeatureExtractor):
 
         try:
             # Load the base dinov2 model
-            model = torch.hub.load(
-                "facebookresearch/dinov2", "dinov2_vitg14_reg", weights=None
-            )
+            model = torch.hub.load("facebookresearch/dinov2", "dinov2_vitg14_reg", weights=None)
 
             # Download OpenMidnight weights
             download_location = hf_hub_download(

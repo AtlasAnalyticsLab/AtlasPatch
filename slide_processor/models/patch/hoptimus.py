@@ -13,6 +13,9 @@ _EMB_DIM = 1536
 
 
 def _build_hoptimus_transform():
+    """
+    This is only for HOptimus-0 and HOptimus-1, H0-Mini uses a different transformation
+    """
     from torchvision import transforms
 
     return transforms.Compose(
@@ -126,6 +129,8 @@ class H0Mini(PatchFeatureExtractor):
         num_workers: int = 0,
     ) -> None:
         import timm
+        from timm.data import resolve_data_config
+        from timm.data.transforms_factory import create_transform
 
         self.device = device
         self.dtype = dtype
@@ -146,7 +151,7 @@ class H0Mini(PatchFeatureExtractor):
             raise RuntimeError(msg) from e
 
         model = model.to(device=self.device, dtype=self.dtype).eval()
-        preprocess = _build_hoptimus_transform()
+        preprocess = create_transform(**resolve_data_config(model.pretrained_cfg, model=model))
 
         def _forward(x, m=model):
             output = m(x)

@@ -37,7 +37,7 @@ class MUSK(PatchFeatureExtractor):
         dtype: torch.dtype,
         num_workers: int = 0,
     ) -> None:
-        from musk import modeling, utils
+        from musk import utils
         from timm.models import create_model
 
         self.device = device
