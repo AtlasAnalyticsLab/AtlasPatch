@@ -419,8 +419,6 @@ slideproc info
 
 #### Natural Images
 
-Requires `pip install -e ".[clip]"` to install `open-clip-torch` (OpenAI pretrained weights).
-
 | Name | Output Dim |
 | --- | --- |
 | `clip_rn50` | 1024 |
