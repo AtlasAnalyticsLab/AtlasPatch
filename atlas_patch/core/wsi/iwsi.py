@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Literal, Optional, Tuple, Union
+from typing import Any, Dict, Literal, Mapping, Optional, Sequence, Tuple, Union
 
 import cv2
 import numpy as np
@@ -118,6 +118,96 @@ class IWSI(ABC):
     def cleanup(self) -> None:
         """Release resources."""
         pass
+
+    @staticmethod
+    def _clean_meta_value(val: Any) -> str | None:
+        """Normalize metadata values to a trimmed string or None."""
+        if val is None:
+            return None
+        try:
+            text = str(val).strip()
+        except Exception:
+            return None
+        return text or None
+
+    @classmethod
+    def _find_meta_value(
+        cls, meta: Mapping[str, Any], keys: Sequence[str], *, contains: Sequence[str] | None = None
+    ) -> str | None:
+        if not meta:
+            return None
+
+        normalized: dict[str, Any] = {}
+        for key, value in meta.items():
+            if value is None:
+                continue
+            try:
+                lower = str(key).lower()
+            except Exception:
+                continue
+            if lower not in normalized:
+                normalized[lower] = value
+
+        for key in keys:
+            val = normalized.get(key.lower())
+            text = cls._clean_meta_value(val)
+            if text:
+                return text
+
+        if contains:
+            for key in sorted(normalized):
+                if any(token in key for token in contains):
+                    text = cls._clean_meta_value(normalized[key])
+                    if text:
+                        return text
+
+        return None
+
+    def metadata_attrs(self) -> Dict[str, Any]:
+        """Collect optional WSI metadata for downstream storage."""
+        self._ensure_loaded()
+        meta = self.meta or {}
+        vendor = self._find_meta_value(
+            meta,
+            ["openslide.vendor", "tiff.make", "tiff.model", "hamamatsu.model", "leica.scanner"],
+            contains=["vendor"],
+        )
+        institution = self._find_meta_value(
+            meta,
+            [
+                "tiff.institution",
+                "tiff.institutionname",
+                "aperio.institution",
+                "openslide.institution",
+                "dicom.institutionname",
+            ],
+            contains=["institution"],
+        )
+        stain = self._find_meta_value(
+            meta,
+            [
+                "aperio.stain",
+                "aperio.staindescription",
+                "openslide.stain",
+                "hamamatsu.stain",
+                "philips.stain",
+            ],
+            contains=["stain"],
+        )
+
+        attrs: Dict[str, Any] = {}
+        if self.mpp is not None:
+            attrs["mpp"] = self.mpp
+        if self.mag is not None:
+            attrs["magnification"] = int(self.mag)
+        if vendor:
+            attrs["vendor"] = vendor
+        if institution:
+            attrs["institution"] = institution
+        if stain:
+            attrs["stain"] = stain
+
+        return attrs
 
     def get_thumbnail_at_power(
         self,

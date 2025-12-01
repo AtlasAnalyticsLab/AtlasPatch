@@ -253,7 +253,7 @@ with h5py.File("output/patches/sample.h5", "r") as f:
 
 | Name | Output Dim |
 | --- | --- |
-| [`plip`](https://github.com/PathologyFoundation/plip) ([Pathology Language and Image Pre-Training (PLIP)](https://www.nature.com/articles/s41591-023-02504-3)) | 512 (projection dim) |
+| [`plip`](https://github.com/PathologyFoundation/plip) ([Pathology Language and Image Pre-Training (PLIP)](https://www.nature.com/articles/s41591-023-02504-3)) | 512 |
 | [`medsiglip`](https://huggingface.co/google/medsiglip-448) ([MedGemma Technical Report](https://arxiv.org/abs/2507.05201)) | 1152 |
 | [`quilt_b_32`](https://quilt1m.github.io/) ([Quilt-1M: One Million Image-Text Pairs for Histopathology](https://arxiv.org/pdf/2306.11207)) | 512 |
 | [`quilt_b_16`](https://quilt1m.github.io/) ([Quilt-1M: One Million Image-Text Pairs for Histopathology](https://arxiv.org/pdf/2306.11207)) | 512 |

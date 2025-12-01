@@ -148,6 +148,9 @@ class PatchExtractionService(ExtractionService):
         step = self.cfg.step_size or self.cfg.patch_size
         overlap = max(0, int(self.cfg.patch_size) - int(step))
 
+        extra_attrs = {"filename": slide.path.name}
+        extra_attrs.update(wsi.metadata_attrs())
+
         writer = H5PatchWriter(
             chunk_rows=self.cfg.write_batch,
             patch_size=self.cfg.patch_size,
@@ -158,6 +161,7 @@ class PatchExtractionService(ExtractionService):
             overlap=overlap,
             slide_stem=slide.stem,
             wsi_path=str(wsi.path),
+            extra_file_attrs=extra_attrs,
         )
 
         entries = self._iter_patch_entries(
