@@ -3,7 +3,7 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "slide-processor"
+name = "atlas-patch"
 version = "0.2.0"
 description = "A Python package for processing and handling whole slide images"
 readme = "README.md"
@@ -14,7 +14,7 @@ authors = [
     {name = "Omar Metwally"},
     {name = "Yousef Kotp", email = "yousefkotp@outlook.com"},
 ]
-keywords = ["slide-processor", "whole-slide-image", "wsi"]
+keywords = ["atlas-patch", "whole-slide-image", "wsi", "tissue-segmentation", "patch-extraction", "computational-pathology"]
 
 dependencies = [
     "openslide-python>=1.2.0",
@@ -37,6 +37,7 @@ dependencies = [
     "open-clip-torch>=2.24.0",
     "fairscale>=0.4.0",
     "einops>=0.8.0",
+    "sam2 @ git+https://github.com/facebookresearch/sam2.git",
     "MUSK @ git+https://github.com/lilab-stanford/MUSK.git",
 ]
 
@@ -50,10 +51,10 @@ dev = [
 ]
 
 [project.scripts]
-slideproc = "slide_processor.cli:main"
+atlaspatch = "atlas_patch.cli:main"
 
 [tool.setuptools]
-packages = ["slide_processor"]
+packages = ["atlas_patch"]
 
 [tool.setuptools.package-dir]
 "" = "."
@@ -77,7 +78,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["slide_processor"]
+known-first-party = ["atlas_patch"]
 
 [tool.ruff.format]
 quote-style = "double"

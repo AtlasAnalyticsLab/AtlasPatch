@@ -1,4 +1,4 @@
-# SlideProcessor
+# AtlasPatch
 
 A Python package for processing and handling whole slide images (WSI).
 
@@ -18,7 +18,7 @@ A Python package for processing and handling whole slide images (WSI).
     - [Custom Filtering Thresholds](#custom-filtering-thresholds)
     - [Verbose Output](#verbose-output)
     - [Generate Visualizations](#generate-visualizations)
-    - [`slideproc info`](#slideproc-info)
+    - [`atlaspatch info`](#atlaspatch-info)
   - [Parameter Guide](#parameter-guide)
 - [Available Feature Extractors](#available-feature-extractors)
 - [HDF5 Output Structure](#hdf5-output-structure)
@@ -33,8 +33,8 @@ A Python package for processing and handling whole slide images (WSI).
 
 1. Create a conda environment:
 ```bash
-conda create -n slide_processor python=3.10
-conda activate slide_processor
+conda create -n atlas_patch python=3.10
+conda activate atlas_patch
 ```
 
 2. Install the OpenSlide system library (required for WSI processing):
@@ -42,12 +42,7 @@ conda activate slide_processor
 conda install -c conda-forge openslide
 ```
 
-3. Install SAM2 (Segment Anything Model 2.0):
-```bash
-pip install "git+https://github.com/facebookresearch/sam2.git"
-```
-
-4. Install the package in development mode:
+3. Install the package in development mode:
 ```bash
 pip install -e .
 ```
@@ -65,44 +60,39 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
    - **macOS**: `brew install openslide`
    - **Other systems**: Visit [OpenSlide Documentation](https://openslide.org/)
 
-3. Install SAM2 (Segment Anything Model 2.0):
-```bash
-pip install "git+https://github.com/facebookresearch/sam2.git"
-```
-
-4. Install the package in development mode:
+3. Install the package in development mode:
 ```bash
 pip install -e .
 ```
 
 ## CLI Usage
 
-SlideProcessor provides an intuitive command-line interface for processing whole slide images. The CLI supports both single file and batch processing with flexible configuration options.
+AtlasPatch provides an intuitive command-line interface for processing whole slide images. The CLI supports both single file and batch processing with flexible configuration options.
 
 ### Quick Start
 
 ```bash
 # Process a single WSI file (uses built-in Tiny SAM2 config)
-slideproc segment-and-get-coords sample.svs --patch-size 256 --target-mag 20
+atlaspatch segment-and-get-coords sample.svs --patch-size 256 --target-mag 20
 
 # Segment, extract patches, and embed features (stores features in the patch H5)
-slideproc process sample.svs \
+atlaspatch process sample.svs \
     --patch-size 256 --target-mag 20 \
     --feature-extractors resnet18,resnet50
 
 # Process all WSI files in a directory
-slideproc segment-and-get-coords ./wsi_folder/ \
+atlaspatch segment-and-get-coords ./wsi_folder/ \
     --patch-size 256 --target-mag 20 --output ./results
 
 # With custom patch settings and visualization
-slideproc segment-and-get-coords sample.svs \
+atlaspatch segment-and-get-coords sample.svs \
     --patch-size 512 --step-size 256 --target-mag 20 \
     --output ./output --save-images --visualize-grids
 ```
 
 ### Commands
 
-#### `slideproc segment-and-get-coords`
+#### `atlaspatch segment-and-get-coords`
 
 Main command for processing whole slide images with tissue segmentation and patch extraction.
 
@@ -137,7 +127,7 @@ Main command for processing whole slide images with tissue segmentation and patc
 | `--skip-existing/--force` | flag | Skip existing | No | Skip existing outputs by default; pass `--force` to reprocess |
 | `--verbose/-v` | flag | False | No | Enable verbose logging output (disables progress bar) |
 
-#### `slideproc process`
+#### `atlaspatch process`
 
 End-to-end command that runs SAM2 segmentation, patch extraction, and feature embedding into a single HDF5. Feature matrices are stored under `features/<extractor_name>` alongside coordinates.
 
@@ -173,14 +163,14 @@ This command respects `--skip-existing`; rerun with `--force` when you need to r
 #### Basic Single File Processing
 
 ```bash
-slideproc segment-and-get-coords sample.svs \
+atlaspatch segment-and-get-coords sample.svs \
     --patch-size 256 --target-mag 20
 ```
 
 #### Full Processing with Feature Extraction
 
 ```bash
-slideproc process sample.svs \
+atlaspatch process sample.svs \
     --patch-size 256 --target-mag 20 \
     --feature-extractors resnet18,resnet50 \
     --feature-batch-size 32
@@ -192,11 +182,11 @@ This produces a single H5 file containing coordinates plus two feature matrices 
 
 ```bash
 # Process all .svs files in a directory
-slideproc segment-and-get-coords ./slides/ \
+atlaspatch segment-and-get-coords ./slides/ \
     --patch-size 256 --target-mag 20 \
     --output ./processed_slides
 # Batch thumbnails for segmentation
-slideproc segment-and-get-coords ./slides/ \
+atlaspatch segment-and-get-coords ./slides/ \
     --patch-size 256 --target-mag 20 \
     --seg-batch-size 8 \
     --patch-workers 4 \
@@ -208,7 +198,7 @@ slideproc segment-and-get-coords ./slides/ \
 
 ```bash
 # Extract larger patches with different stride and magnification
-slideproc segment-and-get-coords sample.svs \
+atlaspatch segment-and-get-coords sample.svs \
     --patch-size 512 \
     --step-size 256 \
     --target-mag 20 \
@@ -219,7 +209,7 @@ slideproc segment-and-get-coords sample.svs \
 
 ```bash
 # Generate individual PNG files for each patch
-slideproc segment-and-get-coords sample.svs \
+atlaspatch segment-and-get-coords sample.svs \
     --patch-size 256 --target-mag 20 \
     --save-images \
     --output ./output
@@ -231,7 +221,7 @@ slideproc segment-and-get-coords sample.svs \
 
 ```bash
 # Use CPU instead of GPU (slower but no GPU required)
-slideproc segment-and-get-coords sample.svs \
+atlaspatch segment-and-get-coords sample.svs \
     --patch-size 256 --target-mag 20 \
     --device cpu
 ```
@@ -252,7 +242,7 @@ sample.png,0.4
 **Usage:**
 
 ```bash
-slideproc segment-and-get-coords ./wsi_folder/ \
+atlaspatch segment-and-get-coords ./wsi_folder/ \
     --patch-size 256 --target-mag 20 \
     --mpp-csv mpp_values.csv
 ```
@@ -265,7 +255,7 @@ slideproc segment-and-get-coords ./wsi_folder/ \
 
 ```bash
 # Adjust thresholds for different tissue characteristics
-slideproc segment-and-get-coords sample.svs \
+atlaspatch segment-and-get-coords sample.svs \
     --patch-size 256 --target-mag 20 \
     --white-thresh 20 \
     --black-thresh 40 \
@@ -276,7 +266,7 @@ slideproc segment-and-get-coords sample.svs \
 
 ```bash
 # Enable detailed logging for debugging
-slideproc segment-and-get-coords sample.svs \
+atlaspatch segment-and-get-coords sample.svs \
     --patch-size 256 --target-mag 20 \
     --verbose
 ```
@@ -287,7 +277,7 @@ slideproc segment-and-get-coords sample.svs \
 
 ```bash
 # Generate visualizations on thumbnail
-slideproc segment-and-get-coords sample.svs \
+atlaspatch segment-and-get-coords sample.svs \
     --patch-size 256 --target-mag 20 \
     --visualize-grids --visualize-mask --visualize-contours
 
@@ -298,12 +288,12 @@ The visualization flags create the following images under `output/<mag>x_<patch>
 - `<wsi_stem>_mask.png`: mask overlay (`--visualize-mask`)
 - `<wsi_stem>_contours.png`: contour overlay (`--visualize-contours`)
 
-#### `slideproc info`
+#### `atlaspatch info`
 
 Display information about supported formats and features.
 
 ```bash
-slideproc info
+atlaspatch info
 ```
 
 ### Parameter Guide
@@ -401,17 +391,17 @@ slideproc info
 
 #### Natural Images
 
-| Name | Output Dim | Paper |
-| --- | --- | --- |
-| `clip_rn50` | 1024 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
-| `clip_rn101` | 512 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
-| `clip_rn50x4` | 640 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
-| `clip_rn50x16` | 768 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
-| `clip_rn50x64` | 1024 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
-| `clip_vit_b_32` | 512 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
-| `clip_vit_b_16` | 512 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
-| `clip_vit_l_14` | 768 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
-| `clip_vit_l_14_336` | 768 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
+| Name | Output Dim |
+| --- | --- |
+| `clip_rn50` ([Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020)) | 1024 |
+| `clip_rn101` ([Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020)) | 512 |
+| `clip_rn50x4` ([Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020)) | 640 |
+| `clip_rn50x16` ([Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020)) | 768 |
+| `clip_rn50x64` ([Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020)) | 1024 |
+| `clip_vit_b_32` ([Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020)) | 512 |
+| `clip_vit_b_16` ([Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020)) | 512 |
+| `clip_vit_l_14` ([Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020)) | 768 |
+| `clip_vit_l_14_336` ([Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020)) | 768 |
 
 #### Medical- and Pathology-Specific CLIP
 
@@ -450,7 +440,7 @@ Results are written under a run-specific subdirectory named `<mag>x_<patch>px_<o
 - `patches/` contains the HDF5 outputs (`<stem>.h5`).
 - `images/` contains optional per-patch PNGs when `--save-images` is set.
 - `visualization/` contains optional overlays for grids, masks, and contours.
-- Feature matrices live inside each slide's H5 under `features/<extractor>` when `slideproc process` is used.
+- Feature matrices live inside each slide's H5 under `features/<extractor>` when `atlaspatch process` is used.
 
 **HDF5 Files** (per input WSI):
 ```
@@ -472,26 +462,26 @@ Each file represents a single extracted patch with its coordinates in the filena
 
 We prepared ready-to-run SLURM templates under `jobs/`:
 
-- Patch extraction (SAM2 + H5/PNG): `jobs/slideproc_patch.slurm.sh`. Edits to make:
+- Patch extraction (SAM2 + H5/PNG): `jobs/atlaspatch_patch.slurm.sh`. Edits to make:
   - Set `WSI_ROOT`, `OUTPUT_ROOT`, `PATCH_SIZE`, `TARGET_MAG`, `SEG_BATCH`.
   - Ensure `--cpus-per-task` matches the CPU you want; the script passes `--patch-workers ${SLURM_CPUS_PER_TASK}` and caps `--max-open-slides` at 200.
   - `--fast-mode` is on by default; append `--no-fast-mode` to enable content filtering.
-  - Submit with `sbatch jobs/slideproc_patch.slurm.sh`.
+  - Submit with `sbatch jobs/atlaspatch_patch.slurm.sh`.
 
 ## Feedback
 
-- Report problems via the [bug report template](https://github.com/AtlasAnalyticsLab/SlideProcessor/issues/new?template=bug_report.md) so we can reproduce and fix them quickly.
-- Suggest enhancements through the [feature request template](https://github.com/AtlasAnalyticsLab/SlideProcessor/issues/new?template=feature_request.md) with your use case and proposal.
+- Report problems via the [bug report template](https://github.com/AtlasAnalyticsLab/AtlasPatch/issues/new?template=bug_report.md) so we can reproduce and fix them quickly.
+- Suggest enhancements through the [feature request template](https://github.com/AtlasAnalyticsLab/AtlasPatch/issues/new?template=feature_request.md) with your use case and proposal.
 - When opening a PR, fill out the [pull request template](.github/pull_request_template.md) and run the listed checks (lint, format, type-check, tests).
 
 ## License
 
-SlideProcessor is licensed under the **PolyForm Noncommercial License 1.0.0**, which strictly prohibits commercial use of this software or any derivative works. This applies to all forms of commercialization, including selling the software, offering it as a commercial service, using it in commercial products, or creating forked versions for commercial purposes. However, the license explicitly permits use for research, experimentation, and non-commercial purposes. Personal use for research, hobby projects, and educational purposes is allowed, as is use by academic institutions, educational organizations, public research organizations, and non-profit entities regardless of their funding sources. If you wish to use SlideProcessor commercially, you must obtain a separate commercial license from the authors. For the complete license text and detailed terms, see the [LICENSE](./LICENSE) file in this repository.
+AtlasPatch is licensed under the **PolyForm Noncommercial License 1.0.0**, which strictly prohibits commercial use of this software or any derivative works. This applies to all forms of commercialization, including selling the software, offering it as a commercial service, using it in commercial products, or creating forked versions for commercial purposes. However, the license explicitly permits use for research, experimentation, and non-commercial purposes. Personal use for research, hobby projects, and educational purposes is allowed, as is use by academic institutions, educational organizations, public research organizations, and non-profit entities regardless of their funding sources. If you wish to use AtlasPatch commercially, you must obtain a separate commercial license from the authors. For the complete license text and detailed terms, see the [LICENSE](./LICENSE) file in this repository.
 
 # TODO
 
 ## Refactor
-- Update name from Slide Processor to `Atlas Patch`
+- Ensure AtlasPatch naming stays consistent across new contributions
 
 ## Patch Encoders
 - CONCH v1

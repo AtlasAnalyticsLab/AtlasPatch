@@ -1,7 +1,7 @@
 .PHONY: help install install-dev lint format type-check clean test
 
 help:
-	@echo "SlideProcessor Development Commands"
+	@echo "AtlasPatch Development Commands"
 	@echo "===================================="
 	@echo "  make install       - Install the package in development mode"
 	@echo "  make install-dev   - Install package with development dependencies"
@@ -30,13 +30,13 @@ format-check:
 	ruff format --check .
 
 type-check:
-	mypy slide_processor --ignore-missing-imports
+	mypy atlas_patch --ignore-missing-imports
 
 test:
 	pytest
 
 test-cov:
-	pytest --cov=slide_processor --cov-report=html --cov-report=term
+	pytest --cov=atlas_patch --cov-report=html --cov-report=term
 
 check: lint format-check type-check
 	@echo "All checks passed!"
