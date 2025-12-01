@@ -51,7 +51,6 @@ def mask_to_contours(
     """
     if filter_params is None:
         filter_params = {
-            "a_t": 100,  # Minimum tissue contour area (in pixels)
             "a_h": 16,  # Minimum hole area
             "max_n_holes": 10,
         }
@@ -82,7 +81,7 @@ def mask_to_contours(
     H, W = mask.shape[:2]
     image_area = float(H * W)
     min_area_threshold = tissue_area_thresh * image_area
-    effective_min_area = max(min_area_threshold, float(filter_params["a_t"]))
+    hole_area_threshold = float(filter_params.get("a_h", 0))
 
     # Collect tissue contours (parent == -1) and holes (parent != -1)
     tissue_indices: list[int] = []
@@ -92,17 +91,18 @@ def mask_to_contours(
         area = cv2.contourArea(cont)
         parent = hierarchy[i][3]
         if parent == -1:
-            if area >= effective_min_area:
+            if area >= min_area_threshold:
                 tissue_indices.append(i)
         else:
-            if area >= filter_params["a_h"]:
+            if area >= hole_area_threshold:
                 holes_by_parent_index.setdefault(parent, []).append(cont)
 
     # Limit total number of holes globally to avoid explosion
     all_holes = [h for hs in holes_by_parent_index.values() for h in hs]
-    if len(all_holes) > filter_params["max_n_holes"]:
+    max_n_holes = int(filter_params.get("max_n_holes", 0))
+    if max_n_holes > 0 and len(all_holes) > max_n_holes:
         all_holes_sorted = sorted(all_holes, key=cv2.contourArea, reverse=True)
-        allowed = set(map(id, all_holes_sorted[: filter_params["max_n_holes"]]))
+        allowed = set(map(id, all_holes_sorted[:max_n_holes]))
         for parent, hs in list(holes_by_parent_index.items()):
             holes_by_parent_index[parent] = [h for h in hs if id(h) in allowed]
 

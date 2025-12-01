@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from typing import Callable, Iterable, Mapping
 
 from .base import FeatureExtractor
+
+logger = logging.getLogger(__name__)
 
 
 class PatchFeatureExtractorRegistry:
@@ -24,7 +27,12 @@ class PatchFeatureExtractorRegistry:
         key = name.lower()
         if key not in self._builders:
             raise KeyError(f"Unknown feature extractor '{name}'. Available: {self.available()}")
-        return self._builders[key]()
+        builder = self._builders[key]
+        try:
+            return builder()
+        except Exception:
+            logger.exception("Failed to create feature extractor '%s'", name)
+            raise
 
     def create_many(self, names: Iterable[str]) -> list[FeatureExtractor]:
         extractors: list[FeatureExtractor] = []

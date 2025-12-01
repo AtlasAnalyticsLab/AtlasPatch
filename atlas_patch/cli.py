@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 import click
+import torch
 from tqdm import tqdm
 
 from atlas_patch.core.config import (
@@ -16,10 +17,11 @@ from atlas_patch.core.config import (
     SegmentationConfig,
     VisualizationConfig,
 )
-from atlas_patch.models.patch import build_default_registry
+from atlas_patch.models.patch import PatchFeatureExtractorRegistry, build_default_registry
+from atlas_patch.models.patch.custom import register_feature_extractors_from_module
 from atlas_patch.orchestration.runner import ProcessingRunner
 from atlas_patch.services.extraction import PatchExtractionService
-from atlas_patch.services.feature_embedding import PatchFeatureEmbeddingService
+from atlas_patch.services.feature_embedding import PatchFeatureEmbeddingService, resolve_feature_dtype
 from atlas_patch.services.mpp import CSVMPPResolver
 from atlas_patch.services.segmentation import SAM2SegmentationService
 from atlas_patch.services.visualization import DefaultVisualizationService
@@ -48,7 +50,13 @@ FEATURE_EXTRACTOR_CHOICES = build_default_registry(device="cpu").available()
 # Shared option sets -----------------------------------------------------------
 _COMMON_OPTIONS: list = [
     click.argument("wsi_path", type=click.Path(exists=True)),
-    click.option("--output", "-o", type=click.Path(), default="./output", show_default=True),
+    click.option(
+        "--output",
+        "-o",
+        type=click.Path(),
+        required=True,
+        help="Output directory root for generated artifacts.",
+    ),
     click.option(
         "--patch-size", type=int, required=True, help="Patch size at target magnification."
     ),
@@ -145,7 +153,7 @@ _FEATURE_OPTIONS: list = [
         type=str,
         help="Space/comma separated feature extractors to run (available: "
         + ", ".join(FEATURE_EXTRACTOR_CHOICES)
-        + ").",
+        + "; add more via --feature-plugin).",
     ),
     click.option(
         "--feature-batch-size",
@@ -167,6 +175,16 @@ _FEATURE_OPTIONS: list = [
         default="float32",
         show_default=True,
         help="Computation precision for feature extraction.",
+    ),
+    click.option(
+        "--feature-plugin",
+        "feature_plugins",
+        type=click.Path(exists=True),
+        multiple=True,
+        help=(
+            "Path(s) to Python modules that register custom feature extractors via "
+            "register_feature_extractors(registry, device, dtype, num_workers)."
+        ),
     ),
 ]
 
@@ -210,6 +228,7 @@ def _run_pipeline(
     skip_existing: bool,
     verbose: bool,
     feature_cfg: FeatureExtractionConfig | None = None,
+    registry: PatchFeatureExtractorRegistry | None = None,
 ) -> tuple[list, list]:
     configure_logging(verbose)
 
@@ -286,7 +305,7 @@ def _run_pipeline(
 
     if app_cfg.features is not None:
         feature_service = PatchFeatureEmbeddingService(
-            app_cfg.extraction, app_cfg.output, app_cfg.features
+            app_cfg.extraction, app_cfg.output, app_cfg.features, registry=registry
         )
         total_units = len(results) * len(app_cfg.features.extractors)
         feature_progress = tqdm(
@@ -414,16 +433,33 @@ def process(
     mpp_csv: str | None,
     skip_existing: bool,
     verbose: bool,
+    feature_plugins: tuple[str, ...],
 ):
     """Run segmentation, patch extraction, and feature embedding into a single H5."""
-    feats = parse_feature_list(feature_extractors, choices=FEATURE_EXTRACTOR_CHOICES)
     feat_device = feature_device.lower() if feature_device else device.lower()
+    torch_device = torch.device(feat_device)
+    dtype = resolve_feature_dtype(torch_device, feature_precision.lower())
+    registry = build_default_registry(
+        device=torch_device, num_workers=feature_num_workers, dtype=dtype
+    )
+    for plugin in feature_plugins:
+        register_feature_extractors_from_module(
+            plugin,
+            registry=registry,
+            device=torch_device,
+            dtype=dtype,
+            num_workers=feature_num_workers,
+        )
+
+    available_extractors = registry.available()
+    feats = parse_feature_list(feature_extractors, choices=available_extractors)
     feature_cfg = FeatureExtractionConfig(
         extractors=feats,
         batch_size=feature_batch_size,
         device=feat_device,
         num_workers=feature_num_workers,
         precision=feature_precision.lower(),
+        plugins=[Path(p) for p in feature_plugins],
     )
     results, failures = _run_pipeline(
         wsi_path=wsi_path,
@@ -449,6 +485,7 @@ def process(
         skip_existing=skip_existing,
         verbose=verbose,
         feature_cfg=feature_cfg,
+        registry=registry,
     )
     _echo_results(results, failures, verbose, feature_cfg)
 

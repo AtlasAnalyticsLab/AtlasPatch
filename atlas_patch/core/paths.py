@@ -7,12 +7,9 @@ from atlas_patch.core.models import Slide
 
 
 def build_run_root(output_cfg: OutputConfig, extraction_cfg: ExtractionConfig) -> Path:
-    step = extraction_cfg.step_size or extraction_cfg.patch_size
-    overlap = max(0, int(extraction_cfg.patch_size) - int(step))
-    dirname = (
-        f"{extraction_cfg.target_magnification}x_{extraction_cfg.patch_size}px_{overlap}px_overlap"
-    )
-    return output_cfg.output_root / dirname
+    """Return the root output directory for a run.
+    """
+    return output_cfg.output_root
 
 
 def patch_h5_path(slide: Slide, output_cfg: OutputConfig, extraction_cfg: ExtractionConfig) -> Path:
