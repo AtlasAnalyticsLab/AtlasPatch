@@ -168,13 +168,13 @@ End-to-end command that runs SAM2 segmentation, patch extraction, and feature em
 - `--checkpoint/-c` **(required)**: Path to SAM2 model checkpoint file (.pt)
 - `--patch-size` **(required)**: Target size of extracted patches in pixels
 - `--target-mag` **(required)**: Target magnification for extraction (e.g., 10, 20, 40)
-- `--feature-extractors` **(required)**: Space/comma separated feature extractors to run. Built-ins: `resnet18`, `resnet34`, `resnet50`, `resnet101`, `resnet152`, `convnext_tiny`, `convnext_small`, `convnext_base`, `convnext_large`, `vit_b_16`, `vit_b_32`, `vit_l_16`, `vit_l_32`, `vit_h_14`, `uni_v1`, `uni_v2`, `biomedclip`, `clip_rn50`, `clip_rn101`, `clip_rn50x4`, `clip_rn50x16`, `clip_rn50x64`, `clip_vit_b_32`, `clip_vit_b_16`, `clip_vit_l_14`, `clip_vit_l_14_336`, `plip`, `medsiglip`, `phikon_v1`, `phikon_v2`, `virchow_v1`, `virchow_v2`, `prov_gigapath`, `midnight`, `musk`, `openmidnight`, `pathorchestra`, `h_optimus_0`, `h_optimus_1`, `h0_mini`, `hibou_b`, `hibou_l`, `quilt_b_32`, `quilt_b_16`, `quilt_b_16_pmb`.
+- `--feature-extractors` **(required)**: Space/comma separated feature extractors to run. Built-ins: `resnet18`, `resnet34`, `resnet50`, `resnet101`, `resnet152`, `convnext_tiny`, `convnext_small`, `convnext_base`, `convnext_large`, `vit_b_16`, `vit_b_32`, `vit_l_16`, `vit_l_32`, `vit_h_14`, `dinov2_small`, `dinov2_base`, `dinov2_large`, `dinov2_giant`, `uni_v1`, `uni_v2`, `biomedclip`, `clip_rn50`, `clip_rn101`, `clip_rn50x4`, `clip_rn50x16`, `clip_rn50x64`, `clip_vit_b_32`, `clip_vit_b_16`, `clip_vit_l_14`, `clip_vit_l_14_336`, `plip`, `medsiglip`, `phikon_v1`, `phikon_v2`, `virchow_v1`, `virchow_v2`, `prov_gigapath`, `midnight`, `musk`, `openmidnight`, `pathorchestra`, `h_optimus_0`, `h_optimus_1`, `h0_mini`, `hibou_b`, `hibou_l`, `quilt_b_32`, `quilt_b_16`, `quilt_b_16_pmb`.
 
 **Feature Options:**
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `--feature-extractors` | comma/space separated | — | Models to embed patches with (built-ins: resnet18/34/50/101/152, convnext_tiny/small/base/large, vit_b_16/b_32/l_16/l_32/h_14, uni_v1, uni_v2, lunit_resnet50_bt, lunit_resnet50_swav, lunit_resnet50_mocov2, lunit_vit_small_patch16_dino, lunit_vit_small_patch8_dino, biomedclip, clip_rn50, clip_rn101, clip_rn50x4, clip_rn50x16, clip_rn50x64, clip_vit_b_32, clip_vit_b_16, clip_vit_l_14, clip_vit_l_14_336, plip, medsiglip, phikon_v1, phikon_v2, virchow_v1, virchow_v2, prov_gigapath, midnight, musk, openmidnight, pathorchestra, h_optimus_0, h_optimus_1, h0_mini, hibou_b, hibou_l, quilt_b_32, quilt_b_16, quilt_b_16_pmb) |
+| `--feature-extractors` | comma/space separated | — | Models to embed patches with (built-ins: resnet18/34/50/101/152, convnext_tiny/small/base/large, vit_b_16/b_32/l_16/l_32/h_14, dinov2_small/base/large/giant, uni_v1, uni_v2, lunit_resnet50_bt, lunit_resnet50_swav, lunit_resnet50_mocov2, lunit_vit_small_patch16_dino, lunit_vit_small_patch8_dino, biomedclip, clip_rn50, clip_rn101, clip_rn50x4, clip_rn50x16, clip_rn50x64, clip_vit_b_32, clip_vit_b_16, clip_vit_l_14, clip_vit_l_14_336, plip, medsiglip, phikon_v1, phikon_v2, virchow_v1, virchow_v2, prov_gigapath, midnight, musk, openmidnight, pathorchestra, h_optimus_0, h_optimus_1, h0_mini, hibou_b, hibou_l, quilt_b_32, quilt_b_16, quilt_b_16_pmb) |
 | `--feature-batch-size` | int | 32 | Batch size for feature forward passes |
 | `--feature-device` | choice | inherits `--device` | Device for feature extraction (cpu/cuda/cuda:<idx>) |
 | `--feature-num-workers` | int | 4 | DataLoader worker count for feature extraction |
@@ -388,13 +388,17 @@ slideproc info
 | `vit_l_16` | 1024 |
 | `vit_l_32` | 1024 |
 | `vit_h_14` | 1280 |
+| [`dinov2_small`](https://huggingface.co/facebook/dinov2-small) ([DINOv2: Learning Robust Visual Features without Supervision](https://arxiv.org/abs/2304.07193)) | 384 |
+| [`dinov2_base`](https://huggingface.co/facebook/dinov2-base) ([DINOv2: Learning Robust Visual Features without Supervision](https://arxiv.org/abs/2304.07193)) | 768 |
+| [`dinov2_large`](https://huggingface.co/facebook/dinov2-large) ([DINOv2: Learning Robust Visual Features without Supervision](https://arxiv.org/abs/2304.07193)) | 1024 |
+| [`dinov2_giant`](https://huggingface.co/facebook/dinov2-giant) ([DINOv2: Learning Robust Visual Features without Supervision](https://arxiv.org/abs/2304.07193)) | 1536 |
 
 ### Medical- and Pathology-Specific Vision Encoders
 
 | Name | Output Dim |
 | --- | --- |
-| [`uni_v1`](https://huggingface.co/MahmoodLab/UNI) | 1024 |
-| [`uni_v2`](https://huggingface.co/MahmoodLab/UNI2-h) | 1536 |
+| [`uni_v1`](https://huggingface.co/MahmoodLab/UNI) ([Towards a General-Purpose Foundation Model for Computational Pathology](https://www.nature.com/articles/s41591-024-02857-3)) | 1024 |
+| [`uni_v2`](https://huggingface.co/MahmoodLab/UNI2-h) ([Towards a General-Purpose Foundation Model for Computational Pathology](https://www.nature.com/articles/s41591-024-02857-3)) | 1536 |
 | [`phikon_v1`](https://huggingface.co/owkin/phikon) ([Scaling Self-Supervised Learning for Histopathology with Masked Image Modeling](https://www.medrxiv.org/content/10.1101/2023.07.21.23292757v1)) | 768 |
 | [`phikon_v2`](https://huggingface.co/owkin/phikon-v2) ([Phikon-v2, A large and public feature extractor for biomarker prediction](https://arxiv.org/abs/2409.09173)) | 1024 |
 | [`virchow_v1`](https://huggingface.co/paige-ai/Virchow) ([Virchow: A Million-Slide Digital Pathology Foundation Model](https://arxiv.org/abs/2309.07778)) | 2560 |
@@ -512,12 +516,12 @@ SlideProcessor is licensed under the **PolyForm Noncommercial License 1.0.0**, w
 - Update name from Slide Processor to `Atlas Patch`
 
 ## Patch Encoders
-- PathoOrchestra
 - CONCH v1
 - CONCH v1.5
 - CHIEF
 - Omiclip
 - CTransPath
+- DINO v3
 
 ## Model loading
 - Add automatic model loading from Hugging Face

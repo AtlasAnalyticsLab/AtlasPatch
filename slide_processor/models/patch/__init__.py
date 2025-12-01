@@ -5,6 +5,7 @@ import torch
 from slide_processor.models.patch.biomedclip import register_biomedclip_model
 from slide_processor.models.patch.clip import register_openai_clip_models
 from slide_processor.models.patch.convnext import register_convnexts
+from slide_processor.models.patch.dinov2 import register_dinov2_models
 from slide_processor.models.patch.gigapath import register_prov_gigapath_model
 from slide_processor.models.patch.hibou import register_hibou_models
 from slide_processor.models.patch.hoptimus import register_hoptimus_models
@@ -38,6 +39,7 @@ def build_default_registry(
     register_resnets(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_convnexts(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_vits(registry, device=dev, num_workers=num_workers, dtype=dtype)
+    register_dinov2_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_openai_clip_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_quilt_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_uni_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
