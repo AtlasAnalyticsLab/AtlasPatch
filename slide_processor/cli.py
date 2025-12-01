@@ -48,13 +48,6 @@ FEATURE_EXTRACTOR_CHOICES = build_default_registry(device="cpu").available()
 # Shared option sets -----------------------------------------------------------
 _COMMON_OPTIONS: list = [
     click.argument("wsi_path", type=click.Path(exists=True)),
-    click.option(
-        "--checkpoint",
-        "-c",
-        type=click.Path(exists=True),
-        required=True,
-        help="Path to SAM2 checkpoint (.pt).",
-    ),
     click.option("--output", "-o", type=click.Path(), default="./output", show_default=True),
     click.option(
         "--patch-size", type=int, required=True, help="Patch size at target magnification."
@@ -195,7 +188,6 @@ def feature_options(func):
 def _run_pipeline(
     *,
     wsi_path: str,
-    checkpoint: str,
     output: str,
     patch_size: int,
     step_size: int | None,
@@ -227,7 +219,7 @@ def _run_pipeline(
         mpp_csv=Path(mpp_csv) if mpp_csv else None,
     )
     segmentation_cfg = SegmentationConfig(
-        checkpoint_path=Path(checkpoint),
+        checkpoint_path=None,
         config_path=_default_config_path(),
         device=device.lower(),
         batch_size=seg_batch_size,
@@ -340,7 +332,6 @@ def cli():
 @common_options
 def segment_and_get_coords(
     wsi_path: str,
-    checkpoint: str,
     output: str,
     patch_size: int,
     step_size: int | None,
@@ -366,7 +357,6 @@ def segment_and_get_coords(
     """Segment, patchify, and optionally visualize WSI files."""
     results, failures = _run_pipeline(
         wsi_path=wsi_path,
-        checkpoint=checkpoint,
         output=output,
         patch_size=patch_size,
         step_size=step_size,
@@ -398,7 +388,6 @@ def segment_and_get_coords(
 @common_options
 def process(
     wsi_path: str,
-    checkpoint: str,
     output: str,
     patch_size: int,
     step_size: int | None,
@@ -438,7 +427,6 @@ def process(
     )
     results, failures = _run_pipeline(
         wsi_path=wsi_path,
-        checkpoint=checkpoint,
         output=output,
         patch_size=patch_size,
         step_size=step_size,

@@ -100,21 +100,19 @@ SlideProcessor provides an intuitive command-line interface for processing whole
 
 ```bash
 # Process a single WSI file (uses built-in Tiny SAM2 config)
-slideproc segment-and-get-coords sample.svs --checkpoint model.pt \
-    --patch-size 256 --target-mag 20
+slideproc segment-and-get-coords sample.svs --patch-size 256 --target-mag 20
 
 # Segment, extract patches, and embed features (stores features in the patch H5)
-slideproc process sample.svs --checkpoint model.pt \
+slideproc process sample.svs \
     --patch-size 256 --target-mag 20 \
     --feature-extractors resnet18,resnet50
 
 # Process all WSI files in a directory
-slideproc segment-and-get-coords ./wsi_folder/ --checkpoint model.pt \
+slideproc segment-and-get-coords ./wsi_folder/ \
     --patch-size 256 --target-mag 20 --output ./results
 
 # With custom patch settings and visualization
 slideproc segment-and-get-coords sample.svs \
-    --checkpoint model.pt \
     --patch-size 512 --step-size 256 --target-mag 20 \
     --output ./output --save-images --visualize-grids
 ```
@@ -129,7 +127,6 @@ Main command for processing whole slide images with tissue segmentation and patc
 - `WSI_PATH` **(required)**: Path to a single WSI file or directory containing multiple WSI files
 
 **Required Options:**
-- `--checkpoint/-c` **(required)**: Path to SAM2 model checkpoint file (.pt)
 - `--patch-size` **(required)**: Target size of extracted patches in pixels (final patch dimensions)
 - `--target-mag` **(required)**: Target magnification for extraction (e.g., 10, 20, 40)
 
@@ -165,7 +162,6 @@ End-to-end command that runs SAM2 segmentation, patch extraction, and feature em
 - `WSI_PATH` **(required)**: Path to a single WSI file or directory containing multiple WSI files
 
 **Required Options:**
-- `--checkpoint/-c` **(required)**: Path to SAM2 model checkpoint file (.pt)
 - `--patch-size` **(required)**: Target size of extracted patches in pixels
 - `--target-mag` **(required)**: Target magnification for extraction (e.g., 10, 20, 40)
 - `--feature-extractors` **(required)**: Space/comma separated feature extractors to run. Built-ins: `resnet18`, `resnet34`, `resnet50`, `resnet101`, `resnet152`, `convnext_tiny`, `convnext_small`, `convnext_base`, `convnext_large`, `vit_b_16`, `vit_b_32`, `vit_l_16`, `vit_l_32`, `vit_h_14`, `dinov2_small`, `dinov2_base`, `dinov2_large`, `dinov2_giant`, `dinov3_vits16`, `dinov3_vits16_plus`, `dinov3_vitb16`, `dinov3_vitl16`, `dinov3_vitl16_sat`, `dinov3_vith16_plus`, `dinov3_vit7b16`, `dinov3_vit7b16_sat`, `uni_v1`, `uni_v2`, `biomedclip`, `clip_rn50`, `clip_rn101`, `clip_rn50x4`, `clip_rn50x16`, `clip_rn50x64`, `clip_vit_b_32`, `clip_vit_b_16`, `clip_vit_l_14`, `clip_vit_l_14_336`, `plip`, `medsiglip`, `phikon_v1`, `phikon_v2`, `virchow_v1`, `virchow_v2`, `prov_gigapath`, `midnight`, `musk`, `openmidnight`, `pathorchestra`, `h_optimus_0`, `h_optimus_1`, `h0_mini`, `hibou_b`, `hibou_l`, `quilt_b_32`, `quilt_b_16`, `quilt_b_16_pmb`.
@@ -194,14 +190,14 @@ This command respects `--skip-existing`; rerun with `--force` when you need to r
 #### Basic Single File Processing
 
 ```bash
-slideproc segment-and-get-coords sample.svs --checkpoint model.pt \
+slideproc segment-and-get-coords sample.svs \
     --patch-size 256 --target-mag 20
 ```
 
 #### Full Processing with Feature Extraction
 
 ```bash
-slideproc process sample.svs --checkpoint model.pt \
+slideproc process sample.svs \
     --patch-size 256 --target-mag 20 \
     --feature-extractors resnet18,resnet50 \
     --feature-batch-size 32
@@ -214,12 +210,10 @@ This produces a single H5 file containing coordinates plus two feature matrices 
 ```bash
 # Process all .svs files in a directory
 slideproc segment-and-get-coords ./slides/ \
-    --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
     --output ./processed_slides
 # Batch thumbnails for segmentation
 slideproc segment-and-get-coords ./slides/ \
-    --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
     --seg-batch-size 8 \
     --patch-workers 4 \
@@ -232,7 +226,6 @@ slideproc segment-and-get-coords ./slides/ \
 ```bash
 # Extract larger patches with different stride and magnification
 slideproc segment-and-get-coords sample.svs \
-    --checkpoint model.pt \
     --patch-size 512 \
     --step-size 256 \
     --target-mag 20 \
@@ -244,7 +237,6 @@ slideproc segment-and-get-coords sample.svs \
 ```bash
 # Generate individual PNG files for each patch
 slideproc segment-and-get-coords sample.svs \
-    --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
     --save-images \
     --output ./output
@@ -257,7 +249,6 @@ slideproc segment-and-get-coords sample.svs \
 ```bash
 # Use CPU instead of GPU (slower but no GPU required)
 slideproc segment-and-get-coords sample.svs \
-    --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
     --device cpu
 ```
@@ -279,7 +270,6 @@ sample.png,0.4
 
 ```bash
 slideproc segment-and-get-coords ./wsi_folder/ \
-    --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
     --mpp-csv mpp_values.csv
 ```
@@ -293,7 +283,6 @@ slideproc segment-and-get-coords ./wsi_folder/ \
 ```bash
 # Adjust thresholds for different tissue characteristics
 slideproc segment-and-get-coords sample.svs \
-    --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
     --white-thresh 20 \
     --black-thresh 40 \
@@ -305,7 +294,6 @@ slideproc segment-and-get-coords sample.svs \
 ```bash
 # Enable detailed logging for debugging
 slideproc segment-and-get-coords sample.svs \
-    --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
     --verbose
 ```
@@ -317,7 +305,6 @@ slideproc segment-and-get-coords sample.svs \
 ```bash
 # Generate visualizations on thumbnail
 slideproc segment-and-get-coords sample.svs \
-    --checkpoint model.pt \
     --patch-size 256 --target-mag 20 \
     --visualize-grids --visualize-mask --visualize-contours
 
@@ -456,7 +443,7 @@ slideproc info
 
 ## HDF5 Output Structure
 
-Each processed slide produces a single HDF5 file under `<output>/<mag>x_<patch>px_<overlap>px_overlap/patches/<stem>_patches.h5`.
+Each processed slide produces a single HDF5 file under `<output>/<mag>x_<patch>px_<overlap>px_overlap/patches/<stem>.h5`.
 
 - Datasets
   - `coords`: int32 shape `(N, 2)` containing `(x, y)` at level 0
@@ -476,14 +463,14 @@ Each processed slide produces a single HDF5 file under `<output>/<mag>x_<patch>p
 
 Results are written under a run-specific subdirectory named `<mag>x_<patch>px_<overlap>px_overlap` (where `overlap = patch_size - step_size`). Inside this directory:
 
-- `patches/` contains the HDF5 outputs (`<stem>_patches.h5`).
+- `patches/` contains the HDF5 outputs (`<stem>.h5`).
 - `images/` contains optional per-patch PNGs when `--save-images` is set.
 - `visualization/` contains optional overlays for grids, masks, and contours.
 - Feature matrices live inside each slide's H5 under `features/<extractor>` when `slideproc process` is used.
 
 **HDF5 Files** (per input WSI):
 ```
-<output>/<mag>x_<patch>px_<overlap>px_overlap/patches/<wsi_stem>_patches.h5
+<output>/<mag>x_<patch>px_<overlap>px_overlap/patches/<wsi_stem>.h5
 ```
 
 Contains:
@@ -503,7 +490,7 @@ Each file represents a single extracted patch with its coordinates in the filena
 We prepared ready-to-run SLURM templates under `jobs/`:
 
 - Patch extraction (SAM2 + H5/PNG): `jobs/slideproc_patch.slurm.sh`. Edits to make:
-  - Set `WSI_ROOT`, `OUTPUT_ROOT`, `SAM_CHECKPOINT`, `PATCH_SIZE`, `TARGET_MAG`, `SEG_BATCH`.
+  - Set `WSI_ROOT`, `OUTPUT_ROOT`, `PATCH_SIZE`, `TARGET_MAG`, `SEG_BATCH`.
   - Ensure `--cpus-per-task` matches the CPU you want; the script passes `--patch-workers ${SLURM_CPUS_PER_TASK}` and caps `--max-open-slides` at 200.
   - `--fast-mode` is on by default; append `--no-fast-mode` to enable content filtering.
   - Submit with `sbatch jobs/slideproc_patch.slurm.sh`.
@@ -571,3 +558,13 @@ coords attrs:
 
 ## Fancy features
 - Support `bring your own encoder` functionality
+
+## Contours
+- filter_params  in mask_to_contours in `utils/contours.py`
+```
+filter_params = {
+            "a_t": 100,  # Minimum tissue contour area (in pixels)
+            "a_h": 16,  # Minimum hole area
+            "max_n_holes": 10,
+        }
+```

@@ -17,7 +17,7 @@ def build_run_root(output_cfg: OutputConfig, extraction_cfg: ExtractionConfig) -
 
 def patch_h5_path(slide: Slide, output_cfg: OutputConfig, extraction_cfg: ExtractionConfig) -> Path:
     run_root = build_run_root(output_cfg, extraction_cfg)
-    return run_root / "patches" / f"{slide.stem}_patches.h5"
+    return run_root / "patches" / f"{slide.stem}.h5"
 
 
 def find_existing_patch(
@@ -42,4 +42,4 @@ def patch_lock_path(
     slide: Slide, output_cfg: OutputConfig, extraction_cfg: ExtractionConfig
 ) -> Path:
     run_root = build_run_root(output_cfg, extraction_cfg)
-    return run_root / "patches" / f"{slide.stem}_patches.lock"
+    return run_root / "patches" / f"{slide.stem}.lock"

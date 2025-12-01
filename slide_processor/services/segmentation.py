@@ -3,11 +3,13 @@ from __future__ import annotations
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from typing import Any, Sequence
 
 import numpy as np
 import torch
 from hydra.utils import instantiate
+from huggingface_hub import hf_hub_download
 from omegaconf import OmegaConf
 from PIL import Image
 from sam2.sam2_image_predictor import SAM2ImagePredictor
@@ -22,6 +24,8 @@ logger = logging.getLogger("slide_processor.segmentation_service")
 
 class _SAM2Predictor:
     """Lightweight wrapper around SAM2ImagePredictor with resizing helpers."""
+    DEFAULT_MODEL_REPO = "AtlasAnalyticsLab/Atlas-Patch"
+    DEFAULT_MODEL_FILENAME = "model.pth"
 
     def __init__(self, cfg: SegmentationConfig):
         self.cfg = cfg
@@ -35,7 +39,22 @@ class _SAM2Predictor:
         self.input_size = 1024
         logger.info("SAM2 predictor device: %s (requested=%s)", self.device, requested_dev)
 
+        self.checkpoint_path = self._resolve_checkpoint_path()
         self.predictor = self._build_predictor()
+
+    def _resolve_checkpoint_path(self) -> Path:
+        """Choose checkpoint: prefer explicit path, else download from Hugging Face."""
+        if self.cfg.checkpoint_path is not None:
+            return self.cfg.checkpoint_path
+
+        repo_id = self.DEFAULT_MODEL_REPO
+        filename = self.DEFAULT_MODEL_FILENAME
+        try:
+            logger.info("Downloading SAM2 checkpoint from Hugging Face: %s/%s", repo_id, filename)
+            downloaded = hf_hub_download(repo_id=repo_id, filename=filename)
+        except Exception as exc:
+            raise RuntimeError(f"Failed to fetch checkpoint from {repo_id}: {exc}") from exc
+        return Path(downloaded)
 
     def _build_predictor(self) -> SAM2ImagePredictor:
         try:
@@ -43,12 +62,12 @@ class _SAM2Predictor:
             model_cfg: Any = conf.get("model", conf)
             model = instantiate(model_cfg)
             predictor = SAM2ImagePredictor(model, mask_threshold=self.cfg.mask_threshold)
-            checkpoint = torch.load(self.cfg.checkpoint_path, map_location=self.device)
+            checkpoint = torch.load(self.checkpoint_path, map_location=self.device)
             predictor.model.load_state_dict(checkpoint["model"], strict=True)
             predictor.model.to(self.device).eval()
             return predictor
-        except Exception as e:  # noqa: BLE001
-            raise RuntimeError(f"Failed to build SAM2 predictor: {e}") from e
+        except Exception as exc:
+            raise RuntimeError(f"Failed to build SAM2 predictor: {exc}") from exc
 
     def _normalize_input(self, image: np.ndarray | Image.Image | torch.Tensor) -> np.ndarray:
         if isinstance(image, Image.Image):

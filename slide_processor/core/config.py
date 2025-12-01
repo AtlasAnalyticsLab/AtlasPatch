@@ -39,7 +39,7 @@ def _validate_device(device: str) -> str:
 
 @dataclass
 class SegmentationConfig:
-    checkpoint_path: Path
+    checkpoint_path: Path | None
     config_path: Path
     device: str = "cuda"
     thumbnail_power: float = 1.25
@@ -48,7 +48,7 @@ class SegmentationConfig:
     mask_threshold: float = 0.0
 
     def validated(self) -> SegmentationConfig:
-        if not self.checkpoint_path.exists():
+        if self.checkpoint_path is not None and not self.checkpoint_path.exists():
             raise FileNotFoundError(f"Checkpoint not found: {self.checkpoint_path}")
         if not self.config_path.exists():
             raise FileNotFoundError(f"SAM2 config not found: {self.config_path}")
