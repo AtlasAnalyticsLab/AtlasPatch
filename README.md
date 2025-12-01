@@ -283,7 +283,7 @@ atlaspatch segment-and-get-coords sample.svs \
 
 ```
 
-The visualization flags create the following images under `output/<mag>x_<patch>px_<overlap>px_overlap/visualization/`:
+The visualization flags create the following images under `output/visualization/`:
 - `<wsi_stem>.png`: patch grid overlay (`--visualize-grids`)
 - `<wsi_stem>_mask.png`: mask overlay (`--visualize-mask`)
 - `<wsi_stem>_contours.png`: contour overlay (`--visualize-contours`)
@@ -416,7 +416,7 @@ atlaspatch info
 
 ## HDF5 Output Structure
 
-Each processed slide produces a single HDF5 file under `<output>/<mag>x_<patch>px_<overlap>px_overlap/patches/<stem>.h5`.
+Each processed slide produces a single HDF5 file under `<output>/patches/<stem>.h5`.
 
 - Datasets
   - `coords`: int32 shape `(N, 5)` containing `(x, y, w, h, level)`. x and y are at level 0, w and h are the reading resolution, level is the level for the patch extraction (level 0 is the highest-resolution level).
@@ -435,7 +435,7 @@ Each processed slide produces a single HDF5 file under `<output>/<mag>x_<patch>p
 
 ### Output
 
-Results are written under a run-specific subdirectory named `<mag>x_<patch>px_<overlap>px_overlap` (where `overlap = patch_size - step_size`). Inside this directory:
+Results are written directly under the configured `--output` directory:
 
 - `patches/` contains the HDF5 outputs (`<stem>.h5`).
 - `images/` contains optional per-patch PNGs when `--save-images` is set.
@@ -444,7 +444,7 @@ Results are written under a run-specific subdirectory named `<mag>x_<patch>px_<o
 
 **HDF5 Files** (per input WSI):
 ```
-<output>/<mag>x_<patch>px_<overlap>px_overlap/patches/<wsi_stem>.h5
+<output>/patches/<wsi_stem>.h5
 ```
 
 Contains:
@@ -453,7 +453,7 @@ Contains:
 
 **Optional PNG Images** (if `--save-images` is used):
 ```
-<output>/<mag>x_<patch>px_<overlap>px_overlap/images/<wsi_stem>/<wsi_stem>_x<x>_y<y>.png
+<output>/images/<wsi_stem>/<wsi_stem>_x<x>_y<y>.png
 ```
 
 Each file represents a single extracted patch with its coordinates in the filename.
@@ -480,9 +480,6 @@ AtlasPatch is licensed under the **PolyForm Noncommercial License 1.0.0**, which
 
 # TODO
 
-## Refactor
-- Ensure AtlasPatch naming stays consistent across new contributions
-
 ## Patch Encoders
 - CONCH v1
 - CONCH v1.5
@@ -499,6 +496,7 @@ AtlasPatch is licensed under the **PolyForm Noncommercial License 1.0.0**, which
 
 ## Fancy features
 - Support `bring your own encoder` functionality
+- add support for installation using uv
 
 ## Contours
 - filter_params  in mask_to_contours in `utils/contours.py`
