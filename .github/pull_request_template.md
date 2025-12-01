@@ -6,7 +6,7 @@
 - [ ] `make format` (or `make format-check`)
 - [ ] `make type-check`
 - [ ] `make test`
-- [ ] Tested relevant CLI workflows (`atlas-patch ...`)
+- [ ] Tested relevant CLI workflows (`atlaspatch ...`)
 
 ## Checklist
 - [ ] Linked to an issue (or added context in the description)
