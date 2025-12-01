@@ -48,7 +48,13 @@ FEATURE_EXTRACTOR_CHOICES = build_default_registry(device="cpu").available()
 # Shared option sets -----------------------------------------------------------
 _COMMON_OPTIONS: list = [
     click.argument("wsi_path", type=click.Path(exists=True)),
-    click.option("--output", "-o", type=click.Path(), default="./output", show_default=True),
+    click.option(
+        "--output",
+        "-o",
+        type=click.Path(),
+        required=True,
+        help="Output directory root for generated artifacts.",
+    ),
     click.option(
         "--patch-size", type=int, required=True, help="Patch size at target magnification."
     ),

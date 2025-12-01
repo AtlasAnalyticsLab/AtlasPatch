@@ -4,25 +4,14 @@ A Python package for processing and handling whole slide images (WSI).
 
 ## Table of Contents
 - [Installation](#installation)
-- [CLI Usage](#cli-usage)
-  - [Quick Start](#quick-start)
-  - [Commands](#commands)
-  - [Usage Examples](#usage-examples)
-    - [Basic Single File Processing](#basic-single-file-processing)
-    - [Full Processing with Feature Extraction](#full-processing-with-feature-extraction)
-    - [Batch Processing Multiple Files](#batch-processing-multiple-files)
-    - [Custom Patch Extraction Parameters](#custom-patch-extraction-parameters)
-    - [Export Individual Patch Images](#export-individual-patch-images)
-    - [CPU Inference](#cpu-inference)
-    - [Custom MPP Values via CSV](#custom-mpp-values-via-csv)
-    - [Custom Filtering Thresholds](#custom-filtering-thresholds)
-    - [Verbose Output](#verbose-output)
-    - [Generate Visualizations](#generate-visualizations)
-    - [`atlaspatch info`](#atlaspatch-info)
-  - [Parameter Guide](#parameter-guide)
+- [Usage Guide](#usage-guide)
+  - [Minimal Run](#minimal-run)
+  - [Process Command Arguments](#process-command-arguments)
+- [Supported Formats](#supported-formats)
+- [Using Extracted Data](#using-extracted-data)
+  - [Patch Coordinates](#patch-coordinates)
+  - [Feature Matrices](#feature-matrices)
 - [Available Feature Extractors](#available-feature-extractors)
-- [HDF5 Output Structure](#hdf5-output-structure)
-  - [Output](#output)
 - [SLURM job scripts](#slurm-job-scripts)
 - [Feedback](#feedback)
 - [License](#license)
@@ -83,268 +72,101 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -e .
 ```
 
-## CLI Usage
+## Usage Guide
 
-AtlasPatch provides an intuitive command-line interface for processing whole slide images. The CLI supports both single file and batch processing with flexible configuration options.
+`atlaspatch process` runs segmentation, patch extraction, and feature embedding into a single HDF5 per slide.
 
-### Quick Start
-
-```bash
-# Process a single WSI file (uses built-in Tiny SAM2 config)
-atlaspatch segment-and-get-coords sample.svs --patch-size 256 --target-mag 20
-
-# Segment, extract patches, and embed features (stores features in the patch H5)
-atlaspatch process sample.svs \
-    --patch-size 256 --target-mag 20 \
-    --feature-extractors resnet18,resnet50
-
-# Process all WSI files in a directory
-atlaspatch segment-and-get-coords ./wsi_folder/ \
-    --patch-size 256 --target-mag 20 --output ./results
-
-# With custom patch settings and visualization
-atlaspatch segment-and-get-coords sample.svs \
-    --patch-size 512 --step-size 256 --target-mag 20 \
-    --output ./output --save-images --visualize-grids
-```
-
-### Commands
-
-#### `atlaspatch segment-and-get-coords`
-
-Main command for processing whole slide images with tissue segmentation and patch extraction.
-
-**Required Arguments:**
-- `WSI_PATH` **(required)**: Path to a single WSI file or directory containing multiple WSI files
-
-**Required Options:**
-- `--patch-size` **(required)**: Target size of extracted patches in pixels (final patch dimensions)
-- `--target-mag` **(required)**: Target magnification for extraction (e.g., 10, 20, 40)
-
-**Optional Parameters:**
-
-| Option | Type | Default | Required? | Description |
-|--------|------|---------|-----------|-------------|
-| `--step-size` | int | patch-size | No | Stride between patches at target magnification; defaults to patch size |
-| `--output/-o` | Path | `./output` | No | Output directory root for results (contains `patches/`, `visualization/`, and `images/`) |
-| `--device` | string | `cuda` | No | Segmentation device: `cuda`, `cuda:<idx>`, or `cpu` |
-| `--tissue-thresh` | float | `0.01` | No | Minimum tissue area threshold as fraction of image (0–1) |
-| `--white-thresh` | int | `15` | No | Saturation threshold for filtering white patches |
-| `--black-thresh` | int | `50` | No | RGB threshold for filtering black patches |
-| `--seg-batch-size` | int | 1 | No | Batch size for SAM2 thumbnail segmentation |
-| `--patch-workers` | int | CPU count | No | Parallel threads for per-slide patch extraction/H5 writing |
-| `--max-open-slides` | int | 200 | No | Cap on simultaneous open WSIs across segmentation + extraction |
-| `--write-batch` | int | 8192 | No | Rows per HDF5 flush when writing coordinates |
-| `--save-images` | flag | False | No | Export individual patch images as PNG files under `images/<stem>/` |
-| `--fast-mode/--no-fast-mode` | flag | True | No | `--fast-mode` skips per-patch content filtering (default); use `--no-fast-mode` to enable filtering |
-| `--visualize-grids` | flag | False | No | Generate patch grid overlay on WSI thumbnail |
-| `--visualize-mask` | flag | False | No | Generate predicted tissue mask overlay visualization on thumbnail |
-| `--visualize-contours` | flag | False | No | Generate tissue contour overlay visualization on thumbnail |
-| `--recursive` | flag | False | No | Recursively search directories for WSI files |
-| `--mpp-csv` | Path | None | No | CSV with custom MPP values (`wsi,mpp`) |
-| `--skip-existing/--force` | flag | Skip existing | No | Skip existing outputs by default; pass `--force` to reprocess |
-| `--verbose/-v` | flag | False | No | Enable verbose logging output (disables progress bar) |
-
-#### `atlaspatch process`
-
-End-to-end command that runs SAM2 segmentation, patch extraction, and feature embedding into a single HDF5. Feature matrices are stored under `features/<extractor_name>` alongside coordinates.
-
-**Required Arguments:**
-- `WSI_PATH` **(required)**: Path to a single WSI file or directory containing multiple WSI files
-
-**Required Options:**
-- `--patch-size` **(required)**: Target size of extracted patches in pixels
-- `--target-mag` **(required)**: Target magnification for extraction (e.g., 10, 20, 40)
-- `--feature-extractors` **(required)**: Space/comma separated feature extractors to run. Built-ins: `resnet18`, `resnet34`, `resnet50`, `resnet101`, `resnet152`, `convnext_tiny`, `convnext_small`, `convnext_base`, `convnext_large`, `vit_b_16`, `vit_b_32`, `vit_l_16`, `vit_l_32`, `vit_h_14`, `dinov2_small`, `dinov2_base`, `dinov2_large`, `dinov2_giant`, `dinov3_vits16`, `dinov3_vits16_plus`, `dinov3_vitb16`, `dinov3_vitl16`, `dinov3_vitl16_sat`, `dinov3_vith16_plus`, `dinov3_vit7b16`, `dinov3_vit7b16_sat`, `uni_v1`, `uni_v2`, `biomedclip`, `clip_rn50`, `clip_rn101`, `clip_rn50x4`, `clip_rn50x16`, `clip_rn50x64`, `clip_vit_b_32`, `clip_vit_b_16`, `clip_vit_l_14`, `clip_vit_l_14_336`, `plip`, `medsiglip`, `phikon_v1`, `phikon_v2`, `virchow_v1`, `virchow_v2`, `prov_gigapath`, `midnight`, `musk`, `openmidnight`, `pathorchestra`, `h_optimus_0`, `h_optimus_1`, `h0_mini`, `hibou_b`, `hibou_l`, `quilt_b_32`, `quilt_b_16`, `quilt_b_16_pmb`, `omiclip`.
-
-**Feature Options:**
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `--feature-extractors` | comma/space separated | — | Models to embed patches with (built-ins: resnet18/34/50/101/152, convnext_tiny/small/base/large, vit_b_16/b_32/l_16/l_32/h_14, dinov2_small/base/large/giant, dinov3_vits16/vits16_plus/vitb16/vitl16/vitl16_sat/vith16_plus/vit7b16/vit7b16_sat, uni_v1, uni_v2, lunit_resnet50_bt, lunit_resnet50_swav, lunit_resnet50_mocov2, lunit_vit_small_patch16_dino, lunit_vit_small_patch8_dino, biomedclip, clip_rn50, clip_rn101, clip_rn50x4, clip_rn50x16, clip_rn50x64, clip_vit_b_32, clip_vit_b_16, clip_vit_l_14, clip_vit_l_14_336, plip, medsiglip, phikon_v1, phikon_v2, virchow_v1, virchow_v2, prov_gigapath, midnight, musk, openmidnight, pathorchestra, h_optimus_0, h_optimus_1, h0_mini, hibou_b, hibou_l, quilt_b_32, quilt_b_16, quilt_b_16_pmb, omiclip) |
-| `--feature-batch-size` | int | 32 | Batch size for feature forward passes |
-| `--feature-device` | choice | inherits `--device` | Device for feature extraction (cpu/cuda/cuda:<idx>) |
-| `--feature-num-workers` | int | 4 | DataLoader worker count for feature extraction |
-| `--feature-precision` | choice | float32 | Compute precision for feature forward passes (`float32`, `float16`, `bfloat16`) |
-
-Feature embedding runs as a deferred pass over saved coordinates for each slide.
-
-All other parameters mirror `segment-and-get-coords` (stride, thresholds, workers, visualization flags, etc.).
-This command respects `--skip-existing`; rerun with `--force` when you need to regenerate features with a different extractor set.
-
-**Supported WSI Formats:**
-- **OpenSlide formats**: .svs, .tif, .tiff, .ndpi, .vms, .vmu, .scn, .mrxs, .bif, .dcm
-- **Image formats**: .png, .jpg, .jpeg, .bmp, .webp, .gif
-
-### Usage Examples
-
-#### Basic Single File Processing
+### Minimal Run
 
 ```bash
-atlaspatch segment-and-get-coords sample.svs \
-    --patch-size 256 --target-mag 20
+atlaspatch process /path/to/slide.svs \
+  --output ./output \
+  --patch-size 256 \
+  --target-mag 20 \
+  --feature-extractors uni_v1,dinov2_small,openmidnight
 ```
 
-#### Full Processing with Feature Extraction
+Pass a directory instead of a single file to process multiple WSIs; outputs land in `<output>/patches/<stem>.h5` based on the path you provide to `--output`.
 
-```bash
-atlaspatch process sample.svs \
-    --patch-size 256 --target-mag 20 \
-    --feature-extractors resnet18,resnet50 \
-    --feature-batch-size 32
+### Process Command Arguments
+
+#### Required
+- `WSI_PATH` — file or directory of slides to process.
+- `--output/-o` — root directory for results.
+- `--patch-size` — final patch size in pixels at target magnification.
+- `--target-mag` — magnification to extract at (e.g., 10/20/40).
+- `--feature-extractors` — comma/space separated names from [Available Feature Extractors](#available-feature-extractors).
+
+#### Optional
+- **Patch layout**: `--step-size` sets stride; omit for non-overlapping grids (stride = patch-size), smaller values create overlaps.
+- **Segmentation & extraction performance**: `--device` picks the segmentation device (`cuda`, `cuda:<idx>`, or `cpu`). `--seg-batch-size` controls SAM2 thumbnail batch size. `--patch-workers` threads handle patch extraction/H5 writes (defaults to CPU count). `--max-open-slides` caps simultaneously open WSIs across segmentation/extraction.
+- **Feature extraction/embedding**: `--feature-device` defaults to `--device`; set separately if you want different GPU for feature extraction than segmentation. `--feature-batch-size` sets forward-pass batch size for the feature model. `--feature-num-workers` configures DataLoader workers. `--feature-precision` can reduce memory/bandwidth (`float32/float16`/`bfloat16` on GPU when supported).
+- **Filtering & quality**: `--fast-mode` (default) skips per-patch black/white filtering; `--no-fast-mode` enables it. `--tissue-thresh` filters tiny tissue regions (fraction of a 1024x1024 mask). When filtering is on (`--no-fast-mode`), `--white-thresh` is the HSV saturation cutoff for white patches (lower = stricter) and `--black-thresh` is the grayscale cutoff for dark patches (lower = stricter).
+- **Visualization**: `--visualize-grids`, `--visualize-mask`, `--visualize-contours` render overlays on thumbnails under `<output>/visualization/`.
+- **Run control**: `--save-images` exports per-patch PNGs. `--recursive` walks subdirectories. `--mpp-csv` supplies custom `wsi,mpp` overrides when metadata is missing/wrong. `--skip-existing` avoids reprocessing; use `--force` to overwrite. `--verbose/-v` switches to debug logging and disables the progress bar. `--write-batch` controls how many coord rows are buffered before flushing to H5 (tune for RAM vs. I/O).
+
+## Supported Formats
+
+AtlasPatch uses OpenSlide for WSIs and Pillow for standard images:
+
+- WSIs: `.svs`, `.tif`, `.tiff`, `.ndpi`, `.vms`, `.vmu`, `.scn`, `.mrxs`, `.bif`, `.dcm`
+- Images: `.png`, `.jpg`, `.jpeg`, `.bmp`, `.webp`, `.gif`
+
+## Using Extracted Data
+
+`atlaspatch process` writes one HDF5 per slide under `<output>/patches/<stem>.h5` containing coordinates and feature matrices. Coordinates and features share row order.
+
+### Patch Coordinates
+
+- Dataset: `coords` (int32, shape `(N, 5)`) with columns `(x, y, read_w, read_h, level)`.
+- `x` and `y` are level-0 pixel coordinates. `read_w`, `read_h`, and `level` describe how the patch was read from the WSI.
+- The level-0 footprint of each patch is stored as the `patch_size_level0` file attribute; some slide encoders use it for positional encoding (e.g., ALiBi in TITAN).
+
+Example:
+
+```python
+import h5py
+import numpy as np
+import openslide
+from PIL import Image
+
+h5_path = "output/patches/sample.h5"
+with h5py.File(h5_path, "r") as f:
+    coords = f["coords"][...]            # (N, 5) int32
+    patch_size_lvl0 = int(f.attrs["patch_size_level0"])
+    boxes_lvl0 = np.column_stack(
+        [coords[:, 0], coords[:, 1], coords[:, 0] + patch_size_lvl0, coords[:, 1] + patch_size_lvl0]
+    )  # [x0, y0, x1, y1] at level 0
+    levels = coords[:, 4]
+    read_wh = coords[:, 2:4]
+
+    # Opening the slide
+    slide_path = f.attrs["wsi_path"]
+    patch_size = int(f.attrs["patch_size"])
+    slide = openslide.OpenSlide(slide_path)
+    try:
+        # Reading the first patch (same flow used before feature extraction)
+        x, y, read_w, read_h, level = coords[0]
+        region = slide.read_region((int(x), int(y)), int(level), (int(read_w), int(read_h))).convert("RGB")
+        patch = region.resize((patch_size, patch_size), resample=Image.Resampling.BILINEAR)
+        patch_np = np.array(patch)  # shape (patch_size, patch_size, 3), uint8
+    finally:
+        slide.close()
 ```
 
-This produces a single H5 file containing coordinates plus two feature matrices under `features/resnet18` and `features/resnet50`.
+### Feature Matrices
 
-#### Batch Processing Multiple Files
+- Group: `features/` inside the same HDF5.
+- Each extractor is stored as `features/<name>` (float32, shape `(N, D)`), aligned row-for-row with `coords`.
+- List available feature sets with `list(f['features'].keys())`.
 
-```bash
-# Process all .svs files in a directory
-atlaspatch segment-and-get-coords ./slides/ \
-    --patch-size 256 --target-mag 20 \
-    --output ./processed_slides
-# Batch thumbnails for segmentation
-atlaspatch segment-and-get-coords ./slides/ \
-    --patch-size 256 --target-mag 20 \
-    --seg-batch-size 8 \
-    --patch-workers 4 \
-    --max-open-slides 12 \
-    --output ./processed_slides
+```python
+import h5py
+
+with h5py.File("output/patches/sample.h5", "r") as f:
+    feat_names = list(f["features"].keys())
+    resnet18_feats = f["features/resnet18"][...]  # numpy array of shape (N, embedding_dim)
 ```
-
-#### Custom Patch Extraction Parameters
-
-```bash
-# Extract larger patches with different stride and magnification
-atlaspatch segment-and-get-coords sample.svs \
-    --patch-size 512 \
-    --step-size 256 \
-    --target-mag 20 \
-    --output ./results
-```
-
-#### Export Individual Patch Images
-
-```bash
-# Generate individual PNG files for each patch
-atlaspatch segment-and-get-coords sample.svs \
-    --patch-size 256 --target-mag 20 \
-    --save-images \
-    --output ./output
-# Creates: output/images/<stem>/<stem>_x<x>_y<y>.png
-```
-
-
-#### CPU Inference
-
-```bash
-# Use CPU instead of GPU (slower but no GPU required)
-atlaspatch segment-and-get-coords sample.svs \
-    --patch-size 256 --target-mag 20 \
-    --device cpu
-```
-
-#### Custom MPP Values via CSV
-
-When WSI files don't have MPP (microns per pixel) metadata or the metadata is incorrect, you can provide custom MPP values via a CSV file.
-
-**CSV Format (required columns: `wsi` and `mpp`):**
-
-```csv
-wsi,mpp
-slide1.svs,0.5
-slide2.svs,0.25
-sample.png,0.4
-```
-
-**Usage:**
-
-```bash
-atlaspatch segment-and-get-coords ./wsi_folder/ \
-    --patch-size 256 --target-mag 20 \
-    --mpp-csv mpp_values.csv
-```
-
-**CSV Specifications:**
-- **Required columns**: `wsi` (filename with or without path) and `mpp` (float value)
-- **WSI names**: Can use just the filename (e.g., `slide1.svs`) or full path; only the stem (filename without extension) is matched
-
-#### Custom Filtering Thresholds
-
-```bash
-# Adjust thresholds for different tissue characteristics
-atlaspatch segment-and-get-coords sample.svs \
-    --patch-size 256 --target-mag 20 \
-    --white-thresh 20 \
-    --black-thresh 40 \
-    --tissue-thresh 0.05
-```
-
-#### Verbose Output
-
-```bash
-# Enable detailed logging for debugging
-atlaspatch segment-and-get-coords sample.svs \
-    --patch-size 256 --target-mag 20 \
-    --verbose
-```
-
-- Default (no --verbose): quiet mode with a progress bar and minimal output.
-
-#### Generate Visualizations
-
-```bash
-# Generate visualizations on thumbnail
-atlaspatch segment-and-get-coords sample.svs \
-    --patch-size 256 --target-mag 20 \
-    --visualize-grids --visualize-mask --visualize-contours
-
-```
-
-The visualization flags create the following images under `output/visualization/`:
-- `<wsi_stem>.png`: patch grid overlay (`--visualize-grids`)
-- `<wsi_stem>_mask.png`: mask overlay (`--visualize-mask`)
-- `<wsi_stem>_contours.png`: contour overlay (`--visualize-contours`)
-
-#### `atlaspatch info`
-
-Display information about supported formats and features.
-
-```bash
-atlaspatch info
-```
-
-### Parameter Guide
-
-**Patch Extraction Parameters:**
-
-- **`--patch-size`**: Target size of extracted patches (e.g., 256 = 256x256 pixels) at the chosen magnification (`--target-mag`). Coordinates in the H5 are always at level 0.
-  - Larger values reduce number of patches but capture more context
-  - Common values: 256, 512
-
-- **`--step-size`**: Sliding window stride during patch extraction, defined in target-magnification pixels. Internally converted to a level-0 stride.
-  - If equal to patch-size: non-overlapping patches
-  - If smaller: overlapping patches (more patches)
-  - Default behavior: uses patch-size (non-overlapping)
-
-- **`--target-mag`**: Target magnification for extraction (40, 20, 10, etc.). Must be less than or equal to the WSI's native magnification. If a higher magnification is requested than available, the CLI exits with an error.
-
-**Filtering Parameters:**
-
-- **`--white-thresh`**: Saturation threshold for white patches
-  - Lower values = more aggressively filter white regions (HSV saturation)
-  - Filtering uses majority rule: a patch is considered white if ≥70% of pixels have
-    saturation below this threshold AND brightness/value ≥ 200.
-
-- **`--black-thresh`**: RGB threshold for black patches
-  - Lower values = filter darker regions
-  - Filtering uses majority rule: a patch is considered black if ≥70% of grayscale
-    pixels are below this threshold.
-
-- **`--tissue-thresh`**: Minimum tissue area as fraction of input image which is of size 1024x1024
-  - Filters out very small tissue regions
-  - Range: 0.0–1.0
-  - Unit: fraction (0–1)
 
 ## Available Feature Extractors
 
@@ -435,50 +257,6 @@ atlaspatch info
 | [`biomedclip`](https://huggingface.co/microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224) ([BiomedCLIP: a multimodal biomedical foundation model pretrained from fifteen million scientific image-text pairs](https://aka.ms/biomedclip-paper)) | 512 |
 | [`omiclip`](https://huggingface.co/WangGuangyuLab/Loki) ([A visual-omics foundation model to bridge histopathology with spatial transcriptomics](https://www.nature.com/articles/s41592-025-02707-1)) | 768 |
 
-## HDF5 Output Structure
-
-Each processed slide produces a single HDF5 file under `<output>/patches/<stem>.h5`.
-
-- Datasets
-  - `coords`: int32 shape `(N, 5)` containing `(x, y, w, h, level)`. x and y are at level 0, w and h are the reading resolution, level is the level for the patch extraction (level 0 is the highest-resolution level).
-  - `features/<extractor>`: float32 shape `(N, D)` feature matrix for each requested extractor (e.g., `features/resnet18`, `features/resnet50`)
-- File attributes
-  - `patch_size`: int (target patch size)
-  - `wsi_path`: original WSI path
-  - `num_patches`: total number of patches
-  - `level0_magnification`: magnification of the highest-resolution level (if known)
-  - `target_magnification`: magnification used for extraction
-  - `patch_size_level0`: size of the patch footprint at level 0 in pixels. Used by some slide encoders which uses it for positional encoding module (e.g., [ALiBi](https://arxiv.org/pdf/2108.12409) in [TITAN](https://arxiv.org/abs/2411.19666))
-  - `overlap`: pixels of overlap between adjacent patches
-  - `level0_width`: width of the slide at level 0 in pixels
-  - `level0_height`: height of the slide at level 0 in pixels
-
-
-### Output
-
-Results are written directly under the configured `--output` directory:
-
-- `patches/` contains the HDF5 outputs (`<stem>.h5`).
-- `images/` contains optional per-patch PNGs when `--save-images` is set.
-- `visualization/` contains optional overlays for grids, masks, and contours.
-- Feature matrices live inside each slide's H5 under `features/<extractor>` when `atlaspatch process` is used.
-
-**HDF5 Files** (per input WSI):
-```
-<output>/patches/<wsi_stem>.h5
-```
-
-Contains:
-- `coords`: Shape (N, 5), dtype int32 - (x, y, w, h, level) at level 0
-- File attributes: `patch_size`, `patch_size_level0`, `wsi_path`, `num_patches`, `level0_magnification`, `target_magnification`, `overlap`, `level0_width`, `level0_height`
-
-**Optional PNG Images** (if `--save-images` is used):
-```
-<output>/images/<wsi_stem>/<wsi_stem>_x<x>_y<y>.png
-```
-
-Each file represents a single extracted patch with its coordinates in the filename.
-
 ## SLURM job scripts
 
 We prepared ready-to-run SLURM templates under `jobs/`:
@@ -488,6 +266,12 @@ We prepared ready-to-run SLURM templates under `jobs/`:
   - Ensure `--cpus-per-task` matches the CPU you want; the script passes `--patch-workers ${SLURM_CPUS_PER_TASK}` and caps `--max-open-slides` at 200.
   - `--fast-mode` is on by default; append `--no-fast-mode` to enable content filtering.
   - Submit with `sbatch jobs/atlaspatch_patch.slurm.sh`.
+- Feature embedding (adds features into existing H5 files): `jobs/atlaspatch_features.slurm.sh`. Edits to make:
+  - Set `WSI_ROOT`, `OUTPUT_ROOT`, `PATCH_SIZE`, and `TARGET_MAG`.
+  - Configure `FEATURES` (comma/space list, multiple extractors are supported), `FEATURE_DEVICE`, `FEATURE_BATCH`, `FEATURE_WORKERS`, and `FEATURE_PRECISION`.
+  - This script is intended for feature extraction; use the patch script when you need segmentation + coordinates, and run the feature script to embed one or more models into those H5 files.
+  - Submit with `sbatch jobs/atlaspatch_features.slurm.sh`.
+- Running multiple jobs: you can submit several jobs in a loop (e.g., 50 job using `for i in {1..50}; do sbatch jobs/atlaspatch_features.slurm.sh; done`). AtlasPatch uses per-slide lock files to avoid overlapping work on the same slide.
 
 ## Feedback
 
