@@ -42,12 +42,7 @@ conda activate slide_processor
 conda install -c conda-forge openslide
 ```
 
-3. Install SAM2 (Segment Anything Model 2.0):
-```bash
-pip install "git+https://github.com/facebookresearch/sam2.git"
-```
-
-4. Install the package in development mode:
+3. Install the package in development mode:
 ```bash
 pip install -e .
 ```
@@ -65,12 +60,7 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
    - **macOS**: `brew install openslide`
    - **Other systems**: Visit [OpenSlide Documentation](https://openslide.org/)
 
-3. Install SAM2 (Segment Anything Model 2.0):
-```bash
-pip install "git+https://github.com/facebookresearch/sam2.git"
-```
-
-4. Install the package in development mode:
+3. Install the package in development mode:
 ```bash
 pip install -e .
 ```
