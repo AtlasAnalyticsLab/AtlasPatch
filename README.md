@@ -26,6 +26,7 @@ A Python package for processing and handling whole slide images (WSI).
   - [Setup TRIDENT](#setup-trident)
   - [Extract patch features from SlideProcessor outputs](#extract-patch-features-from-slideprocessor-outputs)
 - [SLURM job scripts](#slurm-job-scripts)
+- [Feedback](#feedback)
 - [License](#license)
 
 ## Installation
@@ -411,6 +412,12 @@ We prepared ready-to-run SLURM templates are under `jobs/`:
   - Set `WSI_ROOT`, `PATCH_OUTPUT` (same as SlideProcessor `--output`), `PATCH_ENCODER`, `MAG`, `PATCH_SIZE`, `BATCH_SIZE`.
   - Activate your TRIDENT env and set `PYTHONPATH` to the TRIDENT repo if needed.
   - Submit with `sbatch jobs/trident_features.slurm.sh`.
+
+## Feedback
+
+- Report problems via the [bug report template](https://github.com/AtlasAnalyticsLab/SlideProcessor/issues/new?template=bug_report.md) so we can reproduce and fix them quickly.
+- Suggest enhancements through the [feature request template](https://github.com/AtlasAnalyticsLab/SlideProcessor/issues/new?template=feature_request.md) with your use case and proposal.
+- When opening a PR, fill out the [pull request template](.github/pull_request_template.md) and run the listed checks (lint, format, type-check, tests).
 
 ## License
 
