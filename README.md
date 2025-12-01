@@ -351,7 +351,7 @@ If you use AtlasPatch in your research, please cite it:
 
 ## License
 
-AtlasPatch is licensed under the **PolyForm Noncommercial License 1.0.0**, which strictly prohibits commercial use of this software or any derivative works. This applies to all forms of commercialization, including selling the software, offering it as a commercial service, using it in commercial products, or creating forked versions for commercial purposes. However, the license explicitly permits use for research, experimentation, and non-commercial purposes. Personal use for research, hobby projects, and educational purposes is allowed, as is use by academic institutions, educational organizations, public research organizations, and non-profit entities regardless of their funding sources. If you wish to use AtlasPatch commercially, you must obtain a separate commercial license from the authors. For the complete license text and detailed terms, see the [LICENSE](./LICENSE) file in this repository.
+AtlasPatch is released under CC-BY-NC-SA-4.0, which strictly disallows commercial use of the model weights or any derivative works. Commercialization includes selling the model, offering it as a paid service, using it inside commercial products, or distributing modified versions for commercial gain. Non-commercial research, experimentation, educational use, and use by academic or non-profit organizations is permitted under the license terms. If you need commercial rights, please contact the authors to obtain a separate commercial license. See the LICENSE file in this repository for full terms. For the complete license text and detailed terms, see the [LICENSE](./LICENSE) file in this repository.
 
 # Future Updates
 
