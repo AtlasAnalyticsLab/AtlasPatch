@@ -334,13 +334,3 @@ AtlasPatch is licensed under the **PolyForm Noncommercial License 1.0.0**, which
 ## Shipping
 - Make `pip install atlas_patch` or something
 - add support for installation using uv
-
-## Contours
-- filter_params  in mask_to_contours in `utils/contours.py`
-```
-filter_params = {
-            "a_t": 100,  # Minimum tissue contour area (in pixels)
-            "a_h": 16,  # Minimum hole area
-            "max_n_holes": 10,
-        }
-```
