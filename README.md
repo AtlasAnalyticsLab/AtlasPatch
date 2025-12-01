@@ -294,10 +294,6 @@ AtlasPatch is licensed under the **PolyForm Noncommercial License 1.0.0**, which
 - Make `pip install atlas_patch` or something
 - add support for installation using uv
 
-## Documentation
-- Update and decrease the README file size, make it more straight forward
-- Add part on how to use those extracted features
-
 ## Contours
 - filter_params  in mask_to_contours in `utils/contours.py`
 ```
