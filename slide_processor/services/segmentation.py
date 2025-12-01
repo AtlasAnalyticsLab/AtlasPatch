@@ -3,11 +3,13 @@ from __future__ import annotations
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Sequence, Union
+from pathlib import Path
+from typing import Any, Sequence
 
 import numpy as np
 import torch
 from hydra.utils import instantiate
+from huggingface_hub import hf_hub_download
 from omegaconf import OmegaConf
 from PIL import Image
 from sam2.sam2_image_predictor import SAM2ImagePredictor
@@ -22,18 +24,37 @@ logger = logging.getLogger("slide_processor.segmentation_service")
 
 class _SAM2Predictor:
     """Lightweight wrapper around SAM2ImagePredictor with resizing helpers."""
+    DEFAULT_MODEL_REPO = "AtlasAnalyticsLab/Atlas-Patch"
+    DEFAULT_MODEL_FILENAME = "model.pth"
 
     def __init__(self, cfg: SegmentationConfig):
         self.cfg = cfg
 
-        dev_str = str(cfg.device).lower()
+        requested_dev = str(cfg.device).lower()
+        dev_str = requested_dev
         if dev_str == "cuda" and not torch.cuda.is_available():
             logger.warning("CUDA requested but unavailable; falling back to CPU.")
             dev_str = "cpu"
         self.device = torch.device(dev_str)
         self.input_size = 1024
+        logger.info("SAM2 predictor device: %s (requested=%s)", self.device, requested_dev)
 
+        self.checkpoint_path = self._resolve_checkpoint_path()
         self.predictor = self._build_predictor()
+
+    def _resolve_checkpoint_path(self) -> Path:
+        """Choose checkpoint: prefer explicit path, else download from Hugging Face."""
+        if self.cfg.checkpoint_path is not None:
+            return self.cfg.checkpoint_path
+
+        repo_id = self.DEFAULT_MODEL_REPO
+        filename = self.DEFAULT_MODEL_FILENAME
+        try:
+            logger.info("Downloading SAM2 checkpoint from Hugging Face: %s/%s", repo_id, filename)
+            downloaded = hf_hub_download(repo_id=repo_id, filename=filename)
+        except Exception as exc:
+            raise RuntimeError(f"Failed to fetch checkpoint from {repo_id}: {exc}") from exc
+        return Path(downloaded)
 
     def _build_predictor(self) -> SAM2ImagePredictor:
         try:
@@ -41,14 +62,14 @@ class _SAM2Predictor:
             model_cfg: Any = conf.get("model", conf)
             model = instantiate(model_cfg)
             predictor = SAM2ImagePredictor(model, mask_threshold=self.cfg.mask_threshold)
-            checkpoint = torch.load(self.cfg.checkpoint_path, map_location=self.device)
+            checkpoint = torch.load(self.checkpoint_path, map_location=self.device)
             predictor.model.load_state_dict(checkpoint["model"], strict=True)
             predictor.model.to(self.device).eval()
             return predictor
-        except Exception as e:  # noqa: BLE001
-            raise RuntimeError(f"Failed to build SAM2 predictor: {e}") from e
+        except Exception as exc:
+            raise RuntimeError(f"Failed to build SAM2 predictor: {exc}") from exc
 
-    def _normalize_input(self, image: Union[np.ndarray, Image.Image, torch.Tensor]) -> np.ndarray:
+    def _normalize_input(self, image: np.ndarray | Image.Image | torch.Tensor) -> np.ndarray:
         if isinstance(image, Image.Image):
             if image.mode != "RGB":
                 image = image.convert("RGB")
@@ -97,7 +118,7 @@ class _SAM2Predictor:
 
     @torch.inference_mode()
     def predict_image(
-        self, image: Union[np.ndarray, Image.Image, torch.Tensor], *, resize_to_input: bool = True
+        self, image: np.ndarray | Image.Image | torch.Tensor, *, resize_to_input: bool = True
     ) -> np.ndarray:
         arr = self._normalize_input(image)
         arr_resized, orig_shape = self._resize_input_for_sam(arr)
@@ -120,7 +141,7 @@ class _SAM2Predictor:
     @torch.inference_mode()
     def predict_batch(
         self,
-        images: Sequence[Union[np.ndarray, Image.Image, torch.Tensor]],
+        images: Sequence[np.ndarray | Image.Image | torch.Tensor],
         *,
         resize_to_input: bool = True,
     ) -> list[np.ndarray]:
@@ -156,6 +177,18 @@ class _SAM2Predictor:
                 mask = self._resize_mask(mask, orig_shapes[i])
             out_masks.append(mask.astype(np.float32))
         return out_masks
+
+    def close(self) -> None:
+        """Release GPU memory held by the SAM2 model."""
+        try:
+            self.predictor.model.cpu()
+        except Exception:
+            pass
+        if self.device.type == "cuda":
+            try:
+                torch.cuda.empty_cache()
+            except Exception:
+                pass
 
 
 class SAM2SegmentationService(SegmentationService):
@@ -193,3 +226,10 @@ class SAM2SegmentationService(SegmentationService):
             )
             for m in masks
         ]
+
+    def close(self) -> None:
+        """Free underlying SAM2 resources (notably GPU memory)."""
+        try:
+            self.predictor.close()
+        except Exception:
+            pass

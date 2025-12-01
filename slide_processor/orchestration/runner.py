@@ -4,8 +4,9 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Iterable, Sequence, Tuple
+from typing import Any, Iterable, Sequence
 
+import h5py
 from tqdm import tqdm
 
 from slide_processor.core.config import AppConfig
@@ -24,6 +25,7 @@ from slide_processor.services.interfaces import (
     VisualizationService,
     WSILoader,
 )
+from slide_processor.utils import missing_features
 from slide_processor.utils.params import get_wsi_files
 
 logger = logging.getLogger("slide_processor.runner")
@@ -66,11 +68,88 @@ class ProcessingRunner:
             slides.append(slide)
         return slides
 
-    def _should_skip(self, slide: Slide) -> bool:
+    def _build_existing_result(self, slide: Slide, h5_path: Path) -> ExtractionResult | None:
+        """Create a lightweight ExtractionResult from an existing H5 (no re-segmentation)."""
+        metadata: dict[str, Any] = {}
+        num_patches: int | None = None
+        patch_size_level0: int | None = None
+        try:
+            with h5py.File(h5_path, "r") as f:
+                num_attr = f.attrs.get("num_patches")
+                if num_attr is not None:
+                    num_patches = int(num_attr)
+                elif "coords" in f:
+                    num_patches = int(f["coords"].shape[0])
+
+                ps_level0_attr = f.attrs.get("patch_size_level0")
+                if ps_level0_attr is not None:
+                    patch_size_level0 = int(ps_level0_attr)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(
+                "Failed to read existing output for %s; will reprocess. Error: %s",
+                slide.path.name,
+                e,
+            )
+            return None
+
+        if num_patches is None or num_patches <= 0:
+            return None
+
+        return ExtractionResult(
+            slide=slide,
+            h5_path=h5_path,
+            num_patches=int(num_patches),
+            patch_size_level0=patch_size_level0,
+            metadata=metadata,
+        )
+
+    def _handle_existing_slide(
+        self,
+        slide: Slide,
+        results: list[ExtractionResult],
+        progress,
+    ) -> bool:
+        """Handle skip/reuse logic for existing outputs.
+
+        Returns True when the slide is fully handled (skip or reuse), False to continue processing.
+        """
         if not self.config.output.skip_existing:
             return False
-        exists = find_existing_patch(slide, self.config.output, self.config.extraction)
-        return exists is not None
+
+        existing_path = find_existing_patch(slide, self.config.output, self.config.extraction)
+        if existing_path is None:
+            return False
+
+        feat_cfg = self.config.features
+        if feat_cfg is None or not feat_cfg.extractors:
+            logger.info("Skipping %s (already processed).", slide.path.name)
+            if progress:
+                progress.update(1)
+            return True
+
+        existing_result = self._build_existing_result(slide, existing_path)
+        if existing_result is None:
+            logger.info("Existing output invalid for %s; reprocessing.", slide.path.name)
+            return False
+
+        missing = missing_features(
+            existing_path, feat_cfg.extractors, expected_total=existing_result.num_patches
+        )
+        if not missing:
+            logger.info("Skipping %s (features complete).", slide.path.name)
+            if progress:
+                progress.update(1)
+            return True
+
+        results.append(existing_result)
+        logger.info(
+            "Reusing existing patches for %s; missing features: %s",
+            slide.path.name,
+            ", ".join(missing),
+        )
+        if progress:
+            progress.update(1)
+        return True
 
     def _acquire_lock(self, slide: Slide) -> tuple[int | None, Path]:
         """Attempt to acquire a per-slide lock file. Returns (fd, path) or (None, path if held elsewhere)."""
@@ -120,7 +199,7 @@ class ProcessingRunner:
             raise ValueError("max_open_slides must be defined")
         return max(1, int(cfg_val))
 
-    def run(self) -> tuple[list[ExtractionResult], list[Tuple[Slide, Exception | str]]]:
+    def run(self) -> tuple[list[ExtractionResult], list[tuple[Slide, Exception | str]]]:
         slides = self.discover_slides()
         slides = self._attach_mpp(slides)
 
@@ -129,7 +208,7 @@ class ProcessingRunner:
             return [], []
 
         results: list[ExtractionResult] = []
-        failures: list[Tuple[Slide, Exception | str]] = []
+        failures: list[tuple[Slide, Exception | str]] = []
 
         progress = tqdm(total=len(slides), disable=not self.show_progress, desc="Processing slides")
         progress_bar = progress if self.show_progress else None
@@ -151,12 +230,9 @@ class ProcessingRunner:
 
                 opened: list[tuple[Slide, IWSI, int | None, Path]] = []
 
-                # Skip check and open WSIs once with lock acquisition
+                # Skip/reuse check and open WSIs once with lock acquisition
                 for slide in batch:
-                    if self._should_skip(slide):
-                        logger.info("Skipping %s (already processed).", slide.path.name)
-                        if progress_bar:
-                            progress_bar.update(1)
+                    if self._handle_existing_slide(slide, results, progress_bar):
                         continue
                     fd, lock_path = self._acquire_lock(slide)
                     if fd is None:
@@ -198,16 +274,6 @@ class ProcessingRunner:
                             progress_bar.update(1)
                 else:
                     for (slide, wsi, lock_fd, lock_path), mask in zip(opened, masks):
-                        if self._should_skip(slide):
-                            logger.info("Skipping %s (already processed).", slide.path.name)
-                            try:
-                                wsi.cleanup()
-                            except Exception:
-                                pass
-                            self._release_lock(lock_fd, lock_path)
-                            if progress_bar:
-                                progress_bar.update(1)
-                            continue
                         task = ExtractionTask(
                             slide=slide,
                             wsi=wsi,
@@ -220,7 +286,7 @@ class ProcessingRunner:
                         submitted_wsis.add(wsi)
                 finally:
                     # Clean up WSIs that were not submitted (e.g., skipped or segmentation failed).
-                    for slide, wsi, lock_fd, lock_path in opened:
+                    for _slide, wsi, lock_fd, lock_path in opened:
                         if wsi in submitted_wsis:
                             continue
                         try:

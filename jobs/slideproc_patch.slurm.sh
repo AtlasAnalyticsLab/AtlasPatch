@@ -14,7 +14,6 @@ set -euo pipefail
 ##############################
 WSI_ROOT=""
 OUTPUT_ROOT=""
-SAM_CHECKPOINT="sam2_bs2_inp1024_lr5e-4.pth"
 TARGET_MAG=20
 PATCH_SIZE=256
 SEG_BATCH=32
@@ -31,8 +30,7 @@ MAX_OPEN_SLIDES=200
 
 mkdir -p logs
 
-slideproc process "${WSI_ROOT}" \
-    --checkpoint "${SAM_CHECKPOINT}" \
+slideproc segment-and-get-coords "${WSI_ROOT}" \
     --patch-size "${PATCH_SIZE}" \
     --target-mag "${TARGET_MAG}" \
     --output "${OUTPUT_ROOT}" \
