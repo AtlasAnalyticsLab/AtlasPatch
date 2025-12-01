@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import concurrent.futures as _fut
-import json
 import os
 from collections import deque
 from pathlib import Path
@@ -42,37 +41,18 @@ class H5PatchWriter:
 
     def _seed_writer(self, output_path: Path) -> H5AppendWriter:
         writer = H5AppendWriter(str(output_path), chunk_rows=self.chunk_rows)
-        empty_coords = np.empty((0, 2), dtype=np.int32)
-        empty_coords_ext = np.empty((0, 5), dtype=np.int32)
+        empty_coords = np.empty((0, 5), dtype=np.int32)
         level0_width, level0_height = self.level0_wh
-        coords_metadata: dict[str, int | str] = {
-            "description": "(x, y) coordinates at level 0",
-            "patch_size": self.patch_size,
-            "patch_size_level0": self.patch_size_level0,
-            "level0_magnification": self.level0_mag,
-            "target_magnification": self.target_mag,
-            "overlap": self.overlap,
-            "name": self.slide_stem,
-            "savetodir": str(output_path.resolve().parent),
-            "level0_width": int(level0_width),
-            "level0_height": int(level0_height),
-        }
-        dset_attrs: dict[str, dict[str, int | str]] = {
-            "coords": coords_metadata,
-            "coords_ext": {"description": "(x, y, w, h, level) at extraction"},
-        }
-        writer.append(
-            {"coords": empty_coords, "coords_ext": empty_coords_ext}, attributes=dset_attrs
-        )
+        writer.append({"coords": empty_coords})
         writer.update_file_attrs(
             {
-                "patch_size": coords_metadata["patch_size"],
-                "patch_size_level0": coords_metadata["patch_size_level0"],
-                "level0_magnification": coords_metadata["level0_magnification"],
-                "target_magnification": coords_metadata["target_magnification"],
-                "overlap": coords_metadata["overlap"],
-                "level0_width": coords_metadata["level0_width"],
-                "level0_height": coords_metadata["level0_height"],
+                "patch_size": self.patch_size,
+                "patch_size_level0": self.patch_size_level0,
+                "level0_magnification": self.level0_mag,
+                "target_magnification": self.target_mag,
+                "overlap": self.overlap,
+                "level0_width": int(level0_width),
+                "level0_height": int(level0_height),
                 "wsi_path": self.wsi_path,
             }
         )
@@ -121,28 +101,23 @@ class H5PatchWriter:
     ) -> tuple[int, np.ndarray | None]:
         writer = self._seed_writer(output_path)
         total = 0
-        buf_xy: list[tuple[int, int]] = []
-        buf_ext: list[tuple[int, int, int, int, int]] = []
+        buf_coords: list[tuple[int, int, int, int, int]] = []
         coords_viz: list[tuple[int, int]] | None = [] if collect_coords else None
 
         try:
             for x, y, rw, rh, lv, _ in entries:
-                buf_xy.append((x, y))
-                buf_ext.append((x, y, int(rw), int(rh), int(lv)))
+                buf_coords.append((int(x), int(y), int(rw), int(rh), int(lv)))
                 if coords_viz is not None:
-                    coords_viz.append((x, y))
-                if len(buf_xy) >= batch:
-                    coords = np.asarray(buf_xy, dtype=np.int32)
-                    coords_ext = np.asarray(buf_ext, dtype=np.int32)
-                    writer.append({"coords": coords, "coords_ext": coords_ext})
+                    coords_viz.append((int(x), int(y)))
+                if len(buf_coords) >= batch:
+                    coords = np.asarray(buf_coords, dtype=np.int32)
+                    writer.append({"coords": coords})
                     total += int(coords.shape[0])
-                    buf_xy.clear()
-                    buf_ext.clear()
+                    buf_coords.clear()
 
-            if buf_xy:
-                coords = np.asarray(buf_xy, dtype=np.int32)
-                coords_ext = np.asarray(buf_ext, dtype=np.int32)
-                writer.append({"coords": coords, "coords_ext": coords_ext})
+            if buf_coords:
+                coords = np.asarray(buf_coords, dtype=np.int32)
+                writer.append({"coords": coords})
                 total += int(coords.shape[0])
 
             writer.update_file_attrs({"num_patches": int(total)})
@@ -218,31 +193,26 @@ class H5PatchWriter:
         collect_coords: bool = False,
     ) -> tuple[int, np.ndarray | None]:
         total = 0
-        buf_xy: list[tuple[int, int]] = []
-        buf_ext: list[tuple[int, int, int, int, int]] = []
+        buf_coords: list[tuple[int, int, int, int, int]] = []
         coords_viz: list[tuple[int, int]] | None = [] if collect_coords else None
 
         try:
             for x, y, rw, rh, lv, patch in entries:
-                buf_xy.append((x, y))
-                buf_ext.append((x, y, int(rw), int(rh), int(lv)))
+                buf_coords.append((int(x), int(y), int(rw), int(rh), int(lv)))
                 if coords_viz is not None:
-                    coords_viz.append((x, y))
-                if len(buf_xy) >= batch:
-                    coords = np.asarray(buf_xy, dtype=np.int32)
-                    coords_ext = np.asarray(buf_ext, dtype=np.int32)
-                    writer.append({"coords": coords, "coords_ext": coords_ext})
+                    coords_viz.append((int(x), int(y)))
+                if len(buf_coords) >= batch:
+                    coords = np.asarray(buf_coords, dtype=np.int32)
+                    writer.append({"coords": coords})
                     total += int(coords.shape[0])
-                    buf_xy.clear()
-                    buf_ext.clear()
+                    buf_coords.clear()
 
                 if on_patch is not None and patch is not None:
                     on_patch(int(x), int(y), patch)
 
-            if buf_xy:
-                coords = np.asarray(buf_xy, dtype=np.int32)
-                coords_ext = np.asarray(buf_ext, dtype=np.int32)
-                writer.append({"coords": coords, "coords_ext": coords_ext})
+            if buf_coords:
+                coords = np.asarray(buf_coords, dtype=np.int32)
+                writer.append({"coords": coords})
                 total += int(coords.shape[0])
 
             writer.update_file_attrs({"num_patches": int(total)})
@@ -270,7 +240,6 @@ class H5PatchWriter:
     ) -> int:
         """Append a single feature dataset to an existing H5 using a patch iterator."""
         batch_size = max(1, int(feature_batch))
-        feature_dataset_path = f"features/{feature_name}"
         total_written = 0
         dataset = None
         tmp_name = f"__tmp_{feature_name}"
@@ -338,7 +307,6 @@ class H5PatchWriter:
 
                 grp.move(tmp_name, feature_name)
                 moved = True
-                self._merge_feature_sets(f, feature_name, feature_attrs, feature_dataset_path)
             except Exception:
                 if tmp_name in grp:
                     del grp[tmp_name]
@@ -395,20 +363,3 @@ class H5PatchWriter:
         total_written = end
         buf.clear()
         return dataset, total_written
-
-    @staticmethod
-    def _merge_feature_sets(
-        f: h5py.File, feature_name: str, feature_attrs: Mapping[str, int | str], feature_path: str
-    ) -> None:
-        entry = {**feature_attrs, "dataset": feature_path}
-        existing = f.attrs.get("feature_sets")
-        merged: dict[str, dict[str, int | str]] = {}
-        if isinstance(existing, (bytes, str)):
-            try:
-                merged = json.loads(existing)
-            except Exception:
-                merged = {}
-        elif isinstance(existing, dict):
-            merged = dict(existing)
-        merged[feature_name] = entry
-        f.attrs["feature_sets"] = json.dumps(merged)

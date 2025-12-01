@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Sequence
 
 import click
 import h5py
@@ -33,19 +32,6 @@ def parse_feature_list(raw: str, *, choices: list[str]) -> list[str]:
             "Provide each extractor at most once."
         )
     return unique_parts
-
-
-def parse_feature_sets_attr(raw: Any) -> dict[str, dict[str, Any]]:
-    """Parse the feature_sets file attribute into a dict."""
-    if isinstance(raw, (bytes, str)):
-        try:
-            parsed = json.loads(raw)
-            return parsed if isinstance(parsed, dict) else {}
-        except Exception:
-            return {}
-    if isinstance(raw, dict):
-        return dict(raw)
-    return {}
 
 
 def get_existing_features(h5_path: str | Path, *, expected_total: int | None = None) -> set[str]:

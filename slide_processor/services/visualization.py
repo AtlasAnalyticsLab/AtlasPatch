@@ -54,13 +54,14 @@ class DefaultVisualizationService(VisualizationService):
                         psize_l0 = int(f.attrs["patch_size_level0"])
                 if coords is None or psize_l0 is None:
                     raise ValueError("Coordinates or patch size missing for grid visualization")
+                coords_xy = coords[:, :2] if coords.ndim == 2 and coords.shape[1] >= 2 else coords
                 info = {
                     "patch_size": self.extraction_cfg.patch_size,
                     "step_size": self.extraction_cfg.step_size or self.extraction_cfg.patch_size,
                     "tissue_thresh": self.extraction_cfg.tissue_threshold,
                 }
                 path = visualize_patches_on_thumbnail(
-                    coords=coords,
+                    coords=coords_xy,
                     patch_size_level0=psize_l0,
                     wsi=wsi,
                     output_dir=vis_dir,

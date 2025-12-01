@@ -8,7 +8,6 @@ from .features import (
     get_existing_features,
     missing_features,
     parse_feature_list,
-    parse_feature_sets_attr,
 )
 from .h5 import H5AppendWriter
 from .image import is_black_patch, is_white_patch
@@ -29,5 +28,4 @@ __all__ = [
     "parse_feature_list",
     "get_existing_features",
     "missing_features",
-    "parse_feature_sets_attr",
 ]

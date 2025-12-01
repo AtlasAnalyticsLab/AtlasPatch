@@ -25,7 +25,7 @@ from slide_processor.services.interfaces import (
     VisualizationService,
     WSILoader,
 )
-from slide_processor.utils import missing_features, parse_feature_sets_attr
+from slide_processor.utils import missing_features
 from slide_processor.utils.params import get_wsi_files
 
 logger = logging.getLogger("slide_processor.runner")
@@ -84,10 +84,6 @@ class ProcessingRunner:
                 ps_level0_attr = f.attrs.get("patch_size_level0")
                 if ps_level0_attr is not None:
                     patch_size_level0 = int(ps_level0_attr)
-
-                feature_sets = parse_feature_sets_attr(f.attrs.get("feature_sets"))
-                if feature_sets:
-                    metadata["feature_sets"] = sorted(feature_sets.keys())
         except Exception as e:  # noqa: BLE001
             logger.warning(
                 "Failed to read existing output for %s; will reprocess. Error: %s",

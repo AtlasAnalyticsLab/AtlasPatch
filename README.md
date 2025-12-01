@@ -446,8 +446,7 @@ slideproc info
 Each processed slide produces a single HDF5 file under `<output>/<mag>x_<patch>px_<overlap>px_overlap/patches/<stem>.h5`.
 
 - Datasets
-  - `coords`: int32 shape `(N, 2)` containing `(x, y)` at level 0
-  - `coords_ext`: int32 shape `(N, 5)` containing `(x, y, w, h, level)` for reliable re-reading
+  - `coords`: int32 shape `(N, 5)` containing `(x, y, w, h, level)`. x and y are at level 0, w and h are the reading resolution, level is the level for the patch extraction (level 0 is the highest-resolution level).
   - `features/<extractor>`: float32 shape `(N, D)` feature matrix for each requested extractor (e.g., `features/resnet18`, `features/resnet50`)
 - File attributes
   - `patch_size`: int (target patch size)
@@ -456,7 +455,9 @@ Each processed slide produces a single HDF5 file under `<output>/<mag>x_<patch>p
   - `level0_magnification`: magnification of the highest-resolution level (if known)
   - `target_magnification`: magnification used for extraction
   - `patch_size_level0`: size of the patch footprint at level 0 in pixels. Used by some slide encoders which uses it for positional encoding module (e.g., [ALiBi](https://arxiv.org/pdf/2108.12409) in [TITAN](https://arxiv.org/abs/2411.19666))
-  - `feature_sets`: JSON metadata describing each extractor stored in the file (name, embedding_dim, dataset path)
+  - `overlap`: pixels of overlap between adjacent patches
+  - `level0_width`: width of the slide at level 0 in pixels
+  - `level0_height`: height of the slide at level 0 in pixels
 
 
 ### Output
@@ -474,9 +475,8 @@ Results are written under a run-specific subdirectory named `<mag>x_<patch>px_<o
 ```
 
 Contains:
-- `coords`: Shape (N, 2), dtype int32 - (x, y) coordinates at level 0
-- `coords_ext`: Shape (N, 5), dtype int32 - (x, y, w, h, level)
-- File attributes: `patch_size`, `wsi_path`, `num_patches`, `level0_magnification`, `target_magnification`, `patch_size_level0`
+- `coords`: Shape (N, 5), dtype int32 - (x, y, w, h, level) at level 0
+- File attributes: `patch_size`, `patch_size_level0`, `wsi_path`, `num_patches`, `level0_magnification`, `target_magnification`, `overlap`, `level0_width`, `level0_height`
 
 **Optional PNG Images** (if `--save-images` is used):
 ```
@@ -516,38 +516,6 @@ SlideProcessor is licensed under the **PolyForm Noncommercial License 1.0.0**, w
 - CHIEF
 - Omiclip
 - CTransPath
-- DINO v3
-
-## Model loading
-- Add automatic model loading from Hugging Face
-
-## Saving to H5 file:
-- remove the duplication in coordinate attributes and the attributes in general
-```
-  level0_height: 12288
-  level0_magnification: 20
-  level0_width: 3584
-  num_patches: 79
-  overlap: 0
-  patch_size: 512
-  patch_size_level0: 512
-  target_magnification: 20
-  wsi_path: /home/mila/k/kotpy/scratch/datasets/PANDA/images/0a0f8e20b1222b69416301444b117678.tiff
-coords: shape=(79, 2), dtype=int32
-coords attrs:
-  description: (x, y) coordinates at level 0
-  level0_height: 12288
-  level0_magnification: 20
-  level0_width: 3584
-  name: 0a0f8e20b1222b69416301444b117678
-  overlap: 0
-  patch_size: 512
-  patch_size_level0: 512
-  savetodir: /network/scratch/k/kotpy/datasets/PANDA/slide_proc/20x_512px_0px_overlap/patches
-  target_magnification: 20
-```
-
-- Remove the feature set entry entirely
 
 ## Shipping
 - Make `pip install atlas_patch`

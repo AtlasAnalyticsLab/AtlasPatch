@@ -58,9 +58,9 @@ class PatchFeatureEmbeddingService(FeatureEmbeddingService):
         self, wsi: IWSI, result: ExtractionResult
     ) -> Iterable[tuple[int, int, int, int, int, np.ndarray | None]]:
         with h5py.File(result.h5_path, "r") as f:
-            coords_ext = f["coords_ext"]
-            for i in range(coords_ext.shape[0]):
-                x, y, rw, rh, lv = coords_ext[i].tolist()
+            coords = f["coords"]
+            for i in range(coords.shape[0]):
+                x, y, rw, rh, lv = coords[i].tolist()
                 patch_any = wsi.extract(
                     (int(x), int(y)), lv=int(lv), wh=(int(rw), int(rh)), mode="array"
                 )
