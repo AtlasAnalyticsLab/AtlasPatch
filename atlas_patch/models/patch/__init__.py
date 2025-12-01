@@ -6,6 +6,7 @@ from atlas_patch.models.patch.biomedclip import register_biomedclip_model
 from atlas_patch.models.patch.clip import register_openai_clip_models
 from atlas_patch.models.patch.conch import register_conch_models
 from atlas_patch.models.patch.convnext import register_convnexts
+from atlas_patch.models.patch.chief_ctranspath import register_chief_ctranspath_model
 from atlas_patch.models.patch.dinov2 import register_dinov2_models
 from atlas_patch.models.patch.dinov3 import register_dinov3_models
 from atlas_patch.models.patch.gigapath import register_prov_gigapath_model
@@ -75,4 +76,5 @@ def build_default_registry(
     register_virchow_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_prov_gigapath_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_midnight_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
+    register_chief_ctranspath_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
     return registry

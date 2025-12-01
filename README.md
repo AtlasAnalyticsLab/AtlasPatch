@@ -15,7 +15,9 @@ A Python package for processing and handling whole slide images (WSI).
 - [Bring Your Own Encoder](#bring-your-own-encoder)
 - [SLURM job scripts](#slurm-job-scripts)
 - [Feedback](#feedback)
+- [Citation](#citation)
 - [License](#license)
+- [Future Updates](#future-updates)
 
 ## Installation
 
@@ -213,6 +215,7 @@ with h5py.File("output/patches/sample.h5", "r") as f:
 | [`virchow_v1`](https://huggingface.co/paige-ai/Virchow) ([Virchow: A Million-Slide Digital Pathology Foundation Model](https://arxiv.org/abs/2309.07778)) | 2560 |
 | [`virchow_v2`](https://huggingface.co/paige-ai/Virchow2) ([Virchow2: Scaling Self-Supervised Mixed Magnification Models in Pathology](https://arxiv.org/abs/2408.00738)) | 2560 |
 | [`prov_gigapath`](https://huggingface.co/prov-gigapath/prov-gigapath) ([A whole-slide foundation model for digital pathology from real-world data](https://www.nature.com/articles/s41586-024-07441-w)) | 1536 |
+| [`chief-ctranspath`](https://github.com/hms-dbmi/CHIEF?tab=readme-ov-file) ([CHIEF: Clinical Histopathology Imaging Evaluation Foundation Model](https://www.nature.com/articles/s41586-024-07894-z)) | 768 |
 | [`midnight`](https://huggingface.co/kaiko-ai/midnight) ([Training state-of-the-art pathology foundation models with orders of magnitude less data](https://arxiv.org/abs/2504.05186)) | 3072 |
 | [`musk`](https://github.com/lilab-stanford/MUSK) ([MUSK: A Vision-Language Foundation Model for Precision Oncology](https://www.nature.com/articles/s41586-024-08378-w)) | 1024 |
 | [`openmidnight`](https://sophontai.com/blog/openmidnight) ([How to Train a State-of-the-Art Pathology Foundation Model with $1.6k](https://sophontai.com/blog/openmidnight)) | 1536 |
@@ -321,16 +324,27 @@ We prepared ready-to-run SLURM templates under `jobs/`:
 - Suggest enhancements through the [feature request template](https://github.com/AtlasAnalyticsLab/AtlasPatch/issues/new?template=feature_request.md) with your use case and proposal.
 - When opening a PR, fill out the [pull request template](.github/pull_request_template.md) and run the listed checks (lint, format, type-check, tests).
 
+## Citation
+
+If you use AtlasPatch in your research, please cite it:
+
+```
+@software{atlaspatch,
+  author  = {Atlas Analytics Lab},
+  title   = {AtlasPatch},
+  year    = {2025},
+  url     = {https://github.com/AtlasAnalyticsLab/AtlasPatch}
+}
+```
+
 ## License
 
 AtlasPatch is licensed under the **PolyForm Noncommercial License 1.0.0**, which strictly prohibits commercial use of this software or any derivative works. This applies to all forms of commercialization, including selling the software, offering it as a commercial service, using it in commercial products, or creating forked versions for commercial purposes. However, the license explicitly permits use for research, experimentation, and non-commercial purposes. Personal use for research, hobby projects, and educational purposes is allowed, as is use by academic institutions, educational organizations, public research organizations, and non-profit entities regardless of their funding sources. If you wish to use AtlasPatch commercially, you must obtain a separate commercial license from the authors. For the complete license text and detailed terms, see the [LICENSE](./LICENSE) file in this repository.
 
-# TODO
+# Future Updates
 
-## Patch Encoders
-- CHIEF
-- CTransPath
+## Slide Encoders
+- We plan to add slide-level encoders (open for extension): TITAN, PRISM, GigaPath, Madeleine.
 
-## Shipping
-- Make `pip install atlas_patch` or something
-- add support for installation using uv
+## Deployment
+- Streamlined install and packaging flows (e.g., `pip install atlas_patch` with `uv` support).
