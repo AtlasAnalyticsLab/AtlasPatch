@@ -8,8 +8,8 @@ from typing import Any, Sequence
 
 import numpy as np
 import torch
-from hydra.utils import instantiate
 from huggingface_hub import hf_hub_download
+from hydra.utils import instantiate
 from omegaconf import OmegaConf
 from PIL import Image
 from sam2.sam2_image_predictor import SAM2ImagePredictor
@@ -24,6 +24,7 @@ logger = logging.getLogger("atlas_patch.segmentation_service")
 
 class _SAM2Predictor:
     """Lightweight wrapper around SAM2ImagePredictor with resizing helpers."""
+
     DEFAULT_MODEL_REPO = "AtlasAnalyticsLab/Atlas-Patch"
     DEFAULT_MODEL_FILENAME = "model.pth"
 
