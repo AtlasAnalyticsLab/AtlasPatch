@@ -25,7 +25,7 @@ logger = logging.getLogger("atlas_patch.segmentation_service")
 class _SAM2Predictor:
     """Lightweight wrapper around SAM2ImagePredictor with resizing helpers."""
 
-    DEFAULT_MODEL_REPO = "AtlasAnalyticsLab/Atlas-Patch"
+    DEFAULT_MODEL_REPO = "AtlasAnalyticsLab/AtlasPatch"
     DEFAULT_MODEL_FILENAME = "model.pth"
 
     def __init__(self, cfg: SegmentationConfig):
