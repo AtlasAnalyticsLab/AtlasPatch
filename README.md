@@ -26,6 +26,7 @@ A Python package for processing and handling whole slide images (WSI).
   - [Setup TRIDENT](#setup-trident)
   - [Extract patch features from SlideProcessor outputs](#extract-patch-features-from-slideprocessor-outputs)
 - [SLURM job scripts](#slurm-job-scripts)
+- [License](#license)
 
 ## Installation
 
@@ -410,3 +411,7 @@ We prepared ready-to-run SLURM templates are under `jobs/`:
   - Set `WSI_ROOT`, `PATCH_OUTPUT` (same as SlideProcessor `--output`), `PATCH_ENCODER`, `MAG`, `PATCH_SIZE`, `BATCH_SIZE`.
   - Activate your TRIDENT env and set `PYTHONPATH` to the TRIDENT repo if needed.
   - Submit with `sbatch jobs/trident_features.slurm.sh`.
+
+## License
+
+SlideProcessor is licensed under the **PolyForm Noncommercial License 1.0.0**, which strictly prohibits commercial use of this software or any derivative works. This applies to all forms of commercialization, including selling the software, offering it as a commercial service, using it in commercial products, or creating forked versions for commercial purposes. However, the license explicitly permits use for research, experimentation, and non-commercial purposes. Personal use for research, hobby projects, and educational purposes is allowed, as is use by academic institutions, educational organizations, public research organizations, and non-profit entities regardless of their funding sources. If you wish to use SlideProcessor commercially, you must obtain a separate commercial license from the authors. For the complete license text and detailed terms, see the [LICENSE](./LICENSE) file in this repository.
