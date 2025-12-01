@@ -16,12 +16,27 @@ from atlas_patch.core.models import ExtractionResult
 from atlas_patch.core.paths import patch_lock_path
 from atlas_patch.core.wsi.iwsi import IWSI
 from atlas_patch.models.patch import build_default_registry
+from atlas_patch.models.patch.custom import register_feature_extractors_from_module
 from atlas_patch.models.patch.registry import PatchFeatureExtractorRegistry
 from atlas_patch.services.interfaces import FeatureEmbeddingService
 from atlas_patch.services.storage import H5PatchWriter
 from atlas_patch.utils import get_existing_features
 
 logger = logging.getLogger("atlas_patch.feature_embedding_service")
+
+
+def resolve_feature_dtype(device: torch.device, precision: str) -> torch.dtype:
+    """Resolve requested precision into a torch dtype with CPU safety checks."""
+    mapping = {
+        "float32": torch.float32,
+        "float16": torch.float16,
+        "bfloat16": torch.bfloat16,
+    }
+    dtype = mapping.get(precision, torch.float32)
+    if device.type == "cpu" and dtype == torch.float16:
+        logger.warning("float16 on CPU is unsupported in many ops; falling back to float32.")
+        dtype = torch.float32
+    return dtype
 
 
 class PatchFeatureEmbeddingService(FeatureEmbeddingService):
@@ -45,11 +60,20 @@ class PatchFeatureEmbeddingService(FeatureEmbeddingService):
             )
             dev_str = "cpu"
         self.device = torch.device(dev_str)
-        self.dtype = self._resolve_dtype()
+        self.dtype = resolve_feature_dtype(self.device, self.feature_cfg.precision)
 
         self.registry = registry or build_default_registry(
             device=self.device, num_workers=self.feature_cfg.num_workers, dtype=self.dtype
         )
+        if registry is None and self.feature_cfg.plugins:
+            for plugin_path in self.feature_cfg.plugins:
+                register_feature_extractors_from_module(
+                    plugin_path,
+                    registry=self.registry,
+                    device=self.device,
+                    dtype=self.dtype,
+                    num_workers=self.feature_cfg.num_workers,
+                )
         self.extractor_names: list[str] = [name.lower() for name in self.feature_cfg.extractors]
         self._feature_cache: dict[Path, tuple[int | None, set[str]]] = {}
 
@@ -290,15 +314,3 @@ class PatchFeatureEmbeddingService(FeatureEmbeddingService):
                 except Exception:
                     pass
         return failures
-
-    def _resolve_dtype(self) -> torch.dtype:
-        mapping = {
-            "float32": torch.float32,
-            "float16": torch.float16,
-            "bfloat16": torch.bfloat16,
-        }
-        dtype = mapping.get(self.feature_cfg.precision, torch.float32)
-        if self.device.type == "cpu" and dtype == torch.float16:
-            logger.warning("float16 on CPU is unsupported in many ops; falling back to float32.")
-            dtype = torch.float32
-        return dtype

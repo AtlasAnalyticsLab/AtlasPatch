@@ -12,6 +12,7 @@ A Python package for processing and handling whole slide images (WSI).
   - [Patch Coordinates](#patch-coordinates)
   - [Feature Matrices](#feature-matrices)
 - [Available Feature Extractors](#available-feature-extractors)
+- [Bring Your Own Encoder](#bring-your-own-encoder)
 - [SLURM job scripts](#slurm-job-scripts)
 - [Feedback](#feedback)
 - [License](#license)
@@ -257,6 +258,47 @@ with h5py.File("output/patches/sample.h5", "r") as f:
 | [`biomedclip`](https://huggingface.co/microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224) ([BiomedCLIP: a multimodal biomedical foundation model pretrained from fifteen million scientific image-text pairs](https://aka.ms/biomedclip-paper)) | 512 |
 | [`omiclip`](https://huggingface.co/WangGuangyuLab/Loki) ([A visual-omics foundation model to bridge histopathology with spatial transcriptomics](https://www.nature.com/articles/s41592-025-02707-1)) | 768 |
 
+## Bring Your Own Encoder
+
+Add a custom encoder without touching AtlasPatch by writing a small plugin and pointing the CLI at it with `--feature-plugin /path/to/plugin.py`. The plugin must expose a `register_feature_extractors(registry, device, dtype, num_workers)` function; inside that hook call `register_custom_encoder` with a loader that knows how to load the model and run a forward pass.
+
+```python
+import torch
+from torchvision import transforms
+from atlas_patch.models.patch.custom import CustomEncoderComponents, register_custom_encoder
+
+
+def build_my_encoder(device: torch.device, dtype: torch.dtype) -> CustomEncoderComponents:
+    """
+    Build the components used by AtlasPatch to embed patches with a custom model.
+
+    Returns:
+        CustomEncoderComponents describing the model, preprocess transform, and forward pass.
+    """
+    model = ...  # your torch.nn.Module
+    model = model.to(device=device, dtype=dtype).eval()
+    preprocess = transforms.Compose([transforms.Resize(224), transforms.ToTensor()])
+
+    def forward(batch: torch.Tensor) -> torch.Tensor:
+        return model(batch)  # must return [batch, embedding_dim]
+
+    return CustomEncoderComponents(model=model, preprocess=preprocess, forward_fn=forward)
+
+
+def register_feature_extractors(registry, device, dtype, num_workers):
+    register_custom_encoder(
+        registry=registry,
+        name="my_encoder",
+        embedding_dim=512,
+        loader=build_my_encoder,
+        device=device,
+        dtype=dtype,
+        num_workers=num_workers,
+    )
+```
+
+Run AtlasPatch with `--feature-plugin /path/to/plugin.py --feature-extractors my_encoder` to benchmark your encoder alongside the built-ins, multiple plugins and extractors can be added at once. Outputs keep the same HDF5 layout—your custom embeddings live under `features/my_encoder` (row-aligned with `coords`) next to other extractors.
+
 ## SLURM job scripts
 
 We prepared ready-to-run SLURM templates under `jobs/`:
@@ -288,7 +330,6 @@ AtlasPatch is licensed under the **PolyForm Noncommercial License 1.0.0**, which
 ## Patch Encoders
 - CHIEF
 - CTransPath
-- Support `bring your own encoder` functionality
 
 ## Shipping
 - Make `pip install atlas_patch` or something

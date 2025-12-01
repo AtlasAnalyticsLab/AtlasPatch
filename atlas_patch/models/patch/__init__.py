@@ -26,8 +26,21 @@ from atlas_patch.models.patch.resnet import register_resnets
 from atlas_patch.models.patch.uni import register_uni_models
 from atlas_patch.models.patch.virchow import register_virchow_models
 from atlas_patch.models.patch.vit import register_vits
+from atlas_patch.models.patch.custom import (
+    CustomEncoderComponents,
+    CustomEncoderLoader,
+    register_custom_encoder,
+    register_feature_extractors_from_module,
+)
 
-__all__ = ["PatchFeatureExtractorRegistry", "build_default_registry"]
+__all__ = [
+    "PatchFeatureExtractorRegistry",
+    "build_default_registry",
+    "CustomEncoderComponents",
+    "CustomEncoderLoader",
+    "register_custom_encoder",
+    "register_feature_extractors_from_module",
+]
 
 
 def build_default_registry(

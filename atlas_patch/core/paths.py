@@ -8,9 +8,6 @@ from atlas_patch.core.models import Slide
 
 def build_run_root(output_cfg: OutputConfig, extraction_cfg: ExtractionConfig) -> Path:
     """Return the root output directory for a run.
-
-    We keep paths flat (no mag/patch/overlap subfolder) and hang artifacts
-    directly under the configured output root.
     """
     return output_cfg.output_root
 

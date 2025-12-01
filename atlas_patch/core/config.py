@@ -96,6 +96,7 @@ class FeatureExtractionConfig:
     device: str = "cuda"
     num_workers: int = 4
     precision: str = "float32"
+    plugins: list[Path] = field(default_factory=list)
 
     def validated(self) -> FeatureExtractionConfig:
         if not self.extractors:
@@ -110,6 +111,13 @@ class FeatureExtractionConfig:
                 f"precision must be one of {sorted(allowed_prec)}, got {self.precision}"
             )
         self.precision = prec
+        validated_plugins: list[Path] = []
+        for plugin in self.plugins:
+            plugin_path = Path(plugin)
+            if not plugin_path.exists():
+                raise FileNotFoundError(f"Feature plugin not found: {plugin_path}")
+            validated_plugins.append(plugin_path.resolve())
+        self.plugins = validated_plugins
         return self
 
 
