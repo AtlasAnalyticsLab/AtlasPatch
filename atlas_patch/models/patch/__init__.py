@@ -9,13 +9,13 @@ from atlas_patch.models.patch.convnext import register_convnexts
 from atlas_patch.models.patch.dinov2 import register_dinov2_models
 from atlas_patch.models.patch.dinov3 import register_dinov3_models
 from atlas_patch.models.patch.gigapath import register_prov_gigapath_model
-from atlas_patch.models.patch.omiclip import register_omiclip_model
 from atlas_patch.models.patch.hibou import register_hibou_models
 from atlas_patch.models.patch.hoptimus import register_hoptimus_models
 from atlas_patch.models.patch.lunit import register_lunit_models
 from atlas_patch.models.patch.medsiglip import register_medsiglip_model
 from atlas_patch.models.patch.midnight import register_midnight_model
 from atlas_patch.models.patch.musk import register_musk_model
+from atlas_patch.models.patch.omiclip import register_omiclip_model
 from atlas_patch.models.patch.openmidnight import register_openmidnight_model
 from atlas_patch.models.patch.pathorchestra import register_pathorchestra_model
 from atlas_patch.models.patch.phikon import register_phikon_models

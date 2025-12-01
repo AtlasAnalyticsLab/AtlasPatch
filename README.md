@@ -47,6 +47,24 @@ conda install -c conda-forge openslide
 pip install -e .
 ```
 
+### Using uv (pip-compatible, faster installs)
+
+1. Install uv if not already available (see [uv docs](https://docs.astral.sh/uv/getting-started/)):
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+2. Create and activate a virtual environment (UV_VENV defaults to `.venv`):
+```bash
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+```
+
+3. Install in development mode with uv:
+```bash
+uv pip install -e .
+```
+
 ### Using venv
 
 1. Create a virtual environment:
@@ -485,7 +503,6 @@ AtlasPatch is licensed under the **PolyForm Noncommercial License 1.0.0**, which
 
 ## Patch Encoders
 - CHIEF
-- Omiclip
 - CTransPath
 - Support `bring your own encoder` functionality
 

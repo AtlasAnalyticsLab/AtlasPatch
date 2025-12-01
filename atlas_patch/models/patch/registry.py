@@ -30,7 +30,7 @@ class PatchFeatureExtractorRegistry:
         builder = self._builders[key]
         try:
             return builder()
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to create feature extractor '%s'", name)
             raise
 
