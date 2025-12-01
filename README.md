@@ -4,7 +4,6 @@ A Python package for processing and handling whole slide images (WSI).
 
 ## Table of Contents
 - [Installation](#installation)
-- [Development Setup](#development-setup)
 - [CLI Usage](#cli-usage)
   - [Quick Start](#quick-start)
   - [Commands](#commands)
@@ -75,22 +74,6 @@ pip install "git+https://github.com/facebookresearch/sam2.git"
 ```bash
 pip install -e .
 ```
-
-## Development Setup
-
-To set up the development environment with linting and pre-commit hooks:
-
-1. Install development dependencies:
-```bash
-pip install -e ".[dev]"
-```
-
-2. Install pre-commit hooks:
-```bash
-pre-commit install
-```
-
-This will automatically run linting and formatting checks before each commit.
 
 ## CLI Usage
 
@@ -418,17 +401,17 @@ slideproc info
 
 #### Natural Images
 
-| Name | Output Dim |
-| --- | --- |
-| `clip_rn50` | 1024 |
-| `clip_rn101` | 512 |
-| `clip_rn50x4` | 640 |
-| `clip_rn50x16` | 768 |
-| `clip_rn50x64` | 1024 |
-| `clip_vit_b_32` | 512 |
-| `clip_vit_b_16` | 512 |
-| `clip_vit_l_14` | 768 |
-| `clip_vit_l_14_336` | 768 |
+| Name | Output Dim | Paper |
+| --- | --- | --- |
+| `clip_rn50` | 1024 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
+| `clip_rn101` | 512 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
+| `clip_rn50x4` | 640 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
+| `clip_rn50x16` | 768 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
+| `clip_rn50x64` | 1024 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
+| `clip_vit_b_32` | 512 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
+| `clip_vit_b_16` | 512 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
+| `clip_vit_l_14` | 768 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
+| `clip_vit_l_14_336` | 768 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
 
 #### Medical- and Pathology-Specific CLIP
 
