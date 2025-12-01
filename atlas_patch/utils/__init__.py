@@ -10,6 +10,7 @@ from .features import (
     parse_feature_list,
 )
 from .h5 import H5AppendWriter
+from .hf import import_module_from_hf
 from .image import is_black_patch, is_white_patch
 from .logging_utils import SuppressEmbeddingLogs, configure_logging, install_embedding_log_filter
 from .params import get_wsi_files
@@ -28,4 +29,5 @@ __all__ = [
     "parse_feature_list",
     "get_existing_features",
     "missing_features",
+    "import_module_from_hf",
 ]

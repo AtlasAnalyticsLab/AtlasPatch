@@ -379,6 +379,8 @@ atlaspatch info
 | [`h_optimus_0`](https://huggingface.co/bioptimus/H-optimus-0) | 1536 |
 | [`h_optimus_1`](https://huggingface.co/bioptimus/H-optimus-1) | 1536 |
 | [`h0_mini`](https://huggingface.co/bioptimus/H0-mini) ([Distilling foundation models for robust and efficient models in digital pathology](https://doi.org/10.48550/arXiv.2501.16239)) | 1536 |
+| [`conch_v1`](https://huggingface.co/MahmoodLab/CONCH) ([A visual-language foundation model for computational pathology](https://www.nature.com/articles/s41591-024-02856-4)) | 512 |
+| [`conch_v15`](https://huggingface.co/MahmoodLab/conchv1_5) - [From TITAN](https://huggingface.co/MahmoodLab/TITAN) ([A multimodal whole-slide foundation model for pathology](https://www.nature.com/articles/s41591-025-03982-3)) | 768 |
 | [`hibou_b`](https://huggingface.co/histai/hibou-B) ([Hibou: A Family of Foundational Vision Transformers for Pathology](https://arxiv.org/abs/2406.05074)) | 768 |
 | [`hibou_l`](https://huggingface.co/histai/hibou-L) ([Hibou: A Family of Foundational Vision Transformers for Pathology](https://arxiv.org/abs/2406.05074)) | 1024 |
 | [`lunit_resnet50_bt`](https://huggingface.co/1aurent/resnet50.lunit_bt) ([Benchmarking Self-Supervised Learning on Diverse Pathology Datasets](https://openaccess.thecvf.com/content/CVPR2023/papers/Kang_Benchmarking_Self-Supervised_Learning_on_Diverse_Pathology_Datasets_CVPR_2023_paper.pdf)) | 2048 |
@@ -481,22 +483,18 @@ AtlasPatch is licensed under the **PolyForm Noncommercial License 1.0.0**, which
 # TODO
 
 ## Patch Encoders
-- CONCH v1
-- CONCH v1.5
 - CHIEF
 - Omiclip
 - CTransPath
+- Support `bring your own encoder` functionality
 
 ## Shipping
-- Make `pip install atlas_patch`
+- Make `pip install atlas_patch` or something
+- add support for installation using uv
 
 ## Documentation
 - Update and decrease the README file size, make it more straight forward
 - Add part on how to use those extracted features
-
-## Fancy features
-- Support `bring your own encoder` functionality
-- add support for installation using uv
 
 ## Contours
 - filter_params  in mask_to_contours in `utils/contours.py`
