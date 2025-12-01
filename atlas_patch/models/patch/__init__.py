@@ -9,6 +9,7 @@ from atlas_patch.models.patch.convnext import register_convnexts
 from atlas_patch.models.patch.dinov2 import register_dinov2_models
 from atlas_patch.models.patch.dinov3 import register_dinov3_models
 from atlas_patch.models.patch.gigapath import register_prov_gigapath_model
+from atlas_patch.models.patch.omiclip import register_omiclip_model
 from atlas_patch.models.patch.hibou import register_hibou_models
 from atlas_patch.models.patch.hoptimus import register_hoptimus_models
 from atlas_patch.models.patch.lunit import register_lunit_models
@@ -45,6 +46,7 @@ def build_default_registry(
     register_dinov3_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_openai_clip_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_conch_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
+    register_omiclip_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_quilt_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_uni_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
     register_lunit_models(registry, device=dev, num_workers=num_workers, dtype=dtype)

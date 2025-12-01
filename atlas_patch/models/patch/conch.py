@@ -97,14 +97,6 @@ class CONCHV15(PatchFeatureExtractor):
         def _forward(x, m=model):
             with torch.inference_mode():
                 out = m(x)
-            if isinstance(out, tuple):
-                logger.debug(
-                    "CONCH v1.5 raw output shapes: %s",
-                    [getattr(t, "shape", None) for t in out],
-                )
-                out = out[0]
-            else:
-                logger.debug("CONCH v1.5 output shape: %s", getattr(out, "shape", None))
             return out
 
         super().__init__(
