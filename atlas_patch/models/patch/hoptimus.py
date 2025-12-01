@@ -20,6 +20,7 @@ def _build_hoptimus_transform():
 
     return transforms.Compose(
         [
+            transforms.Resize((224, 224)),
             transforms.ToTensor(),
             transforms.Normalize(
                 mean=(0.707223, 0.578729, 0.703617),
