@@ -401,17 +401,17 @@ slideproc info
 
 #### Natural Images
 
-| Name | Output Dim | Paper |
-| --- | --- | --- |
-| `clip_rn50` | 1024 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
-| `clip_rn101` | 512 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
-| `clip_rn50x4` | 640 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
-| `clip_rn50x16` | 768 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
-| `clip_rn50x64` | 1024 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
-| `clip_vit_b_32` | 512 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
-| `clip_vit_b_16` | 512 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
-| `clip_vit_l_14` | 768 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
-| `clip_vit_l_14_336` | 768 | [Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020) |
+| Name | Output Dim |
+| --- | --- |
+| `clip_rn50` ([Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020)) | 1024 |
+| `clip_rn101` ([Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020)) | 512 |
+| `clip_rn50x4` ([Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020)) | 640 |
+| `clip_rn50x16` ([Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020)) | 768 |
+| `clip_rn50x64` ([Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020)) | 1024 |
+| `clip_vit_b_32` ([Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020)) | 512 |
+| `clip_vit_b_16` ([Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020)) | 512 |
+| `clip_vit_l_14` ([Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020)) | 768 |
+| `clip_vit_l_14_336` ([Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020)) | 768 |
 
 #### Medical- and Pathology-Specific CLIP
 
