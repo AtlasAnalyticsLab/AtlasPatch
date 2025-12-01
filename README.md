@@ -4,20 +4,32 @@ A Python package for processing and handling whole slide images (WSI).
 
 ## Table of Contents
 - [Installation](#installation)
+  - [Using Conda (Recommended)](#using-conda-recommended)
+  - [Using uv (pip-compatible, faster installs)](#using-uv-pip-compatible-faster-installs)
+  - [Using venv](#using-venv)
 - [Usage Guide](#usage-guide)
   - [Minimal Run](#minimal-run)
   - [Process Command Arguments](#process-command-arguments)
+    - [Required](#required)
+    - [Optional](#optional)
 - [Supported Formats](#supported-formats)
 - [Using Extracted Data](#using-extracted-data)
   - [Patch Coordinates](#patch-coordinates)
   - [Feature Matrices](#feature-matrices)
 - [Available Feature Extractors](#available-feature-extractors)
+  - [Core vision backbones on Natural Images](#core-vision-backbones-on-natural-images)
+  - [Medical- and Pathology-Specific Vision Encoders](#medical--and-pathology-specific-vision-encoders)
+  - [CLIP-like models](#clip-like-models)
+    - [Natural Images](#natural-images)
+    - [Medical- and Pathology-Specific CLIP](#medical--and-pathology-specific-clip)
 - [Bring Your Own Encoder](#bring-your-own-encoder)
 - [SLURM job scripts](#slurm-job-scripts)
 - [Feedback](#feedback)
 - [Citation](#citation)
 - [License](#license)
 - [Future Updates](#future-updates)
+  - [Slide Encoders](#slide-encoders)
+  - [Deployment](#deployment)
 
 ## Installation
 
