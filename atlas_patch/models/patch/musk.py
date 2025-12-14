@@ -38,6 +38,7 @@ class MUSK(PatchFeatureExtractor):
         num_workers: int = 0,
     ) -> None:
         from musk import utils
+        import musk.modeling as _musk_modeling  # noqa: F401 - registers timm models as it invoke @register_model decorator
         from timm.models import create_model
 
         self.device = device
