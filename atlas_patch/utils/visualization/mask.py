@@ -25,13 +25,13 @@ def visualize_mask_on_thumbnail(
         m_img = m_img.resize((thumb.width, thumb.height), resample=Image.Resampling.NEAREST)
         mask_float = np.asarray(m_img, dtype=np.float32) / 255.0
 
-    alpha = 90
+    alpha = 80
     mask_rgba = Image.fromarray((mask_float * alpha).astype(np.uint8), mode="L")
-    red_layer = Image.new("RGBA", thumb.size, (255, 0, 0, 0))
-    red_layer.putalpha(mask_rgba)
+    green_layer = Image.new("RGBA", thumb.size, (0, 255, 0, 0))
+    green_layer.putalpha(mask_rgba)
 
     out_img = thumb.convert("RGBA")
-    out_img = Image.alpha_composite(out_img, red_layer)
+    out_img = Image.alpha_composite(out_img, green_layer)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     out_path = output_dir / f"{Path(wsi.path).stem}_mask.png"

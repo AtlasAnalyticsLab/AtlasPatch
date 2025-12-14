@@ -17,6 +17,7 @@ from atlas_patch.core.config import (
     SegmentationConfig,
     VisualizationConfig,
 )
+from atlas_patch.core.models import Slide
 from atlas_patch.models.patch import PatchFeatureExtractorRegistry, build_default_registry
 from atlas_patch.models.patch.custom import register_feature_extractors_from_module
 from atlas_patch.orchestration.runner import ProcessingRunner
@@ -31,6 +32,8 @@ from atlas_patch.utils import (
     install_embedding_log_filter,
     parse_feature_list,
 )
+from atlas_patch.utils.params import get_wsi_files
+from atlas_patch.utils.visualization import visualize_mask_on_thumbnail
 
 logging.basicConfig(
     level=logging.WARNING,
@@ -323,6 +326,118 @@ def _run_pipeline(
     return results, failures
 
 
+def _run_tissue_visualization(
+    *,
+    wsi_path: str,
+    output: str,
+    device: str,
+    seg_batch_size: int,
+    recursive: bool,
+    mpp_csv: str | None,
+    verbose: bool,
+) -> tuple[list[tuple[Slide, Path]], list[tuple[Slide, Exception | str]]]:
+    configure_logging(verbose)
+
+    processing_cfg = ProcessingConfig(
+        input_path=Path(wsi_path),
+        recursive=recursive,
+        mpp_csv=Path(mpp_csv) if mpp_csv else None,
+    ).validated()
+    segmentation_cfg = (
+        SegmentationConfig(
+            checkpoint_path=None,
+            config_path=_default_config_path(),
+            device=device.lower(),
+            batch_size=seg_batch_size,
+        )
+        .validated()
+    )
+    vis_cfg = VisualizationConfig().validated()
+
+    slide_paths = get_wsi_files(str(processing_cfg.input_path), recursive=processing_cfg.recursive)
+
+    output_root = Path(output)
+    output_root.mkdir(parents=True, exist_ok=True)
+    vis_dir = output_root / "visualization"
+
+    mpp_resolver = CSVMPPResolver(processing_cfg.mpp_csv)
+    wsi_loader = DefaultWSILoader()
+    segmentation_service = SAM2SegmentationService(segmentation_cfg)
+
+    results: list[tuple[Slide, Path]] = []
+    failures: list[tuple[Slide, Exception | str]] = []
+    progress = tqdm(total=len(slide_paths), disable=verbose, desc="Tissue detection")
+
+    def _process_batch(batch: list[tuple[Slide, object]]) -> None:
+        if not batch:
+            return
+
+        wsis = [w for _, w in batch]
+        slides_batch = [s for s, _ in batch]
+
+        try:
+            masks = (
+                segmentation_service.segment_batch(wsis)
+                if len(wsis) > 1
+                else [segmentation_service.segment_thumbnail(wsis[0])]
+            )
+        except Exception as e:  # noqa: BLE001
+            for slide, wsi in batch:
+                failures.append((slide, e))
+                try:
+                    wsi.cleanup()
+                except Exception:
+                    pass
+                progress.update(1)
+            return
+
+        for slide, wsi, mask in zip(slides_batch, wsis, masks):
+            try:
+                out_path = visualize_mask_on_thumbnail(
+                    mask=mask.data,
+                    wsi=wsi,
+                    output_dir=vis_dir,
+                    thumbnail_size=vis_cfg.thumbnail_size,
+                )
+                results.append((slide, out_path))
+            except Exception as e:  # noqa: BLE001
+                failures.append((slide, e))
+            finally:
+                try:
+                    wsi.cleanup()
+                except Exception:
+                    pass
+            progress.update(1)
+
+    try:
+        batch: list[tuple[Slide, object]] = []
+        for path_str in slide_paths:
+            base_slide = Slide(path=Path(path_str))
+            mpp_val = mpp_resolver.resolve(base_slide)
+            slide = Slide(path=base_slide.path, mpp=mpp_val, backend=base_slide.backend)
+            try:
+                wsi = wsi_loader.open(slide)
+            except Exception as e:  # noqa: BLE001
+                failures.append((slide, e))
+                progress.update(1)
+                continue
+
+            batch.append((slide, wsi))
+            if len(batch) >= segmentation_cfg.batch_size:
+                _process_batch(batch)
+                batch = []
+
+        if batch:
+            _process_batch(batch)
+    finally:
+        try:
+            segmentation_service.close()
+        finally:
+            progress.close()
+
+    return results, failures
+
+
 def _echo_results(
     results: list, failures: list, verbose: bool, feature_cfg: FeatureExtractionConfig | None
 ) -> None:
@@ -333,6 +448,17 @@ def _echo_results(
             click.echo(
                 f"[OK] {res.slide.path.name} -> {res.h5_path} (patches={res.num_patches}){feature_note}"
             )
+        for slide, err in failures:
+            click.echo(f"[FAIL] {slide.path.name}: {err}", err=True)
+
+
+def _echo_mask_results(
+    results: list[tuple[Slide, Path]], failures: list[tuple[Slide, Exception | str]], verbose: bool
+) -> None:
+    click.echo(f"Created {len(results)} mask overlay(s), failures: {len(failures)}")
+    if verbose:
+        for slide, path in results:
+            click.echo(f"[OK] {slide.path.name} -> {path}")
         for slide, err in failures:
             click.echo(f"[FAIL] {slide.path.name}: {err}", err=True)
 
@@ -400,6 +526,56 @@ def segment_and_get_coords(
         feature_cfg=None,
     )
     _echo_results(results, failures, verbose, None)
+
+
+@cli.command()
+@click.argument("wsi_path", type=click.Path(exists=True))
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(),
+    required=True,
+    help="Output directory root for generated artifacts.",
+)
+@click.option(
+    "--device",
+    type=str,
+    default="cuda",
+    show_default=True,
+    help="Segmentation device (e.g., cuda, cuda:0, cpu).",
+)
+@click.option(
+    "--seg-batch-size",
+    type=click.IntRange(1, None),
+    default=1,
+    show_default=True,
+    help="Segmentation batch size for thumbnail inference.",
+)
+@click.option("--recursive", is_flag=True, help="Recursively search directories for WSIs.")
+@click.option(
+    "--mpp-csv", type=click.Path(exists=True), default=None, help="CSV with custom MPP."
+)
+@click.option("--verbose", "-v", is_flag=True, help="Enable debug logging.")
+def detect_tissue(
+    wsi_path: str,
+    output: str,
+    device: str,
+    seg_batch_size: int,
+    recursive: bool,
+    mpp_csv: str | None,
+    verbose: bool,
+):
+    """Run tissue segmentation only and export mask overlays."""
+    results, failures = _run_tissue_visualization(
+        wsi_path=wsi_path,
+        output=output,
+        device=device,
+        seg_batch_size=seg_batch_size,
+        recursive=recursive,
+        mpp_csv=mpp_csv,
+        verbose=verbose,
+    )
+    _echo_mask_results(results, failures, verbose)
 
 
 @cli.command()
