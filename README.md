@@ -1,6 +1,8 @@
-# AtlasPatch
+<p align="center">
+  <img src="assets/images/Logo.png" alt="AtlasPatch Logo" width="100%">
+</p>
 
-A Python package for processing and handling whole slide images (WSI).
+# AtlasPatch: An Efficient and Scalable Tool for Whole Slide Image Preprocessing in Computational Pathology
 
 ## Table of Contents
 - [Installation](#installation)
@@ -8,10 +10,20 @@ A Python package for processing and handling whole slide images (WSI).
   - [Using uv (pip-compatible, faster installs)](#using-uv-pip-compatible-faster-installs)
   - [Using venv](#using-venv)
 - [Usage Guide](#usage-guide)
-  - [Minimal Run](#minimal-run)
+  - [Pipeline Checkpoints](#pipeline-checkpoints)
+    - [A - Tissue Detection](#a-tissue-detection)
+    - [B - Patch Coordinate Extraction](#b-patch-coordinate-extraction)
+    - [C - Patch Embedding](#c-patch-embedding)
+    - [D - Patch Writing](#d-patch-writing)
   - [Process Command Arguments](#process-command-arguments)
     - [Required](#required)
     - [Optional](#optional)
+      - [Patch Layout](#patch-layout)
+      - [Segmentation & Extraction Performance](#segmentation--extraction-performance)
+      - [Feature Extraction](#feature-extraction)
+      - [Filtering & Quality](#filtering--quality)
+      - [Visualization](#visualization)
+      - [Run Control](#run-control)
 - [Supported Formats](#supported-formats)
 - [Using Extracted Data](#using-extracted-data)
   - [Patch Coordinates](#patch-coordinates)
@@ -89,36 +101,156 @@ pip install -e .
 
 ## Usage Guide
 
-`atlaspatch process` runs segmentation, patch extraction, and feature embedding into a single HDF5 per slide.
+AtlasPatch provides a flexible pipeline with **4 checkpoints** that you can use independently or combine based on your needs.
 
-### Minimal Run
+### Pipeline Checkpoints
+
+<p align="center">
+  <img src="assets/images/Checkouts.png" alt="AtlasPatch Pipeline Checkpoints" width="100%">
+</p>
+
+Quick overview of the checkpoint commands:
+- `detect-tissue`: runs SAM2 segmentation and writes mask overlays under `<output>/visualization/`.
+- `segment-and-get-coords`: runs segmentation + patch coordinate extraction into `<output>/patches/<stem>.h5`.
+- `process`: full pipeline (segmentation + coords + feature embeddings) in the same H5.
+- `process --save-images`: same as `process`, plus patch PNGs under `<output>/images/<stem>/`.
+
+---
+
+#### [A] Tissue Detection
+
+Detect and visualize tissue regions in your WSI using SAM2 segmentation.
+
+```bash
+atlaspatch detect-tissue /path/to/slide.svs \
+  --output ./output \
+  --device cuda
+```
+
+---
+
+#### [B] Patch Coordinate Extraction
+
+Detect tissue and extract patch coordinates without feature embedding.
+
+```bash
+atlaspatch segment-and-get-coords /path/to/slide.svs \
+  --output ./output \
+  --patch-size 256 \
+  --target-mag 20 \
+  --device cuda
+```
+
+---
+
+#### [C] Patch Embedding
+
+Run the full pipeline: Tissue detection, coordinate extraction, and feature embedding.
 
 ```bash
 atlaspatch process /path/to/slide.svs \
   --output ./output \
   --patch-size 256 \
   --target-mag 20 \
-  --feature-extractors uni_v1,dinov2_small,openmidnight
+  --feature-extractors resnet50 \
+  --device cuda
 ```
+
+---
+
+#### [D] Patch Writing
+
+Full pipeline with optional patch image export for visualization or downstream tasks.
+
+```bash
+atlaspatch process /path/to/slide.svs \
+  --output ./output \
+  --patch-size 256 \
+  --target-mag 20 \
+  --feature-extractors resnet50 \
+  --device cuda \
+  --save-images \
+  --visualize-mask
+```
+
+---
 
 Pass a directory instead of a single file to process multiple WSIs; outputs land in `<output>/patches/<stem>.h5` based on the path you provide to `--output`.
 
 ### Process Command Arguments
 
+The `process` command is the primary entry point for most workflows. It runs the full pipeline: tissue segmentation, patch coordinate extraction, and feature embedding. You can process a single slide or an entire directory of WSIs in one command.
+
+```bash
+atlaspatch process <WSI_PATH> --output <DIR> --patch-size <INT> --target-mag <INT> --feature-extractors <NAMES> [OPTIONS]
+```
+
 #### Required
-- `WSI_PATH` — file or directory of slides to process.
-- `--output/-o` — root directory for results.
-- `--patch-size` — final patch size in pixels at target magnification.
-- `--target-mag` — magnification to extract at (e.g., 10/20/40).
-- `--feature-extractors` — comma/space separated names from [Available Feature Extractors](#available-feature-extractors).
+
+| Argument | Description |
+| --- | --- |
+| `WSI_PATH` | Path to a single slide file or a directory containing slides. When a directory is provided, all supported formats are processed. |
+| `--output`, `-o` | Root directory for results. Outputs are organized as `<output>/patches/<stem>.h5` for coordinates and features, and `<output>/visualization/` for overlays. |
+| `--patch-size` | Final patch size in pixels at the target magnification (e.g., `256` for 256×256 patches). |
+| `--target-mag` | Magnification level to extract patches at. Common values: `5`, `10`, `20`, `40`. The pipeline reads from the closest available pyramid level and resizes if needed. |
+| `--feature-extractors` | Comma or space-separated list of encoder names from [Available Feature Extractors](#available-feature-extractors). Multiple encoders can be specified to extract several feature sets in one pass (e.g., `resnet50,uni_v2`). |
 
 #### Optional
-- **Patch layout**: `--step-size` sets stride; omit for non-overlapping grids (stride = patch-size), smaller values create overlaps.
-- **Segmentation & extraction performance**: `--device` picks the segmentation device (`cuda`, `cuda:<idx>`, or `cpu`). `--seg-batch-size` controls SAM2 thumbnail batch size. `--patch-workers` threads handle patch extraction/H5 writes (defaults to CPU count). `--max-open-slides` caps simultaneously open WSIs across segmentation/extraction.
-- **Feature extraction/embedding**: `--feature-device` defaults to `--device`; set separately if you want different GPU for feature extraction than segmentation. `--feature-batch-size` sets forward-pass batch size for the feature model. `--feature-num-workers` configures DataLoader workers. `--feature-precision` can reduce memory/bandwidth (`float32/float16`/`bfloat16` on GPU when supported).
-- **Filtering & quality**: `--fast-mode` (default) skips per-patch black/white filtering; `--no-fast-mode` enables it. `--tissue-thresh` filters tiny tissue regions (fraction of a 1024x1024 mask). When filtering is on (`--no-fast-mode`), `--white-thresh` is the HSV saturation cutoff for white patches (lower = stricter) and `--black-thresh` is the grayscale cutoff for dark patches (lower = stricter).
-- **Visualization**: `--visualize-grids`, `--visualize-mask`, `--visualize-contours` render overlays on thumbnails under `<output>/visualization/`.
-- **Run control**: `--save-images` exports per-patch PNGs. `--recursive` walks subdirectories. `--mpp-csv` supplies custom `wsi,mpp` overrides when metadata is missing/wrong. `--skip-existing` avoids reprocessing; use `--force` to overwrite. `--verbose/-v` switches to debug logging and disables the progress bar. `--write-batch` controls how many coord rows are buffered before flushing to H5 (tune for RAM vs. I/O).
+
+##### Patch Layout
+
+| Argument | Default | Description |
+| --- | --- | --- |
+| `--step-size` | Same as `--patch-size` | Stride between patches. Omit for non-overlapping grids. Use smaller values (e.g., `128` with `--patch-size 256`) to create 50% overlap. |
+
+##### Segmentation & Extraction Performance
+
+| Argument | Default | Description |
+| --- | --- | --- |
+| `--device` | `cuda` | Device for SAM2 tissue segmentation. Options: `cuda`, `cuda:0`, `cuda:1`, or `cpu`. |
+| `--seg-batch-size` | `1` | Batch size for SAM2 thumbnail segmentation. Increase for faster processing if GPU memory allows. |
+| `--patch-workers` | CPU count | Number of threads for patch extraction and H5 writes. |
+| `--max-open-slides` | `200` | Maximum number of WSI files open simultaneously. Lower this if you hit file descriptor limits. |
+
+##### Feature Extraction
+
+| Argument | Default | Description |
+| --- | --- | --- |
+| `--feature-device` | Same as `--device` | Device for feature extraction. Set separately to use a different GPU than segmentation. |
+| `--feature-batch-size` | `32` | Batch size for the feature extractor forward pass. Increase for faster throughput; decrease if running out of GPU memory. |
+| `--feature-num-workers` | `4` | Number of DataLoader workers for loading patches during feature extraction. |
+| `--feature-precision` | `float16` | Precision for feature extraction. Options: `float32`, `float16`, `bfloat16`. Lower precision reduces memory and can improve throughput on compatible GPUs. |
+
+##### Filtering & Quality
+
+| Argument | Default | Description |
+| --- | --- | --- |
+| `--fast-mode` | Enabled | Skips per-patch black/white content filtering for faster processing. Use `--no-fast-mode` to enable filtering. |
+| `--tissue-thresh` | `0.0` | Minimum tissue area fraction to keep a region. Filters out tiny tissue fragments. |
+| `--white-thresh` | `15` | Saturation threshold for white patch filtering (only with `--no-fast-mode`). Lower values are stricter. |
+| `--black-thresh` | `50` | RGB threshold for black/dark patch filtering (only with `--no-fast-mode`). Higher values are stricter. |
+
+##### Visualization
+
+| Argument | Default | Description |
+| --- | --- | --- |
+| `--visualize-grids` | Off | Render patch grid overlay on slide thumbnails. |
+| `--visualize-mask` | Off | Render tissue segmentation mask overlay. |
+| `--visualize-contours` | Off | Render tissue contour overlay. |
+
+All visualization outputs are saved under `<output>/visualization/`.
+
+##### Run Control
+
+| Argument | Default | Description |
+| --- | --- | --- |
+| `--save-images` | Off | Export each patch as a PNG file under `<output>/images/<stem>/`. |
+| `--recursive` | Off | Walk subdirectories when `WSI_PATH` is a directory. |
+| `--mpp-csv` | None | Path to a CSV file with `wsi,mpp` columns to override microns-per-pixel when slide metadata is missing or incorrect. |
+| `--skip-existing` | Off | Skip slides that already have an output H5 file. |
+| `--force` | Off | Overwrite existing output files. |
+| `--verbose`, `-v` | Off | Enable debug logging and disable the progress bar. |
+| `--write-batch` | `8192` | Number of coordinate rows to buffer before flushing to H5. Tune for RAM vs. I/O trade-off. |
 
 ## Supported Formats
 
@@ -146,27 +278,23 @@ import openslide
 from PIL import Image
 
 h5_path = "output/patches/sample.h5"
-with h5py.File(h5_path, "r") as f:
-    coords = f["coords"][...]            # (N, 5) int32
-    patch_size_lvl0 = int(f.attrs["patch_size_level0"])
-    boxes_lvl0 = np.column_stack(
-        [coords[:, 0], coords[:, 1], coords[:, 0] + patch_size_lvl0, coords[:, 1] + patch_size_lvl0]
-    )  # [x0, y0, x1, y1] at level 0
-    levels = coords[:, 4]
-    read_wh = coords[:, 2:4]
+wsi_path = "/path/to/slide.svs"
 
-    # Opening the slide
-    slide_path = f.attrs["wsi_path"]
+with h5py.File(h5_path, "r") as f:
+    coords = f["coords"][...]  # (N, 5) int32: [x, y, read_w, read_h, level]
     patch_size = int(f.attrs["patch_size"])
-    slide = openslide.OpenSlide(slide_path)
-    try:
-        # Reading the first patch (same flow used before feature extraction)
-        x, y, read_w, read_h, level = coords[0]
-        region = slide.read_region((int(x), int(y)), int(level), (int(read_w), int(read_h))).convert("RGB")
-        patch = region.resize((patch_size, patch_size), resample=Image.Resampling.BILINEAR)
-        patch_np = np.array(patch)  # shape (patch_size, patch_size, 3), uint8
-    finally:
-        slide.close()
+
+with openslide.OpenSlide(wsi_path) as wsi:
+    for x, y, read_w, read_h, level in coords:
+        img = wsi.read_region(
+            (int(x), int(y)),
+            int(level),
+            (int(read_w), int(read_h)),
+        ).convert("RGB")
+        if img.size != (patch_size, patch_size):
+            # Some slides don't have a pyramid level that matches target magnification exactly, so they have to be resized.
+            img = img.resize((patch_size, patch_size), resample=Image.BILINEAR)
+        patch = np.array(img)  # (H, W, 3) uint8
 ```
 
 ### Feature Matrices
@@ -180,7 +308,7 @@ import h5py
 
 with h5py.File("output/patches/sample.h5", "r") as f:
     feat_names = list(f["features"].keys())
-    resnet18_feats = f["features/resnet18"][...]  # numpy array of shape (N, embedding_dim)
+    resnet50_feats = f["features/resnet50"][...]  # (N, 2048) float32
 ```
 
 ## Available Feature Extractors
@@ -244,6 +372,14 @@ with h5py.File("output/patches/sample.h5", "r") as f:
 | [`lunit_resnet50_mocov2`](https://huggingface.co/1aurent/resnet50.lunit_mocov2) ([Benchmarking Self-Supervised Learning on Diverse Pathology Datasets](https://openaccess.thecvf.com/content/CVPR2023/papers/Kang_Benchmarking_Self-Supervised_Learning_on_Diverse_Pathology_Datasets_CVPR_2023_paper.pdf)) | 2048 |
 | [`lunit_vit_small_patch16_dino`](https://huggingface.co/1aurent/vit_small_patch16_224.lunit_dino) ([Benchmarking Self-Supervised Learning on Diverse Pathology Datasets](https://openaccess.thecvf.com/content/CVPR2023/papers/Kang_Benchmarking_Self-Supervised_Learning_on_Diverse_Pathology_Datasets_CVPR_2023_paper.pdf)) | 384 |
 | [`lunit_vit_small_patch8_dino`](https://huggingface.co/1aurent/vit_small_patch8_224.lunit_dino) ([Benchmarking Self-Supervised Learning on Diverse Pathology Datasets](https://openaccess.thecvf.com/content/CVPR2023/papers/Kang_Benchmarking_Self-Supervised_Learning_on_Diverse_Pathology_Datasets_CVPR_2023_paper.pdf)) | 384 |
+
+> **Note:** Some encoders (e.g., `uni_v1`, etc.) require access approval from Hugging Face. To use these models:
+> 1. Request access on the respective Hugging Face model page
+> 2. Once approved, set your Hugging Face token as an environment variable:
+>    ```bash
+>    export HF_TOKEN=your_huggingface_token
+>    ```
+> 3. Then you can use the encoder in your commands
 
 ### CLIP-like models
 
@@ -353,10 +489,10 @@ If you use AtlasPatch in your research, please cite it:
 
 AtlasPatch is released under CC-BY-NC-SA-4.0, which strictly disallows commercial use of the model weights or any derivative works. Commercialization includes selling the model, offering it as a paid service, using it inside commercial products, or distributing modified versions for commercial gain. Non-commercial research, experimentation, educational use, and use by academic or non-profit organizations is permitted under the license terms. If you need commercial rights, please contact the authors to obtain a separate commercial license. See the LICENSE file in this repository for full terms. For the complete license text and detailed terms, see the [LICENSE](./LICENSE) file in this repository.
 
-# Future Updates
+## Future Updates
 
-## Slide Encoders
+### Slide Encoders
 - We plan to add slide-level encoders (open for extension): TITAN, PRISM, GigaPath, Madeleine.
 
-## Deployment
+### Deployment
 - Streamlined install and packaging flows (e.g., `pip install atlas_patch` with `uv` support).
