@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AtlasPatch</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+  <header>
+    <h1>AtlasPatch</h1>
+    <p>An Efficient and Scalable Tool for Whole Slide Image Preprocessing in Computational Pathology.</p>
+
+    <div class="links">
+      <a href="#">Paper</a>
+      <a href="#">Code</a>
+      <a href="#">Demo</a>
+    </div>
+  </header>
+
+  <section>
+    <h2>Abstract</h2>
+    <p>
+        Patch extraction from gigapixel whole-slide images, typically guided by tissue detection methods, forms the backbone of computational pathology workflows, 
+        and remains a major computational bottleneck. Here we present AtlasPatch, an efficient and scalable slide preprocessing framework designed to enable accurate tissue 
+        detection and high-throughput patch extraction with minimal computational overhead. To ensure robust and generalizable slide processing, we curated and 
+        semi-manually annotated a diverse dataset of approximately 35,000 whole-slide image thumbnails spanning multiple cohorts, tissue types, and organ systems. Using this 
+        corpus, we implement selective finetuning of the normalization layers of the Segment-Anything2 model for efficient thumbnail-level segmentation. This strategy ensures
+        fast processing while achieving segmentation accuracy comparable to—or exceeding—that of existing methods. From the thumbnail masks, tissue coordinates are efficiently 
+        extrapolated to full-resolution slides for precise patch extraction. The entire pipeline is parallelized for both CPU and GPU execution to maximize throughput. We assess 
+        AtlasPatch across segmentation accuracy, computational complexity, and downstream multiple-instance learning performance, showing consistent predictive power with 
+        state-of-the-art methods while operating at a fraction of their computational cost.
+    </p>
+  </section>
+
+  <footer>
+    <p>© 2026 AtlasPatch. All rights reserved.</p>
+  </footer>
+
+</body>
+</html>

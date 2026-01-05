@@ -1,0 +1,31 @@
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  line-height: 1.6;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 80px;
+}
+
+.links a {
+  margin: 0 10px;
+  text-decoration: none;
+  border: 1px solid #000;
+  padding: 8px 14px;
+  border-radius: 4px;
+  color: black;
+}
+
+section {
+  margin-bottom: 60px;
+}
+
+footer {
+  text-align: center;
+  color: #666;
+  margin-top: 80px;
+}
