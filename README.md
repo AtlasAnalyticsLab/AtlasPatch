@@ -115,7 +115,7 @@ atlaspatch detect-tissue /path/to/slide.svs \
 
 #### [B] Patch Coordinate Extraction
 
-Segment tissue and extract patch coordinates without feature embedding.
+Detect tissue and extract patch coordinates without feature embedding.
 
 ```bash
 atlaspatch segment-and-get-coords /path/to/slide.svs \
@@ -129,7 +129,7 @@ atlaspatch segment-and-get-coords /path/to/slide.svs \
 
 #### [C] Patch Embedding
 
-Run the full pipeline: segmentation, coordinate extraction, and feature embedding.
+Run the full pipeline: Tissue detection, coordinate extraction, and feature embedding.
 
 ```bash
 atlaspatch process /path/to/slide.svs \
