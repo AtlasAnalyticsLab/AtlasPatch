@@ -1,6 +1,8 @@
-# AtlasPatch
+<p align="center">
+  <img src="assets/images/Logo.png" alt="AtlasPatch Logo" width="100%">
+</p>
 
-A Python package for processing and handling whole slide images (WSI).
+# AtlasPatch: An Efficient and Scalable Tool for Whole Slide Image Preprocessing in Computational Pathology
 
 ## Table of Contents
 - [Installation](#installation)
@@ -8,7 +10,7 @@ A Python package for processing and handling whole slide images (WSI).
   - [Using uv (pip-compatible, faster installs)](#using-uv-pip-compatible-faster-installs)
   - [Using venv](#using-venv)
 - [Usage Guide](#usage-guide)
-  - [Minimal Run](#minimal-run)
+  - [Pipeline Checkpoints](#pipeline-checkpoints)
   - [Process Command Arguments](#process-command-arguments)
     - [Required](#required)
     - [Optional](#optional)
@@ -89,17 +91,73 @@ pip install -e .
 
 ## Usage Guide
 
-`atlaspatch process` runs segmentation, patch extraction, and feature embedding into a single HDF5 per slide.
+AtlasPatch provides a flexible pipeline with **4 checkpoints** that you can use independently or combine based on your needs.
 
-### Minimal Run
+### Pipeline Checkpoints
+
+<p align="center">
+  <img src="assets/images/Checkouts.png" alt="AtlasPatch Pipeline Checkpoints" width="100%">
+</p>
+
+---
+
+#### [A] Tissue Detection
+
+Detect and visualize tissue regions in your WSI using SAM2 segmentation.
+
+```bash
+atlaspatch detect-tissue /path/to/slide.svs \
+  --output ./output \
+  --device cuda
+```
+
+---
+
+#### [B] Patch Coordinate Extraction
+
+Segment tissue and extract patch coordinates without feature embedding.
+
+```bash
+atlaspatch segment-and-get-coords /path/to/slide.svs \
+  --output ./output \
+  --patch-size 256 \
+  --target-mag 20 \
+  --device cuda
+```
+
+---
+
+#### [C] Patch Embedding
+
+Run the full pipeline: segmentation, coordinate extraction, and feature embedding.
 
 ```bash
 atlaspatch process /path/to/slide.svs \
   --output ./output \
   --patch-size 256 \
   --target-mag 20 \
-  --feature-extractors uni_v1,dinov2_small,openmidnight
+  --feature-extractors resnet50 \
+  --device cuda
 ```
+
+---
+
+#### [D] Patch Writing
+
+Full pipeline with optional patch image export for visualization or downstream tasks.
+
+```bash
+atlaspatch process /path/to/slide.svs \
+  --output ./output \
+  --patch-size 256 \
+  --target-mag 20 \
+  --feature-extractors resnet50 \
+  --device cuda \
+  --save-images \
+  --visualize-mask
+```
+
+---
 
 Pass a directory instead of a single file to process multiple WSIs; outputs land in `<output>/patches/<stem>.h5` based on the path you provide to `--output`.
 
@@ -141,32 +199,21 @@ Example:
 
 ```python
 import h5py
-import numpy as np
-import openslide
-from PIL import Image
 
 h5_path = "output/patches/sample.h5"
-with h5py.File(h5_path, "r") as f:
-    coords = f["coords"][...]            # (N, 5) int32
-    patch_size_lvl0 = int(f.attrs["patch_size_level0"])
-    boxes_lvl0 = np.column_stack(
-        [coords[:, 0], coords[:, 1], coords[:, 0] + patch_size_lvl0, coords[:, 1] + patch_size_lvl0]
-    )  # [x0, y0, x1, y1] at level 0
-    levels = coords[:, 4]
-    read_wh = coords[:, 2:4]
 
-    # Opening the slide
-    slide_path = f.attrs["wsi_path"]
-    patch_size = int(f.attrs["patch_size"])
-    slide = openslide.OpenSlide(slide_path)
-    try:
-        # Reading the first patch (same flow used before feature extraction)
-        x, y, read_w, read_h, level = coords[0]
-        region = slide.read_region((int(x), int(y)), int(level), (int(read_w), int(read_h))).convert("RGB")
-        patch = region.resize((patch_size, patch_size), resample=Image.Resampling.BILINEAR)
-        patch_np = np.array(patch)  # shape (patch_size, patch_size, 3), uint8
-    finally:
-        slide.close()
+with h5py.File(h5_path, "r") as f:
+    # Read coordinates
+    coords = f["coords"][...]  # (N, 5) int32: [x, y, read_w, read_h, level]
+
+    # Read metadata
+    patch_size = f.attrs["patch_size"]
+    wsi_path = f.attrs["wsi_path"]
+
+    # Print summary
+    print(f"Number of patches: {len(coords)}")
+    print(f"Patch size: {patch_size}")
+    print(f"First 5 coordinates:\n{coords[:5]}")
 ```
 
 ### Feature Matrices
@@ -180,7 +227,7 @@ import h5py
 
 with h5py.File("output/patches/sample.h5", "r") as f:
     feat_names = list(f["features"].keys())
-    resnet18_feats = f["features/resnet18"][...]  # numpy array of shape (N, embedding_dim)
+    resnet50_feats = f["features/resnet50"][...]  # (N, 2048) float32
 ```
 
 ## Available Feature Extractors
@@ -244,6 +291,14 @@ with h5py.File("output/patches/sample.h5", "r") as f:
 | [`lunit_resnet50_mocov2`](https://huggingface.co/1aurent/resnet50.lunit_mocov2) ([Benchmarking Self-Supervised Learning on Diverse Pathology Datasets](https://openaccess.thecvf.com/content/CVPR2023/papers/Kang_Benchmarking_Self-Supervised_Learning_on_Diverse_Pathology_Datasets_CVPR_2023_paper.pdf)) | 2048 |
 | [`lunit_vit_small_patch16_dino`](https://huggingface.co/1aurent/vit_small_patch16_224.lunit_dino) ([Benchmarking Self-Supervised Learning on Diverse Pathology Datasets](https://openaccess.thecvf.com/content/CVPR2023/papers/Kang_Benchmarking_Self-Supervised_Learning_on_Diverse_Pathology_Datasets_CVPR_2023_paper.pdf)) | 384 |
 | [`lunit_vit_small_patch8_dino`](https://huggingface.co/1aurent/vit_small_patch8_224.lunit_dino) ([Benchmarking Self-Supervised Learning on Diverse Pathology Datasets](https://openaccess.thecvf.com/content/CVPR2023/papers/Kang_Benchmarking_Self-Supervised_Learning_on_Diverse_Pathology_Datasets_CVPR_2023_paper.pdf)) | 384 |
+
+> **Note:** Some encoders (e.g., `uni_v1`, `uni_v2`, `conch_v1`, `conch_v15`, `virchow_v1`, `virchow_v2`, `prov_gigapath`, `hibou_b`, `hibou_l`) require access approval from Hugging Face. To use these models:
+> 1. Request access on the respective Hugging Face model page
+> 2. Once approved, set your Hugging Face token as an environment variable:
+>    ```bash
+>    export HF_TOKEN=your_huggingface_token
+>    ```
+> 3. Then you can use the encoder in your commands
 
 ### CLIP-like models
 
