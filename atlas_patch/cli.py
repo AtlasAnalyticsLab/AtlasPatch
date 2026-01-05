@@ -175,7 +175,7 @@ _FEATURE_OPTIONS: list = [
     click.option(
         "--feature-precision",
         type=click.Choice(["float32", "float16", "bfloat16"], case_sensitive=False),
-        default="float32",
+        default="float16",
         show_default=True,
         help="Computation precision for feature extraction.",
     ),
