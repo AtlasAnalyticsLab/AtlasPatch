@@ -199,21 +199,28 @@ Example:
 
 ```python
 import h5py
+import numpy as np
+import openslide
+from PIL import Image
 
 h5_path = "output/patches/sample.h5"
+wsi_path = "/path/to/slide.svs"
 
 with h5py.File(h5_path, "r") as f:
-    # Read coordinates
     coords = f["coords"][...]  # (N, 5) int32: [x, y, read_w, read_h, level]
+    patch_size = int(f.attrs["patch_size"])
 
-    # Read metadata
-    patch_size = f.attrs["patch_size"]
-    wsi_path = f.attrs["wsi_path"]
-
-    # Print summary
-    print(f"Number of patches: {len(coords)}")
-    print(f"Patch size: {patch_size}")
-    print(f"First 5 coordinates:\n{coords[:5]}")
+with openslide.OpenSlide(wsi_path) as wsi:
+    for x, y, read_w, read_h, level in coords:
+        img = wsi.read_region(
+            (int(x), int(y)),
+            int(level),
+            (int(read_w), int(read_h)),
+        ).convert("RGB")
+        if img.size != (patch_size, patch_size):
+            # Some slides don't have a pyramid level that matches target magnification exactly, so they have to be resized.
+            img = img.resize((patch_size, patch_size), resample=Image.BILINEAR)
+        patch = np.array(img)  # (H, W, 3) uint8
 ```
 
 ### Feature Matrices
