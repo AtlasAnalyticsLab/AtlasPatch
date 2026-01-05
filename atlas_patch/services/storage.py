@@ -3,6 +3,7 @@ from __future__ import annotations
 import concurrent.futures as _fut
 import os
 from collections import deque
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
@@ -28,6 +29,7 @@ class H5PatchWriter:
         overlap: int,
         slide_stem: str,
         wsi_path: str,
+        total_patches: int | None = None,
         extra_file_attrs: Mapping[str, Any] | None = None,
     ) -> None:
         self.chunk_rows = max(1, int(chunk_rows))
@@ -39,8 +41,9 @@ class H5PatchWriter:
         self.overlap = int(overlap)
         self.slide_stem = slide_stem
         self.wsi_path = wsi_path
+        self.total_patches = int(total_patches) if total_patches is not None else None
         self.extra_file_attrs = dict(extra_file_attrs) if extra_file_attrs else {}
-        self._passport_dtype = np.dtype("S128")
+        self._passport_dtype = np.dtype("S160")
 
     def _seed_writer(self, output_path: Path) -> H5AppendWriter:
         writer = H5AppendWriter(str(output_path), chunk_rows=self.chunk_rows)
@@ -48,6 +51,7 @@ class H5PatchWriter:
         empty_passports = np.empty((0,), dtype=self._passport_dtype)
         level0_width, level0_height = self.level0_wh
         writer.append({"coords": empty_coords, "passports": empty_passports})
+
         file_attrs = {
             "patch_size": self.patch_size,
             "patch_size_level0": self.patch_size_level0,
@@ -57,8 +61,9 @@ class H5PatchWriter:
             "level0_width": int(level0_width),
             "level0_height": int(level0_height),
             "wsi_path": self.wsi_path,
-            "passport_format": "{stem}__x{X}_y{Y}_rw{RW}_rh{RH}_lv{LV}_mag{MAG}_tmag{TMAG}",
-            "passport_version": 1,
+            "passport_format": "{stem}__x{X}_y{Y}_rw{RW}_rh{RH}_lv{LV}_mag{MAG}_tmag{TMAG}_total{TOTAL}",
+            "passport_version": 2,
+            "creation_date": datetime.now(timezone.utc).isoformat(),
         }
         if self.extra_file_attrs:
             file_attrs.update(self.extra_file_attrs)
@@ -106,18 +111,29 @@ class H5PatchWriter:
         batch: int,
         collect_coords: bool = False,
     ) -> tuple[int, np.ndarray | None]:
+        # First pass: collect all coords to determine total count
+        all_coords: list[tuple[int, int, int, int, int]] = []
+        coords_viz: list[tuple[int, int]] | None = [] if collect_coords else None
+
+        for x, y, rw, rh, lv, _ in entries:
+            all_coords.append((int(x), int(y), int(rw), int(rh), int(lv)))
+            if coords_viz is not None:
+                coords_viz.append((int(x), int(y)))
+
+        # Set total_patches so passports include it
+        self.total_patches = len(all_coords)
+
+        # Now write with known total
         writer = self._seed_writer(output_path)
         total = 0
-        buf_coords: list[tuple[int, int, int, int, int]] = []
-        coords_viz: list[tuple[int, int]] | None = [] if collect_coords else None
-        buf_passports: list[str] = []
 
         try:
-            for x, y, rw, rh, lv, _ in entries:
-                buf_coords.append((int(x), int(y), int(rw), int(rh), int(lv)))
-                buf_passports.append(self._passport(int(x), int(y), int(rw), int(rh), int(lv)))
-                if coords_viz is not None:
-                    coords_viz.append((int(x), int(y)))
+            buf_coords: list[tuple[int, int, int, int, int]] = []
+            buf_passports: list[str] = []
+
+            for x, y, rw, rh, lv in all_coords:
+                buf_coords.append((x, y, rw, rh, lv))
+                buf_passports.append(self._passport(x, y, rw, rh, lv))
                 if len(buf_coords) >= batch:
                     coords = np.asarray(buf_coords, dtype=np.int32)
                     passports = np.asarray(buf_passports, dtype=self._passport_dtype)
@@ -153,7 +169,6 @@ class H5PatchWriter:
         batch: int,
         collect_coords: bool,
     ) -> tuple[int, np.ndarray | None]:
-        writer = self._seed_writer(output_path)
         stem = self.slide_stem
 
         max_workers = max(2, min(8, os.cpu_count() or 4))
@@ -161,60 +176,41 @@ class H5PatchWriter:
         futures: deque[_fut.Future[None]] = deque()
         executor = _fut.ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="patch-img")
 
-        def _submit_image(x: int, y: int, patch_arr: np.ndarray) -> None:
-            out_name = f"{stem}_x{x}_y{y}.png"
-            fut = executor.submit(self._save_patch_image, patch_arr.copy(), image_dir / out_name)
-            futures.append(fut)
-            if len(futures) >= max_pending:
-                futures.popleft().result()
-
-        try:
-            total, coords_viz = self._write_coords_stream(
-                writer=writer,
-                entries=entries,
-                batch=batch,
-                on_patch=lambda x, y, patch: self._schedule_image_save(
-                    executor=executor,
-                    futures=futures,
-                    max_pending=max_pending,
-                    stem=stem,
-                    image_dir=image_dir,
-                    x=x,
-                    y=y,
-                    patch_arr=patch,
-                ),
-                collect_coords=collect_coords,
-            )
-            while futures:
-                futures.popleft().result()
-            return total, coords_viz
-        finally:
-            self._drain_futures(executor, futures)
-
-    @staticmethod
-    def _save_patch_image(patch_arr: np.ndarray, out_path: Path) -> None:
-        Image.fromarray(patch_arr).save(str(out_path))
-
-    def _write_coords_stream(
-        self,
-        *,
-        writer: H5AppendWriter,
-        entries: Iterable[tuple[int, int, int, int, int, np.ndarray | None]],
-        batch: int,
-        on_patch: Callable[[int, int, np.ndarray], None] | None = None,
-        collect_coords: bool = False,
-    ) -> tuple[int, np.ndarray | None]:
-        total = 0
-        buf_coords: list[tuple[int, int, int, int, int]] = []
+        # First pass: collect coords and save images (to determine total count)
+        all_coords: list[tuple[int, int, int, int, int]] = []
         coords_viz: list[tuple[int, int]] | None = [] if collect_coords else None
-        buf_passports: list[str] = []
 
         try:
             for x, y, rw, rh, lv, patch in entries:
-                buf_coords.append((int(x), int(y), int(rw), int(rh), int(lv)))
-                buf_passports.append(self._passport(int(x), int(y), int(rw), int(rh), int(lv)))
+                all_coords.append((int(x), int(y), int(rw), int(rh), int(lv)))
                 if coords_viz is not None:
                     coords_viz.append((int(x), int(y)))
+                # Save image immediately
+                if patch is not None:
+                    self._schedule_image_save(
+                        executor=executor,
+                        futures=futures,
+                        max_pending=max_pending,
+                        stem=stem,
+                        image_dir=image_dir,
+                        x=int(x),
+                        y=int(y),
+                        patch_arr=patch,
+                    )
+
+            # Set total_patches so passports include it
+            self.total_patches = len(all_coords)
+
+            # Now write coords with known total
+            writer = self._seed_writer(output_path)
+            total = 0
+
+            buf_coords: list[tuple[int, int, int, int, int]] = []
+            buf_passports: list[str] = []
+
+            for x, y, rw, rh, lv in all_coords:
+                buf_coords.append((x, y, rw, rh, lv))
+                buf_passports.append(self._passport(x, y, rw, rh, lv))
                 if len(buf_coords) >= batch:
                     coords = np.asarray(buf_coords, dtype=np.int32)
                     passports = np.asarray(buf_passports, dtype=self._passport_dtype)
@@ -222,9 +218,6 @@ class H5PatchWriter:
                     total += int(coords.shape[0])
                     buf_coords.clear()
                     buf_passports.clear()
-
-                if on_patch is not None and patch is not None:
-                    on_patch(int(x), int(y), patch)
 
             if buf_coords:
                 coords = np.asarray(buf_coords, dtype=np.int32)
@@ -234,15 +227,25 @@ class H5PatchWriter:
 
             writer.update_file_attrs({"num_patches": int(total)})
             writer.close()
+
+            # Wait for remaining image saves
+            while futures:
+                futures.popleft().result()
+
+            coords_arr = np.asarray(coords_viz, dtype=np.int32) if coords_viz is not None else None
+            return int(total), coords_arr
         except Exception:
             try:
                 writer.abort()
-            finally:
+            except Exception:
                 pass
             raise
+        finally:
+            self._drain_futures(executor, futures)
 
-        coords_arr = np.asarray(coords_viz, dtype=np.int32) if coords_viz is not None else None
-        return int(total), coords_arr
+    @staticmethod
+    def _save_patch_image(patch_arr: np.ndarray, out_path: Path) -> None:
+        Image.fromarray(patch_arr).save(str(out_path))
 
     def append_features(
         self,
@@ -382,6 +385,8 @@ class H5PatchWriter:
         return dataset, total_written
 
     def _passport(self, x: int, y: int, rw: int, rh: int, lv: int) -> str:
+        if self.total_patches is None:
+            raise RuntimeError("total_patches must be set before generating passports")
         mag_val = self.level0_mag if self.level0_mag else "na"
         tgt_val = self.target_mag if self.target_mag else "na"
-        return f"{self.slide_stem}__x{x}_y{y}_rw{rw}_rh{rh}_lv{lv}_mag{mag_val}_tmag{tgt_val}"
+        return f"{self.slide_stem}__x{x}_y{y}_rw{rw}_rh{rh}_lv{lv}_mag{mag_val}_tmag{tgt_val}_total{self.total_patches}"
