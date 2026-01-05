@@ -163,14 +163,12 @@ atlaspatch process /path/to/slide.svs \
 Full pipeline with optional patch image export for visualization or downstream tasks.
 
 ```bash
-atlaspatch process /path/to/slide.svs \
+atlaspatch segment-and-get-coords /path/to/slide.svs \
   --output ./output \
   --patch-size 256 \
   --target-mag 20 \
-  --feature-extractors resnet50 \
   --device cuda \
-  --save-images \
-  --visualize-mask
+  --save-images
 ```
 
 ---
