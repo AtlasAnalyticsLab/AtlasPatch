@@ -41,7 +41,6 @@
 - [License](#license)
 - [Future Updates](#future-updates)
   - [Slide Encoders](#slide-encoders)
-  - [Deployment](#deployment)
 
 ## Installation
 
