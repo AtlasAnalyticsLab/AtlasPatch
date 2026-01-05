@@ -292,7 +292,7 @@ with h5py.File("output/patches/sample.h5", "r") as f:
 | [`lunit_vit_small_patch16_dino`](https://huggingface.co/1aurent/vit_small_patch16_224.lunit_dino) ([Benchmarking Self-Supervised Learning on Diverse Pathology Datasets](https://openaccess.thecvf.com/content/CVPR2023/papers/Kang_Benchmarking_Self-Supervised_Learning_on_Diverse_Pathology_Datasets_CVPR_2023_paper.pdf)) | 384 |
 | [`lunit_vit_small_patch8_dino`](https://huggingface.co/1aurent/vit_small_patch8_224.lunit_dino) ([Benchmarking Self-Supervised Learning on Diverse Pathology Datasets](https://openaccess.thecvf.com/content/CVPR2023/papers/Kang_Benchmarking_Self-Supervised_Learning_on_Diverse_Pathology_Datasets_CVPR_2023_paper.pdf)) | 384 |
 
-> **Note:** Some encoders (e.g., `uni_v1`, `uni_v2`, `conch_v1`, `conch_v15`, `virchow_v1`, `virchow_v2`, `prov_gigapath`, `hibou_b`, `hibou_l`) require access approval from Hugging Face. To use these models:
+> **Note:** Some encoders (e.g., `uni_v1`, etc.) require access approval from Hugging Face. To use these models:
 > 1. Request access on the respective Hugging Face model page
 > 2. Once approved, set your Hugging Face token as an environment variable:
 >    ```bash
