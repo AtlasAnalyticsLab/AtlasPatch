@@ -9,6 +9,10 @@ from PIL import Image
 class IWSI(ABC):
     """Base interface for whole slide image access."""
 
+    # Valid MPP range (µm/pixel): 0.1 (~100x) to 10.0 (~1x)
+    MPP_MIN = 0.1
+    MPP_MAX = 10.0
+
     def __init__(self, path: str, mpp: Optional[float] = None):
         """Initialize WSI interface.
 
@@ -118,6 +122,36 @@ class IWSI(ABC):
     def cleanup(self) -> None:
         """Release resources."""
         pass
+
+    @classmethod
+    def validate_mpp(cls, mpp: float, *, source: str = "metadata") -> float:
+        """Validate that MPP value is within plausible range.
+
+        Parameters
+        ----------
+        mpp : float
+            Microns per pixel value to validate.
+        source : str, default "metadata"
+            Description of where the MPP came from (for error messages).
+
+        Returns
+        -------
+        float
+            The validated MPP value.
+
+        Raises
+        ------
+        ValueError
+            If MPP is outside the valid range [MPP_MIN, MPP_MAX].
+        """
+        if mpp < cls.MPP_MIN or mpp > cls.MPP_MAX:
+            raise ValueError(
+                f"MPP value {mpp} from {source} is outside valid range "
+                f"[{cls.MPP_MIN}, {cls.MPP_MAX}] µm/pixel. "
+                f"This may indicate corrupted metadata or incorrect input. "
+                f"If this value is intentional, please verify your data source."
+            )
+        return mpp
 
     @staticmethod
     def _clean_meta_value(val: Any) -> str | None:

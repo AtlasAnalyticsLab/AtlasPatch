@@ -16,14 +16,18 @@ class ImageWSI(IWSI):
         ----------
         mpp : float, required
             Microns per pixel value (mandatory for standard images).
+            Must be within valid range [IWSI.MPP_MIN, IWSI.MPP_MAX].
         """
         mpp = kwargs.get("mpp")
-        if mpp is None or mpp <= 0:
-            raise ValueError("mpp parameter is required and must be positive")
+        if mpp is None:
+            raise ValueError("mpp parameter is required for standard images")
+        if mpp <= 0:
+            raise ValueError(f"mpp must be positive, got {mpp}")
 
         super().__init__(**kwargs)
         self._pil_img: Optional[Image.Image] = None
-        self._mpp_value = mpp
+
+        self._mpp_value = self.validate_mpp(mpp, source="user-provided mpp")
 
     def _setup(self) -> None:
         """Initialize image and extract metadata."""

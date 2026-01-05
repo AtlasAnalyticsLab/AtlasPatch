@@ -1,3 +1,4 @@
+import re
 from typing import Any, Literal, Optional, Tuple, Union
 
 import numpy as np
@@ -13,6 +14,23 @@ from .iwsi import IWSI
 
 class OpenSlideWSI(IWSI):
     """OpenSlide backend implementation."""
+
+    # Metadata keys for direct MPP lookup (in priority order)
+    _MPP_KEYS = (
+        openslide.PROPERTY_NAME_MPP_X,  # "openslide.mpp-x"
+        "openslide.mpp-y",
+        "openslide.mirax.MPP",
+        "aperio.MPP",
+        "hamamatsu.XResolution",
+    )
+
+    # Keys containing free-text that may embed MPP
+    _MPP_TEXT_KEYS = ("openslide.comment", "tiff.ImageDescription")
+
+    # Magnification keys for fallback MPP estimation
+    _MAG_KEYS = ("aperio.AppMag", "openslide.objective-power", "hamamatsu.SourceLens")
+
+    
 
     def __init__(self, **kwargs: Any) -> None:
         """Initialize OpenSlideWSI."""
@@ -31,9 +49,13 @@ class OpenSlideWSI(IWSI):
             self.meta = dict(self._oslide.properties)
 
             if self._mpp_manual is not None:
-                self.mpp = self._mpp_manual
+                self.mpp = self.validate_mpp(self._mpp_manual, source="user-provided mpp")
             else:
-                self.mpp = self._extract_mpp()
+                extracted = self._extract_mpp()
+                if extracted is not None:
+                    self.mpp = self.validate_mpp(extracted, source="slide metadata")
+                else:
+                    self.mpp = None
 
             self.mag = self._extract_mag()
 
@@ -41,27 +63,43 @@ class OpenSlideWSI(IWSI):
             raise FileNotFoundError(f"File not found: {self.path}") from e
         except openslide.OpenSlideError as e:
             raise RuntimeError(f"OpenSlide error: {e}") from e
+        except ValueError:
+            raise
         except Exception as e:
             raise RuntimeError(f"Setup failed: {e}") from e
 
     def _extract_mpp(self) -> Optional[float]:
-        """Extract MPP from metadata."""
+        """Extract MPP from metadata using multiple strategies.
+
+        Lookup order:
+        1. Direct metadata keys (openslide.mpp-x, aperio.MPP, etc.)
+        2. Regex parsing from comment/description fields
+        3. TIFF resolution fields (XResolution + ResolutionUnit)
+        4. Estimation from magnification (10.0 / mag)
+
+        Returns
+        -------
+        float or None
+            MPP in microns per pixel, rounded to 4 decimal places.
+        """
         if self._oslide is None or self.meta is None:
             return None
 
-        keys = [
-            openslide.PROPERTY_NAME_MPP_X,
-            "openslide.mirax.MPP",
-            "aperio.MPP",
-        ]
-
-        for key in keys:
+        # 1. Direct key lookup
+        for key in self._MPP_KEYS:
             if key in self.meta:
                 try:
                     return round(float(self.meta[key]), 4)
                 except (ValueError, TypeError):
                     continue
 
+        # 2. Parse from text fields (comment, description)
+        for key in self._MPP_TEXT_KEYS:
+            parsed = self._parse_mpp_from_string(self.meta.get(key))
+            if parsed is not None:
+                return round(parsed, 4)
+
+        # 3. TIFF resolution fallback
         try:
             x_res = self.meta.get("tiff.XResolution")
             unit = self.meta.get("tiff.ResolutionUnit")
@@ -73,6 +111,17 @@ class OpenSlideWSI(IWSI):
                     return round(25400 / x_res_f, 4)
         except (ValueError, TypeError):
             pass
+
+        # 4. Magnification-based estimation (10.0 / mag)
+        for mag_key in self._MAG_KEYS:
+            mag_val = self.meta.get(mag_key)
+            if mag_val is not None:
+                try:
+                    mag = float(mag_val)
+                    if mag > 0:
+                        return round(10.0 / mag, 4)
+                except (ValueError, TypeError):
+                    continue
 
         return None
 
@@ -93,6 +142,42 @@ class OpenSlideWSI(IWSI):
                 return self._infer_mag(self.mpp)
             except ValueError:
                 pass
+
+        return None
+
+    @staticmethod
+    def _parse_mpp_from_string(val: Optional[str]) -> Optional[float]:
+        """Parse MPP value from a free-text metadata string.
+
+        Searches for patterns like:
+        - "mpp = 0.25" or "mpp: 0.25"
+        - "microns per pixel 0.25"
+
+        Parameters
+        ----------
+        val : str or None
+            Text to parse.
+
+        Returns
+        -------
+        float or None
+            Parsed MPP value, or None if not found.
+        """
+        if not val:
+            return None
+
+        patterns = (
+            r"mpp\s*[:=]\s*([0-9]*\.?[0-9]+)",
+            r"microns?\s+per\s+pixel[^0-9]*([0-9]*\.?[0-9]+)",
+        )
+
+        for pattern in patterns:
+            match = re.search(pattern, val, flags=re.IGNORECASE)
+            if match:
+                try:
+                    return float(match.group(1))
+                except ValueError:
+                    continue
 
         return None
 
