@@ -493,6 +493,3 @@ AtlasPatch is released under CC-BY-NC-SA-4.0, which strictly disallows commercia
 
 ### Slide Encoders
 - We plan to add slide-level encoders (open for extension): TITAN, PRISM, GigaPath, Madeleine.
-
-### Deployment
-- Streamlined install and packaging flows (e.g., `pip install atlas_patch` with `uv` support).
