@@ -41,6 +41,7 @@
 - [License](#license)
 - [Future Updates](#future-updates)
   - [Slide Encoders](#slide-encoders)
+- [Visualization Samples](#visualization-samples)
 
 ## Installation
 
@@ -112,7 +113,7 @@ Quick overview of the checkpoint commands:
 - `detect-tissue`: runs SAM2 segmentation and writes mask overlays under `<output>/visualization/`.
 - `segment-and-get-coords`: runs segmentation + patch coordinate extraction into `<output>/patches/<stem>.h5`.
 - `process`: full pipeline (segmentation + coords + feature embeddings) in the same H5.
-- `process --save-images`: same as `process`, plus patch PNGs under `<output>/images/<stem>/`.
+- `segment-and-get-coords --save-images`: same as `segment-and-get-coords`, plus patch PNGs under `<output>/images/<stem>/`.
 
 ---
 
@@ -490,3 +491,11 @@ AtlasPatch is released under CC-BY-NC-SA-4.0, which strictly disallows commercia
 
 ### Slide Encoders
 - We plan to add slide-level encoders (open for extension): TITAN, PRISM, GigaPath, Madeleine.
+
+## Visualization Samples
+
+Below are some examples for the output masks and overlays (original image, predicted mask, overlay, contours, grid).
+
+<p align="center">
+  <img src="assets/images/VisualizationSamples.png" alt="AtlasPatch visualization samples" width="100%">
+</p>
