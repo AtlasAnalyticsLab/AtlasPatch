@@ -18,13 +18,22 @@ def visualize_contours_on_thumbnail(
     wsi: IWSI,
     output_dir: Path,
     thumbnail_size: int,
+    mask_shape: tuple[int, int] | None = None,
 ) -> Path:
     """Visualize tissue and hole contours on a thumbnail."""
     thumb = wsi.get_thumb((thumbnail_size, thumbnail_size)).convert("RGB")
-    W0, H0 = wsi.get_size(lv=0)
     tw, th = thumb.width, thumb.height
-    sx = float(tw) / float(W0)
-    sy = float(th) / float(H0)
+
+    # Scale contours from mask resolution to thumbnail resolution
+    if mask_shape is not None:
+        mask_h, mask_w = mask_shape
+        sx = float(tw) / float(mask_w)
+        sy = float(th) / float(mask_h)
+    else:
+        # Fallback to level-0 scaling (legacy behavior)
+        W0, H0 = wsi.get_size(lv=0)
+        sx = float(tw) / float(W0)
+        sy = float(th) / float(H0)
 
     tcs = scale_contours(list(tissue_contours), sx, sy)
     holes_flat = [h for hs in holes_contours for h in hs]
