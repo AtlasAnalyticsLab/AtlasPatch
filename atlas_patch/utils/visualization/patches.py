@@ -68,7 +68,7 @@ def visualize_patches_on_thumbnail(
         y0 = int(coord_y)
         x1 = int(coord_x + patch_size_thumb_x)
         y1 = int(coord_y + patch_size_thumb_y)
-        draw.rectangle(((x0, y0), (x1, y1)), outline=(0, 255, 0), width=1)
+        draw.rectangle(((x0, y0), (x1, y1)), outline=(0, 0, 0), width=1)
 
     info_lines = [
         f"Patches Extracted: {len(coords)}",

@@ -95,7 +95,7 @@ class DefaultVisualizationService(VisualizationService):
                     wsi=wsi,
                     output_dir=vis_dir,
                     thumbnail_size=self.vis_cfg.thumbnail_size,
-                    mask_shape=(mask.shape[0], mask.shape[1]),
+                    mask_shape=mask.shape,
                 )
                 result.visualizations["contours"] = path
             except Exception as e:  # noqa: BLE001
