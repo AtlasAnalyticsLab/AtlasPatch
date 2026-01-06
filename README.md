@@ -112,7 +112,7 @@ Quick overview of the checkpoint commands:
 - `detect-tissue`: runs SAM2 segmentation and writes mask overlays under `<output>/visualization/`.
 - `segment-and-get-coords`: runs segmentation + patch coordinate extraction into `<output>/patches/<stem>.h5`.
 - `process`: full pipeline (segmentation + coords + feature embeddings) in the same H5.
-- `process --save-images`: same as `process`, plus patch PNGs under `<output>/images/<stem>/`.
+- `segment-and-get-coords --save-images`: same as `segment-and-get-coords`, plus patch PNGs under `<output>/images/<stem>/`.
 
 ---
 
