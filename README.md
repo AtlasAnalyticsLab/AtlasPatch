@@ -41,6 +41,7 @@
 - [License](#license)
 - [Future Updates](#future-updates)
   - [Slide Encoders](#slide-encoders)
+- [Visualization Samples](#visualization-samples)
 
 ## Installation
 
@@ -490,3 +491,11 @@ AtlasPatch is released under CC-BY-NC-SA-4.0, which strictly disallows commercia
 
 ### Slide Encoders
 - We plan to add slide-level encoders (open for extension): TITAN, PRISM, GigaPath, Madeleine.
+
+## Visualization Samples
+
+Below are some examples for the output masks and overlays (original image, predicted mask, overlay, contours, grid).
+
+<p align="center">
+  <img src="assets/images/VisualizationSamples.png" alt="AtlasPatch visualization samples" width="100%">
+</p>
