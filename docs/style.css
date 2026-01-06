@@ -1,27 +1,157 @@
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 40px 20px;
+  margin: 0;
   line-height: 1.6;
 }
 
-header {
-  text-align: center;
-  margin-bottom: 80px;
+/* Navbar Section */
+.navbar {
+  position: sticky;
+  top: 0;
+  width: 100%;
+  background-color: #ffffff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  z-index: 1000;
+  overflow-x: auto;
+  box-sizing: border-box;
 }
 
-.links a {
-  margin: 0 10px;
+.navbar .logo {
+  font-weight: bold;
+  font-size: 1.4rem;
+  color: #5b5bff;
+}
+
+.nav-links {
+  list-style: none;
+  display: flex;
+  gap: 2rem;
+  margin: 0;
+  padding: 0;
+  flex-wrap: wrap;
+}
+
+.nav-links li a {
+  position: relative;
   text-decoration: none;
-  border: 1px solid #000;
-  padding: 8px 14px;
-  border-radius: 4px;
-  color: black;
+  color: #333;
+  font-weight: 500;
+  transition: color 0.3s;
+}
+
+.nav-links li a:hover {
+  color: #5b5bff;
+}
+
+.nav-links li a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -3px;
+  width: 0%;
+  height: 2px;
+  background-color: #5b5bff;
+  transition: width 0.3s ease;
+}
+
+.nav-links li a:hover::after {
+  width: 100%;
 }
 
 section {
-  margin-bottom: 60px;
+  padding: 4rem 2rem;
+  scroll-margin-top: 30px;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Header Section */
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.hero {
+  min-height: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  text-align: center;
+  background: #5b5bff;
+  color: white;
+  padding: 0.2rem 1rem;
+}
+
+.hero-content {
+  max-width: 900px;
+}
+
+.hero-title {
+  font-size: 3.5rem;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+  line-height: 0.9;
+}
+
+.hero-subtitle {
+  font-size: 1.5rem;
+  margin-bottom: 0.3rem;
+  line-height: 1.4;
+}
+
+.hero-authors {
+  font-size: 1rem;
+  margin-bottom: 0.3rem;
+  line-height: 1.4;
+}
+
+.hero-notes {
+  font-size: 0.9rem;
+  opacity: 0.95;
+  margin-bottom: 1.5rem;
+}
+
+/* Buttons */
+.links {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+
+.links a {
+  padding: 0.6rem 1.2rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  color: white;
+  text-decoration: none;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+
+/* Abstract Section */
+.abstract {
+  text-align: center;
+}
+
+.abstract p {
+  max-width: 750px;
+  margin: 0 auto 2rem;
+}
+
+.abstract img {
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  display: block;
 }
 
 footer {

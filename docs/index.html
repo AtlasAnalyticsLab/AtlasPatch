@@ -5,34 +5,46 @@
   <title>AtlasPatch</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 </head>
 
 <body>
+  <nav class="navbar">
+    <div class="logo">AtlasPatch</div>
+    <ul class="nav-links">
+      <li><a href="#abstract">Abstract</a></li>
+    </ul>
+  </nav>
 
-  <header>
-    <h1>AtlasPatch</h1>
-    <p>An Efficient and Scalable Tool for Whole Slide Image Preprocessing in Computational Pathology.</p>
+  <header class="hero">
+    <div class="hero-content">
+      <h1 class="hero-title">AtlasPatch</h1>
+      <p class="hero-subtitle">An Efficient and Scalable Tool for Whole Slide Image Preprocessing in Computational Pathology.</p>
+      <p class="hero-authors">Ahmed Alagha*, Christopher Leclerc, Yousef Hassan†, Omar Abdelwahed†, Calvin Moras, Peter Rentopoulos, Rose Rostami, Bich Ngoc Nguyen, 
+      Jumanah Baig, Abdelhakim Khellaf, Vincent Quoc-Huy Trinh, Rabeb Mizouni, Hadi Otrok, Jamal Bentahar, Mahdi S. Hosseini*</p>
+      <p class="hero-notes">*Project Lead, †Equal Contributer</p>
 
-    <div class="links">
-      <a href="#">Paper</a>
-      <a href="#">Code</a>
-      <a href="#">Demo</a>
+      <div class="links">
+        <a href="#"><i class="fas fa-file-alt"></i> Paper</a>
+        <a href="#"><i class="fas fa-code"></i> Code</a>
+        <a href="#"><i class="fas fa-image"></i> Gallery</a>
+      </div>
     </div>
   </header>
 
-  <section>
+  <section id="abstract" class="abstract container">
     <h2>Abstract</h2>
-    <p>
-        Patch extraction from gigapixel whole-slide images, typically guided by tissue detection methods, forms the backbone of computational pathology workflows, 
-        and remains a major computational bottleneck. Here we present AtlasPatch, an efficient and scalable slide preprocessing framework designed to enable accurate tissue 
-        detection and high-throughput patch extraction with minimal computational overhead. To ensure robust and generalizable slide processing, we curated and 
-        semi-manually annotated a diverse dataset of approximately 35,000 whole-slide image thumbnails spanning multiple cohorts, tissue types, and organ systems. Using this 
-        corpus, we implement selective finetuning of the normalization layers of the Segment-Anything2 model for efficient thumbnail-level segmentation. This strategy ensures
-        fast processing while achieving segmentation accuracy comparable to—or exceeding—that of existing methods. From the thumbnail masks, tissue coordinates are efficiently 
-        extrapolated to full-resolution slides for precise patch extraction. The entire pipeline is parallelized for both CPU and GPU execution to maximize throughput. We assess 
-        AtlasPatch across segmentation accuracy, computational complexity, and downstream multiple-instance learning performance, showing consistent predictive power with 
-        state-of-the-art methods while operating at a fraction of their computational cost.
-    </p>
+    <p>Patch extraction from gigapixel whole-slide images, typically guided by tissue detection methods, forms the backbone of computational pathology workflows, 
+    and remains a major computational bottleneck. Here we present AtlasPatch, an efficient and scalable slide preprocessing framework designed to enable accurate tissue 
+    detection and high-throughput patch extraction with minimal computational overhead. To ensure robust and generalizable slide processing, we curated and 
+    semi-manually annotated a diverse dataset of approximately 35,000 whole-slide image thumbnails spanning multiple cohorts, tissue types, and organ systems. Using this 
+    corpus, we implement selective finetuning of the normalization layers of the Segment-Anything2 model for efficient thumbnail-level segmentation. This strategy ensures
+    fast processing while achieving segmentation accuracy comparable to—or exceeding—that of existing methods. From the thumbnail masks, tissue coordinates are efficiently 
+    extrapolated to full-resolution slides for precise patch extraction. The entire pipeline is parallelized for both CPU and GPU execution to maximize throughput. We assess 
+    AtlasPatch across segmentation accuracy, computational complexity, and downstream multiple-instance learning performance, showing consistent predictive power with 
+    state-of-the-art methods while operating at a fraction of their computational cost.</p>
+
+    <img src="images/Fig1a.png" alt=""/>
   </section>
 
   <footer>
