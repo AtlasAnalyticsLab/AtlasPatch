@@ -9,13 +9,16 @@
 </head>
 
 <body>
+  <!-- Global Navbar -->
   <nav class="navbar">
     <div class="logo">AtlasPatch</div>
     <ul class="nav-links">
-      <li><a href="#abstract">Abstract</a></li>
+      <li><a href="#abstract">Overview</a></li>
+      <li><a href="#abilities">Abilities</a></li>
     </ul>
   </nav>
 
+  <!-- Hero Header Section -->
   <header class="hero">
     <div class="hero-content">
       <h1 class="hero-title">AtlasPatch</h1>
@@ -27,13 +30,13 @@
       <div class="links">
         <a href="#"><i class="fas fa-file-alt"></i> Paper</a>
         <a href="#"><i class="fas fa-code"></i> Code</a>
-        <a href="#"><i class="fas fa-image"></i> Gallery</a>
       </div>
     </div>
   </header>
 
+  <!-- Abstract Section -->
   <section id="abstract" class="abstract container">
-    <h2>Abstract</h2>
+    <h2 class="abstract-title">Abstract</h2>
     <p>Patch extraction from gigapixel whole-slide images, typically guided by tissue detection methods, forms the backbone of computational pathology workflows, 
     and remains a major computational bottleneck. Here we present AtlasPatch, an efficient and scalable slide preprocessing framework designed to enable accurate tissue 
     detection and high-throughput patch extraction with minimal computational overhead. To ensure robust and generalizable slide processing, we curated and 
@@ -47,9 +50,96 @@
     <img src="images/Fig1a.png" alt=""/>
   </section>
 
+  <!-- Abilities Section -->
+  <section id="abilities" class="abilities">
+    <h2 class="abilities-title">Abilities</h2>
+    <div class="abilities-carousel">
+      <button class="carousel-btn prev" aria-label="Previous ability"></button>
+
+      <div class="abilities-track">
+        <div class="ability-card active">
+          <h3>Fast Tissue Segmentation</h3>
+          <p>AtlasPatch efficiently segments tissue regions from whole-slide images using a fine-tuned Segment-Anything2 (SAM2) model.</p>
+          <div class="image-hover-container">
+            <img src="images/Tissue.png" alt="" class="base-img"/>
+            <img src="images/Tissue_Mask.png" alt="" class="hover-img"/>
+          </div>
+        </div>
+
+        <div class="ability-card">
+          <h3>Patch Coordinate Extraction</h3>
+          <p>AtlasPatch efficiently extracts patch coordinates from the generated SAM2 tissue masks.</p>
+          <div class="image-hover-container">
+            <img src="images/Tissue.png" alt="" class="base-img"/>
+            <img src="images/Tissue_Grid.png" alt="" class="hover-img"/>
+          </div>
+        </div>
+
+        <div class="ability-card">
+          <h3>Patch Embedding</h3>
+          <p>Can perform feature embedding with numerous feature encoders available, with the use of custom encoders also possible.</p>
+          <img src="images/Patch_Encoder.png" alt=""/>
+        </div>
+
+        <div class="ability-card">
+          <h3>Patch Writing</h3>
+          <p>Can save and export tissue patch images for patch visualization or for downstream task use.</p>
+          <img src="images/Patch_Writting.png" alt=""/>
+        </div>
+      </div>
+
+      <button class="carousel-btn next" aria-label="Next ability"></button>
+    </div>
+
+    <div class="carousel-dots">
+      <span class="dot active"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+    </div>
+  </section>
+
   <footer>
     <p>© 2026 AtlasPatch. All rights reserved.</p>
   </footer>
 
+  <script>
+    const cards = document.querySelectorAll(".ability-card");
+    const prevBtn = document.querySelector(".carousel-btn.prev");
+    const nextBtn = document.querySelector(".carousel-btn.next");
+    const dots = document.querySelectorAll(".carousel-dots .dot"); // select dots
+
+    let currentIndex = 0;
+
+    function showCard(index) {
+      // Show active card
+      cards.forEach(card => card.classList.remove("active"));
+      cards[index].classList.add("active");
+
+      // Update active dot
+      dots.forEach((dot, i) => dot.classList.toggle("active", i === index));
+      
+      currentIndex = index;
+    }
+
+    // Next / Previous buttons
+    prevBtn.addEventListener("click", () => {
+      let prevIndex = (currentIndex - 1 + cards.length) % cards.length;
+      showCard(prevIndex);
+    });
+
+    nextBtn.addEventListener("click", () => {
+      let nextIndex = (currentIndex + 1) % cards.length;
+      showCard(nextIndex);
+    });
+
+    // Optional: click on dots to jump to slide
+    dots.forEach((dot, i) => {
+      dot.addEventListener("click", () => showCard(i));
+    });
+
+    // Initialize first card
+    showCard(0);
+  </script>
 </body>
 </html>
