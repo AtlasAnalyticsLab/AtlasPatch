@@ -179,13 +179,13 @@ Pass a directory instead of a single file to process multiple WSIs; outputs land
 
 Below are some examples for the output masks and overlays (original image, predicted mask, overlay, contours, grid).
 
+Quantitative and qualitative analysis of AtlasPatch tissue detection against existing slide-preprocessing tools.
+
 <p align="center">
   <img src="assets/images/VisualizationSamples.png" alt="AtlasPatch visualization samples" width="100%">
 </p>
 
-Quantitative and qualitative analysis of AtlasPatch tissue detection against existing slide-preprocessing tools. Representative WSI thumbnails are shown from diverse tissue features and artifact conditions, with tissue masks predicted by thresholding methods (TIAToolbox, CLAM) and deep learning methods (pretrained "non-finetuned" SAM2 model, Trident-QC, Trident-Hest and AtlasPatch), highlighting differences in boundary fidelity, artifact suppression and handling of fragmented tissue (more tools are shown in the appendix). Tissue detection performance is also shown on the held-out test set for AtlasPatch and baseline pipelines, highlighting that AtlasPatch matches or exceeds their segmentation quality. The segmentation complexity–performance trade-off, plotting F1-score against segmentation runtime (on a random set of 100 WSIs), shows AtlasPatch achieves high performance with substantially lower wall-clock time than tile-wise detectors and heuristic pipelines, underscoring its suitability for large-scale WSI preprocessing.
-
-Comparison across methods:
+Representative WSI thumbnails are shown from diverse tissue features and artifact conditions, with tissue masks predicted by thresholding methods (TIAToolbox, CLAM) and deep learning methods (pretrained "non-finetuned" SAM2 model, Trident-QC, Trident-Hest and AtlasPatch), highlighting differences in boundary fidelity, artifact suppression and handling of fragmented tissue (more tools are shown in the appendix). Tissue detection performance is also shown on the held-out test set for AtlasPatch and baseline pipelines, highlighting that AtlasPatch matches or exceeds their segmentation quality. The segmentation complexity–performance trade-off, plotting F1-score against segmentation runtime (on a random set of 100 WSIs), shows AtlasPatch achieves high performance with substantially lower wall-clock time than tile-wise detectors and heuristic pipelines, underscoring its suitability for large-scale WSI preprocessing.
 
 <p align="center">
   <img src="assets/images/Comparisons.jpg" alt="AtlasPatch method comparison" width="100%">
