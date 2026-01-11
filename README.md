@@ -15,6 +15,7 @@
     - [B - Patch Coordinate Extraction](#b-patch-coordinate-extraction)
     - [C - Patch Embedding](#c-patch-embedding)
     - [D - Patch Writing](#d-patch-writing)
+  - [Visualization Samples](#visualization-samples)
   - [Process Command Arguments](#process-command-arguments)
     - [Required](#required)
     - [Optional](#optional)
@@ -41,7 +42,6 @@
 - [License](#license)
 - [Future Updates](#future-updates)
   - [Slide Encoders](#slide-encoders)
-- [Visualization Samples](#visualization-samples)
 
 ## Installation
 
@@ -174,6 +174,22 @@ atlaspatch segment-and-get-coords /path/to/slide.svs \
 ---
 
 Pass a directory instead of a single file to process multiple WSIs; outputs land in `<output>/patches/<stem>.h5` based on the path you provide to `--output`.
+
+### Visualization Samples
+
+Below are some examples for the output masks and overlays (original image, predicted mask, overlay, contours, grid).
+
+<p align="center">
+  <img src="assets/images/VisualizationSamples.png" alt="AtlasPatch visualization samples" width="100%">
+</p>
+
+Quantitative and qualitative analysis of AtlasPatch tissue detection against existing slide-preprocessing tools. Representative WSI thumbnails are shown from diverse tissue features and artifact conditions, with tissue masks predicted by thresholding methods (TIAToolbox, CLAM) and deep learning methods (pretrained "non-finetuned" SAM2 model, Trident-QC, Trident-Hest and AtlasPatch), highlighting differences in boundary fidelity, artifact suppression and handling of fragmented tissue (more tools are shown in the appendix). Tissue detection performance is also shown on the held-out test set for AtlasPatch and baseline pipelines, highlighting that AtlasPatch matches or exceeds their segmentation quality. The segmentation complexity–performance trade-off, plotting F1-score against segmentation runtime (on a random set of 100 WSIs), shows AtlasPatch achieves high performance with substantially lower wall-clock time than tile-wise detectors and heuristic pipelines, underscoring its suitability for large-scale WSI preprocessing.
+
+Comparison across methods:
+
+<p align="center">
+  <img src="assets/images/Comparisons.jpg" alt="AtlasPatch method comparison" width="100%">
+</p>
 
 ### Process Command Arguments
 
@@ -491,11 +507,3 @@ AtlasPatch is released under CC-BY-NC-SA-4.0, which strictly disallows commercia
 
 ### Slide Encoders
 - We plan to add slide-level encoders (open for extension): TITAN, PRISM, GigaPath, Madeleine.
-
-## Visualization Samples
-
-Below are some examples for the output masks and overlays (original image, predicted mask, overlay, contours, grid).
-
-<p align="center">
-  <img src="assets/images/VisualizationSamples.png" alt="AtlasPatch visualization samples" width="100%">
-</p>
