@@ -40,15 +40,16 @@
   <!-- Abstract Section -->
   <section id="abstract" class="abstract container">
     <h2 class="abstract-title">Abstract</h2>
-    <p>Patch extraction from gigapixel whole-slide images, typically guided by tissue detection methods, forms the backbone of computational pathology workflows, 
-    and remains a major computational bottleneck. Here we present AtlasPatch, an efficient and scalable slide preprocessing framework designed to enable accurate tissue 
-    detection and high-throughput patch extraction with minimal computational overhead. To ensure robust and generalizable slide processing, we curated and 
-    semi-manually annotated a diverse dataset of approximately 35,000 whole-slide image thumbnails spanning multiple cohorts, tissue types, and organ systems. Using this 
-    corpus, we implement selective finetuning of the normalization layers of the Segment-Anything2 model for efficient thumbnail-level segmentation. This strategy ensures
-    fast processing while achieving segmentation accuracy comparable to—or exceeding—that of existing methods. From the thumbnail masks, tissue coordinates are efficiently 
-    extrapolated to full-resolution slides for precise patch extraction. The entire pipeline is parallelized for both CPU and GPU execution to maximize throughput. We assess 
-    AtlasPatch across segmentation accuracy, computational complexity, and downstream multiple-instance learning performance, showing consistent predictive power with 
-    state-of-the-art methods while operating at a fraction of their computational cost.</p>
+    <p>Whole-slide image (WSI) preprocessing, typically comprising tissue detection followed by patch extraction, is foundational to AI-driven
+    and image-based computational pathology workflows. This remains a major computational bottleneck as existing tools either rely on inacurate
+    heuristic thresholding for tissue detection, or adopt AI-based approaches trained on limited-diversity data that operate at the patch level,
+    incurring substantial computational complexity. We present AtlasPatch, an efficient and scalable slide preprocessing framework for accurate
+    tissue detection and high-throughput patch extraction with minimal computational overhead. AtlasPatch’s tissue detection module is trained
+    on a heterogeneous and semi-manually annotated dataset of $\sim$35,000 WSI thumbnails, using efficient fine-tuning of the Segment Anything2 
+    model. The tool extrapolates tissue masks from thumbnails to full-resolution slides to extract patch coordinates at user-specified magnifications, 
+    with options to stream patches directly into commonly used image encoders for embedding generation or export patch images for storage, all efficiently
+    parallelized across CPUs and GPUs to maximize throughput. We assess AtlasPatch across segmentation accuracy, computational complexity, and downstream 
+    multiple-instance learning, matching state-of-the-art performance while operating at a fraction of their computational cost.</p>
 
     <img src="assets/Fig1a.png" alt=""/>
   </section>
@@ -124,20 +125,34 @@
       <div class="comparison-example">
         <p class="example-label">AtlasPatch</p>
         <div class="timeline">
-          <div class="progress" data-speed="24"></div>
+          <div class="progress" data-speed="19"></div>
         </div>
       </div>
 
       <div class="comparison-example">
-        <p class="example-label">GrandQC</p>
+        <p class="example-label">CLAM</p>
         <div class="timeline">
-          <div class="progress" data-speed="88"></div>
+          <div class="progress" data-speed="42"></div>
+        </div>
+      </div>
+
+      <div class="comparison-example">
+        <p class="example-label">Trident-GrandQC</p>
+        <div class="timeline">
+          <div class="progress" data-speed="47"></div>
+        </div>
+      </div>
+
+      <div class="comparison-example">
+        <p class="example-label">Trident-Hest</p>
+        <div class="timeline">
+          <div class="progress" data-speed="328"></div>
         </div>
       </div>
     </div>
 
     <p>All runs shown compare the speed of image segmentation and patch extraction of 100 whole-slide images run on the 
-    same computerhardware.</p>
+    same computer hardware (time sped up 10x).</p>
   </section>
 
   <!-- Citation Section -->
