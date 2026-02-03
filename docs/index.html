@@ -9,13 +9,19 @@
 </head>
 
 <body>
+  <!-- Global Navbar -->
   <nav class="navbar">
     <div class="logo">AtlasPatch</div>
     <ul class="nav-links">
-      <li><a href="#abstract">Abstract</a></li>
+      <li><a href="#abstract">Overview</a></li>
+      <li><a href="#features">Features</a></li>
+      <li><a href="#segmenter">Segmenter</a></li>
+      <li><a href="#comparison">Comparison</a></li>
+      <li><a href="#citation">Citation</a></li>
     </ul>
   </nav>
 
+  <!-- Hero Header Section -->
   <header class="hero">
     <div class="hero-content">
       <h1 class="hero-title">AtlasPatch</h1>
@@ -25,31 +31,242 @@
       <p class="hero-notes">*Project Lead, †Equal Contributer</p>
 
       <div class="links">
-        <a href="#"><i class="fas fa-file-alt"></i> Paper</a>
-        <a href="#"><i class="fas fa-code"></i> Code</a>
-        <a href="#"><i class="fas fa-image"></i> Gallery</a>
+        <a href="#"><i class="fas fa-graduation-cap"></i> Paper</a>
+        <a href="https://github.com/AtlasAnalyticsLab/AtlasPatch"><i class="fab fa-github"></i> Code</a>
       </div>
     </div>
   </header>
 
+  <!-- Abstract Section -->
   <section id="abstract" class="abstract container">
-    <h2>Abstract</h2>
-    <p>Patch extraction from gigapixel whole-slide images, typically guided by tissue detection methods, forms the backbone of computational pathology workflows, 
-    and remains a major computational bottleneck. Here we present AtlasPatch, an efficient and scalable slide preprocessing framework designed to enable accurate tissue 
-    detection and high-throughput patch extraction with minimal computational overhead. To ensure robust and generalizable slide processing, we curated and 
-    semi-manually annotated a diverse dataset of approximately 35,000 whole-slide image thumbnails spanning multiple cohorts, tissue types, and organ systems. Using this 
-    corpus, we implement selective finetuning of the normalization layers of the Segment-Anything2 model for efficient thumbnail-level segmentation. This strategy ensures
-    fast processing while achieving segmentation accuracy comparable to—or exceeding—that of existing methods. From the thumbnail masks, tissue coordinates are efficiently 
-    extrapolated to full-resolution slides for precise patch extraction. The entire pipeline is parallelized for both CPU and GPU execution to maximize throughput. We assess 
-    AtlasPatch across segmentation accuracy, computational complexity, and downstream multiple-instance learning performance, showing consistent predictive power with 
-    state-of-the-art methods while operating at a fraction of their computational cost.</p>
+    <h2 class="abstract-title">Abstract</h2>
+    <p>Whole-slide image (WSI) preprocessing, typically comprising tissue detection followed by patch extraction, is foundational to AI-driven
+    and image-based computational pathology workflows. This remains a major computational bottleneck as existing tools either rely on inacurate
+    heuristic thresholding for tissue detection, or adopt AI-based approaches trained on limited-diversity data that operate at the patch level,
+    incurring substantial computational complexity. We present AtlasPatch, an efficient and scalable slide preprocessing framework for accurate
+    tissue detection and high-throughput patch extraction with minimal computational overhead. AtlasPatch’s tissue detection module is trained
+    on a heterogeneous and semi-manually annotated dataset of $\sim$35,000 WSI thumbnails, using efficient fine-tuning of the Segment Anything2 
+    model. The tool extrapolates tissue masks from thumbnails to full-resolution slides to extract patch coordinates at user-specified magnifications, 
+    with options to stream patches directly into commonly used image encoders for embedding generation or export patch images for storage, all efficiently
+    parallelized across CPUs and GPUs to maximize throughput. We assess AtlasPatch across segmentation accuracy, computational complexity, and downstream 
+    multiple-instance learning, matching state-of-the-art performance while operating at a fraction of their computational cost.</p>
 
-    <img src="images/Fig1a.png" alt=""/>
+    <img src="assets/Fig1a.png" alt=""/>
+  </section>
+
+  <!-- Features Section -->
+  <section id="features" class="features">
+    <h2 class="features-title">Features</h2>
+    <div class="features-carousel">
+      <button class="carousel-btn prev" aria-label="Previous feature"></button>
+
+      <div class="features-track">
+        <div class="feature-card active">
+          <h3>Fast Tissue Segmentation</h3>
+          <p>AtlasPatch efficiently segments tissue regions from whole-slide images using a fine-tuned Segment-Anything2 (SAM2) model.</p>
+          <div class="image-hover-container">
+            <img src="assets/Tissue.png" alt="" class="base-img"/>
+            <img src="assets/Tissue_Mask.png" alt="" class="hover-img"/>
+          </div>
+        </div>
+
+        <div class="feature-card">
+          <h3>Patch Coordinate Extraction</h3>
+          <p>AtlasPatch efficiently extracts patch coordinates from the generated SAM2 tissue masks.</p>
+          <div class="image-hover-container">
+            <img src="assets/Tissue.png" alt="" class="base-img"/>
+            <img src="assets/Tissue_Grid.png" alt="" class="hover-img"/>
+          </div>
+        </div>
+
+        <div class="feature-card">
+          <h3>Patch Embedding</h3>
+          <p>Can perform feature embedding with numerous feature encoders available, with the use of custom encoders also possible.</p>
+          <img src="assets/Patch_Encoder.png" alt=""/>
+        </div>
+
+        <div class="feature-card">
+          <h3>Patch Writing</h3>
+          <p>Can save and export tissue patch images for patch visualization or for downstream task use.</p>
+          <img src="assets/Patch_Writting.png" alt=""/>
+        </div>
+      </div>
+
+      <button class="carousel-btn next" aria-label="Next feature"></button>
+    </div>
+
+    <div class="carousel-dots">
+      <span class="dot active"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+    </div>
+  </section>
+
+  <!-- Segmenter Section -->
+  <section id="segmenter" class="segmenter container">
+    <h2 class="segmenter-title">Segmenter</h2>
+    <p>Our high quality tissue detector generates masks using Segment Anything Model 2 (SAM2), finetuned using a large 
+    and diverse annotated dataset. This dataset, comprised of over 35,000 whole-slide image (WSI) thumbnails, was curated 
+    to cover several organs and tissue types, institutions, scanner vendors, acquisition protocols, and covering variations 
+    in illumination, tissue fragment number and size, tissue boundary definition, and histologic heterogeneity. We finetuned 
+    the SAM2 model by freezing the backbone and training only the normalization layers for the tissue-versus-background task.</p>
+
+    <img src="assets/Fig1c.png" alt="">
+  </section>
+
+  <!-- Comparison Section -->
+  <section id="comparison" class="comparison">
+    <h2 class="comparison-title">Speed Comparison</h2>
+
+    <button id="replay-btn">Replay</button>
+
+    <div class="comparison-examples">
+      <div class="comparison-example">
+        <p class="example-label">AtlasPatch</p>
+        <div class="timeline">
+          <div class="progress" data-speed="19"></div>
+        </div>
+      </div>
+
+      <div class="comparison-example">
+        <p class="example-label">CLAM</p>
+        <div class="timeline">
+          <div class="progress" data-speed="42"></div>
+        </div>
+      </div>
+
+      <div class="comparison-example">
+        <p class="example-label">Trident-GrandQC</p>
+        <div class="timeline">
+          <div class="progress" data-speed="47"></div>
+        </div>
+      </div>
+
+      <div class="comparison-example">
+        <p class="example-label">Trident-Hest</p>
+        <div class="timeline">
+          <div class="progress" data-speed="328"></div>
+        </div>
+      </div>
+    </div>
+
+    <p>All runs shown compare the speed of image segmentation and patch extraction of 100 whole-slide images run on the 
+    same computer hardware (time sped up 10x).</p>
+  </section>
+
+  <!-- Citation Section -->
+  <section class="citation" id="citation">
+    <h2 class="citation-title">Citation</h2>
+
+    <div class="citation-box">
+      <button class="copy-btn" onclick="copyCitation()" aria-label="Copy citation">
+        <span class="copy-icon"></span>
+      </button>
+
+      <pre id="citation-text"><code>
+      @software{atlaspatch,
+        title = {AtlasPatch},
+        author = {Ahmed Alagha, Christopher Leclerc, Yousef Hassan, Omar Abdelwahed, Calvin Moras, Peter Rentopoulos, Rose Rostami,
+        Bich Ngoc Nguyen, Jumanah Baig, Abdelhakim Khellaf, Vincent Quoc-Huy Trinh, Rabeb Mizouni, Hadi Otrok, Jamal Bentahar, 
+        Mahdi S. Hosseini},
+        year = {2025},
+        url = {https://github.com/AtlasAnalyticsLab/AtlasPatch},
+      }
+      </code></pre>
+    </div>
   </section>
 
   <footer>
     <p>© 2026 AtlasPatch. All rights reserved.</p>
   </footer>
 
+  <script>
+  // Feature carousel
+  const cards = document.querySelectorAll(".feature-card");
+  const prevBtn = document.querySelector(".carousel-btn.prev");
+  const nextBtn = document.querySelector(".carousel-btn.next");
+  const dots = document.querySelectorAll(".carousel-dots .dot");
+
+  let currentIndex = 0;
+
+  function showCard(index) {
+    cards.forEach(card => card.classList.remove("active"));
+    cards[index].classList.add("active");
+
+    dots.forEach((dot, i) => dot.classList.toggle("active", i === index));
+    
+    currentIndex = index;
+  }
+
+  prevBtn.addEventListener("click", () => {
+    let prevIndex = (currentIndex - 1 + cards.length) % cards.length;
+    showCard(prevIndex);
+  });
+
+  nextBtn.addEventListener("click", () => {
+    let nextIndex = (currentIndex + 1) % cards.length;
+    showCard(nextIndex);
+  });
+
+  dots.forEach((dot, i) => {
+    dot.addEventListener("click", () => showCard(i));
+  });
+
+  showCard(0);
+  </script>
+
+  <script>
+  // Progress bars
+  document.addEventListener('DOMContentLoaded', () => {
+    const bars = document.querySelectorAll('.progress');
+    const replayBtn = document.getElementById('replay-btn');
+    const comparisonSection = document.getElementById('comparison');
+    
+    function animateBars() {
+      bars.forEach(bar => {
+        const seconds = parseFloat(bar.dataset.speed) || 2;
+        bar.style.transition = `width ${seconds}s linear`;
+        bar.style.width = '100%';
+      });
+    }
+
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          animateBars();
+          observer.unobserve(comparisonSection);
+        }
+      });
+    }, { threshold: 0.7 });
+
+    observer.observe(comparisonSection);
+
+    // Replay button
+    replayBtn.addEventListener('click', () => {
+      bars.forEach(bar => {
+        bar.style.transition = 'none';
+        bar.style.width = '0';
+      });
+      void bars[0].offsetWidth;
+      animateBars();
+    });
+  });
+  </script>
+
+  <script>
+  // Copy button
+  function copyCitation() {
+    const text = document.getElementById("citation-text").innerText;
+    const btn = document.querySelector(".copy-btn");
+
+    navigator.clipboard.writeText(text).then(() => {
+      btn.classList.add("copied");
+      setTimeout(() => {
+        btn.classList.remove("copied");
+      }, 1500);
+    });
+  }
+  </script>
 </body>
 </html>
