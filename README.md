@@ -14,6 +14,7 @@
 <p align="center">
   <a href="https://atlasanalyticslab.github.io/AtlasPatch/"><b>Project Page</b></a> |
   <a href="https://arxiv.org/abs/XXXX.XXXXX"><b>Paper</b></a> |
+  <a href="https://huggingface.co/AtlasAnalyticsLab/AtlasPatch"><b>Hugging Face</b></a> |
   <a href="https://github.com/AtlasAnalyticsLab/AtlasPatch"><b>GitHub</b></a>
 </p>
 
@@ -21,6 +22,7 @@
 - [Installation](#installation)
   - [Quick Install (Recommended)](#quick-install-recommended)
   - [OpenSlide Prerequisites](#openslide-prerequisites)
+  - [Optional Encoder Dependencies](#optional-encoder-dependencies)
   - [Alternative Installation Methods](#alternative-installation-methods)
 - [Usage Guide](#usage-guide)
   - [Pipeline Checkpoints](#pipeline-checkpoints)
@@ -62,7 +64,11 @@
 ### Quick Install (Recommended)
 
 ```bash
+# Install AtlasPatch
 pip install atlas-patch
+
+# Install SAM2 (required for tissue segmentation)
+pip install git+https://github.com/facebookresearch/sam2.git
 ```
 
 > **Note:** AtlasPatch requires the OpenSlide system library for WSI processing. See [OpenSlide Prerequisites](#openslide-prerequisites) below.
@@ -88,6 +94,20 @@ Before installing AtlasPatch, you need the OpenSlide system library:
 
 - **Other systems**: Visit [OpenSlide Documentation](https://openslide.org/)
 
+### Optional Encoder Dependencies
+
+Some feature extractors require additional dependencies that must be installed separately:
+
+```bash
+# For CONCH encoder (conch_v1, conch_v15)
+pip install git+https://github.com/Mahmoodlab/CONCH.git
+
+# For MUSK encoder
+pip install git+https://github.com/lilab-stanford/MUSK.git
+```
+
+These are only needed if you plan to use those specific encoders.
+
 ### Alternative Installation Methods
 
 <details>
@@ -101,8 +121,9 @@ conda activate atlas_patch
 # Install OpenSlide
 conda install -c conda-forge openslide
 
-# Install AtlasPatch
+# Install AtlasPatch and SAM2
 pip install atlas-patch
+pip install git+https://github.com/facebookresearch/sam2.git
 ```
 </details>
 
@@ -117,8 +138,9 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-# Install AtlasPatch
+# Install AtlasPatch and SAM2
 uv pip install atlas-patch
+uv pip install git+https://github.com/facebookresearch/sam2.git
 ```
 </details>
 

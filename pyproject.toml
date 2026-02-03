@@ -32,15 +32,12 @@ dependencies = [
     "timm>=0.9.0",
     "huggingface-hub>=0.23.0",
     "gdown>=5.2.0",
-    "conch @ git+https://github.com/Mahmoodlab/CONCH.git",
     "transformers>=4.41.0",
     "sentencepiece>=0.2.0",
     "open-clip-torch>=2.24.0",
     "fairscale>=0.4.0",
     "einops>=0.8.0",
     "einops-exts>=0.0.4",
-    "sam-2 @ git+https://github.com/facebookresearch/sam2.git",
-    "MUSK @ git+https://github.com/lilab-stanford/MUSK.git",
 ]
 
 [project.optional-dependencies]
@@ -51,6 +48,11 @@ dev = [
     "pytest-cov>=4.0.0",
     "mypy>=1.0.0",
 ]
+
+# See README for installation instructions:
+#   pip install git+https://github.com/facebookresearch/sam2.git  (required)
+#   pip install git+https://github.com/Mahmoodlab/CONCH.git       (optional)
+#   pip install git+https://github.com/lilab-stanford/MUSK.git    (optional)
 
 [project.scripts]
 atlaspatch = "atlas_patch.cli:main"
