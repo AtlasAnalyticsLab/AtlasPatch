@@ -4,11 +4,24 @@
 
 # AtlasPatch: An Efficient and Scalable Tool for Whole Slide Image Preprocessing in Computational Pathology
 
+<p align="center">
+  <a href="https://pypi.org/project/atlas-patch/"><img alt="PyPI" src="https://img.shields.io/pypi/v/atlas-patch"></a>
+  <a href="https://pypi.org/project/atlas-patch/"><img alt="Python" src="https://img.shields.io/pypi/pyversions/atlas-patch"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-CC--BY--NC--SA--4.0-blue"></a>
+</p>
+
+<!-- TODO: Update paper link (XXXX.XXXXX) once published on arXiv -->
+<p align="center">
+  <a href="https://atlasanalyticslab.github.io/AtlasPatch/"><b>Project Page</b></a> |
+  <a href="https://arxiv.org/abs/XXXX.XXXXX"><b>Paper</b></a> |
+  <a href="https://github.com/AtlasAnalyticsLab/AtlasPatch"><b>GitHub</b></a>
+</p>
+
 ## Table of Contents
 - [Installation](#installation)
-  - [Using Conda (Recommended)](#using-conda-recommended)
-  - [Using uv (pip-compatible, faster installs)](#using-uv-pip-compatible-faster-installs)
-  - [Using venv](#using-venv)
+  - [Quick Install (Recommended)](#quick-install-recommended)
+  - [OpenSlide Prerequisites](#openslide-prerequisites)
+  - [Alternative Installation Methods](#alternative-installation-methods)
 - [Usage Guide](#usage-guide)
   - [Pipeline Checkpoints](#pipeline-checkpoints)
     - [A - Tissue Detection](#a-tissue-detection)
@@ -37,6 +50,7 @@
     - [Medical- and Pathology-Specific CLIP](#medical--and-pathology-specific-clip)
 - [Bring Your Own Encoder](#bring-your-own-encoder)
 - [SLURM job scripts](#slurm-job-scripts)
+- [Frequently Asked Questions (FAQ)](#frequently-asked-questions-faq)
 - [Feedback](#feedback)
 - [Citation](#citation)
 - [License](#license)
@@ -45,59 +59,69 @@
 
 ## Installation
 
-### Using Conda (Recommended)
+### Quick Install (Recommended)
 
-1. Create a conda environment:
 ```bash
+pip install atlas-patch
+```
+
+> **Note:** AtlasPatch requires the OpenSlide system library for WSI processing. See [OpenSlide Prerequisites](#openslide-prerequisites) below.
+
+### OpenSlide Prerequisites
+
+Before installing AtlasPatch, you need the OpenSlide system library:
+
+- **Using Conda (Recommended)**:
+  ```bash
+  conda install -c conda-forge openslide
+  ```
+
+- **Ubuntu/Debian**:
+  ```bash
+  sudo apt-get install openslide-tools
+  ```
+
+- **macOS**:
+  ```bash
+  brew install openslide
+  ```
+
+- **Other systems**: Visit [OpenSlide Documentation](https://openslide.org/)
+
+### Alternative Installation Methods
+
+<details>
+<summary><b>Using Conda Environment</b></summary>
+
+```bash
+# Create and activate environment
 conda create -n atlas_patch python=3.10
 conda activate atlas_patch
-```
 
-2. Install the OpenSlide system library (required for WSI processing):
-```bash
+# Install OpenSlide
 conda install -c conda-forge openslide
+
+# Install AtlasPatch
+pip install atlas-patch
 ```
+</details>
 
-3. Install the package in development mode:
+<details>
+<summary><b>Using uv (faster installs)</b></summary>
+
 ```bash
-pip install -e .
-```
-
-### Using uv (pip-compatible, faster installs)
-
-1. Install uv if not already available (see [uv docs](https://docs.astral.sh/uv/getting-started/)):
-```bash
+# Install uv (see https://docs.astral.sh/uv/getting-started/)
 curl -LsSf https://astral.sh/uv/install.sh | sh
-```
 
-2. Create and activate a virtual environment (UV_VENV defaults to `.venv`):
-```bash
+# Create and activate environment
 uv venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install AtlasPatch
+uv pip install atlas-patch
 ```
+</details>
 
-3. Install in development mode with uv:
-```bash
-uv pip install -e .
-```
-
-### Using venv
-
-1. Create a virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-2. Install the OpenSlide system library:
-   - **Ubuntu/Debian**: `sudo apt-get install openslide-tools`
-   - **macOS**: `brew install openslide`
-   - **Other systems**: Visit [OpenSlide Documentation](https://openslide.org/)
-
-3. Install the package in development mode:
-```bash
-pip install -e .
-```
 
 ## Usage Guide
 
@@ -373,7 +397,7 @@ with h5py.File("output/patches/sample.h5", "r") as f:
 | [`midnight`](https://huggingface.co/kaiko-ai/midnight) ([Training state-of-the-art pathology foundation models with orders of magnitude less data](https://arxiv.org/abs/2504.05186)) | 3072 |
 | [`musk`](https://github.com/lilab-stanford/MUSK) ([MUSK: A Vision-Language Foundation Model for Precision Oncology](https://www.nature.com/articles/s41586-024-08378-w)) | 1024 |
 | [`openmidnight`](https://sophontai.com/blog/openmidnight) ([How to Train a State-of-the-Art Pathology Foundation Model with $1.6k](https://sophontai.com/blog/openmidnight)) | 1536 |
-| [`pathorchestra`](https://huggingface.co/AI4Pathology/PathOrchestra) ([PathOrchestra: A Comprehensive Foundation Model for Computational Pathology with Over 100 Diverse Clinical-Grade Tasks](https://arxiv.org/abs/2503.24345)) | 512 |
+| [`pathorchestra`](https://huggingface.co/AI4Pathology/PathOrchestra) ([PathOrchestra: A Comprehensive Foundation Model for Computational Pathology with Over 100 Diverse Clinical-Grade Tasks](https://arxiv.org/abs/2503.24345)) | 1024 |
 | [`h_optimus_0`](https://huggingface.co/bioptimus/H-optimus-0) | 1536 |
 | [`h_optimus_1`](https://huggingface.co/bioptimus/H-optimus-1) | 1536 |
 | [`h0_mini`](https://huggingface.co/bioptimus/H0-mini) ([Distilling foundation models for robust and efficient models in digital pathology](https://doi.org/10.48550/arXiv.2501.16239)) | 1536 |
@@ -480,6 +504,132 @@ We prepared ready-to-run SLURM templates under `jobs/`:
   - Submit with `sbatch jobs/atlaspatch_features.slurm.sh`.
 - Running multiple jobs: you can submit several jobs in a loop (e.g., 50 job using `for i in {1..50}; do sbatch jobs/atlaspatch_features.slurm.sh; done`). AtlasPatch uses per-slide lock files to avoid overlapping work on the same slide.
 
+## Frequently Asked Questions (FAQ)
+
+<details>
+<summary><b>I'm facing an out of memory (OOM) error</b></summary>
+
+This usually happens when too many WSI files are open simultaneously. Try reducing the `--max-open-slides` parameter:
+
+```bash
+atlaspatch process /path/to/slides --output ./output --max-open-slides 50
+```
+
+The default is 200. Lower this value if you're processing many large slides or have limited system memory.
+</details>
+
+<details>
+<summary><b>I'm getting a CUDA out of memory error</b></summary>
+
+Try one or more of the following:
+
+1. **Reduce feature extraction batch size**:
+   ```bash
+   --feature-batch-size 16  # Default is 32
+   ```
+
+2. **Reduce segmentation batch size**:
+   ```bash
+   --seg-batch-size 1  # Default is 1
+   ```
+
+3. **Use lower precision**:
+   ```bash
+   --feature-precision float16  # or bfloat16
+   ```
+
+4. **Use a smaller patch size**:
+   ```bash
+   --patch-size 224  # Instead of 256
+   ```
+</details>
+
+<details>
+<summary><b>OpenSlide library not found</b></summary>
+
+AtlasPatch requires the OpenSlide system library. Install it based on your system:
+
+- **Conda**: `conda install -c conda-forge openslide`
+- **Ubuntu/Debian**: `sudo apt-get install openslide-tools`
+- **macOS**: `brew install openslide`
+
+See [OpenSlide Prerequisites](#openslide-prerequisites) for more details.
+</details>
+
+<details>
+<summary><b>Access denied for gated models (UNI, Virchow, etc.)</b></summary>
+
+Some encoders require Hugging Face access approval:
+
+1. Request access on the model's Hugging Face page (e.g., [UNI](https://huggingface.co/MahmoodLab/UNI))
+2. Once approved, set your token:
+   ```bash
+   export HF_TOKEN=your_huggingface_token
+   ```
+3. Run AtlasPatch again
+</details>
+
+<details>
+<summary><b>Missing microns-per-pixel (MPP) metadata</b></summary>
+
+Some slides lack MPP metadata. You can provide it via a CSV file:
+
+```bash
+atlaspatch process /path/to/slides --output ./output --mpp-csv /path/to/mpp.csv
+```
+
+The CSV should have columns `wsi` (filename) and `mpp` (microns per pixel value).
+</details>
+
+<details>
+<summary><b>Processing is slow</b></summary>
+
+Try these optimizations:
+
+1. **Enable fast mode** (skips content filtering, enabled by default):
+   ```bash
+   --fast-mode
+   ```
+
+2. **Increase parallel workers**:
+   ```bash
+   --patch-workers 16  # Match your CPU cores
+   --feature-num-workers 8
+   ```
+
+3. **Increase batch sizes** (if GPU memory allows):
+   ```bash
+   --feature-batch-size 64
+   --seg-batch-size 4
+   ```
+
+4. **Use multiple GPUs** by running separate jobs on different GPU devices.
+</details>
+
+<details>
+<summary><b>My file format is not supported</b></summary>
+
+AtlasPatch supports most common formats via OpenSlide and Pillow:
+- **WSIs**: `.svs`, `.tif`, `.tiff`, `.ndpi`, `.vms`, `.vmu`, `.scn`, `.mrxs`, `.bif`, `.dcm`
+- **Images**: `.png`, `.jpg`, `.jpeg`, `.bmp`, `.webp`, `.gif`
+
+If your format isn't supported, consider converting it to a supported format or [open an issue](https://github.com/AtlasAnalyticsLab/AtlasPatch/issues/new?template=feature_request.md).
+</details>
+
+<details>
+<summary><b>How do I skip already processed slides?</b></summary>
+
+Use the `--skip-existing` flag to skip slides that already have an output H5 file:
+
+```bash
+atlaspatch process /path/to/slides --output ./output --skip-existing
+```
+</details>
+
+---
+
+Have a question not covered here? Feel free to [open an issue](https://github.com/AtlasAnalyticsLab/AtlasPatch/issues/new) and ask!
+
 ## Feedback
 
 - Report problems via the [bug report template](https://github.com/AtlasAnalyticsLab/AtlasPatch/issues/new?template=bug_report.md) so we can reproduce and fix them quickly.
@@ -488,14 +638,15 @@ We prepared ready-to-run SLURM templates under `jobs/`:
 
 ## Citation
 
-If you use AtlasPatch in your research, please cite it:
+If you use AtlasPatch in your research, please cite our paper:
 
-```
-@software{atlaspatch,
-  author  = {Atlas Analytics Lab},
-  title   = {AtlasPatch},
+```bibtex
+@article{atlaspatch2025,
+  title   = {AtlasPatch: An Efficient and Scalable Tool for Whole Slide Image Preprocessing in Computational Pathology},
+  author  = {Alagha, Ahmed and Leclerc, Christopher and Kotp, Yousef and Abdelwahed, Omar and Moras, Calvin and Rentopoulos, Peter and Rostami, Rose and Nguyen, Bich Ngoc and Baig, Jumanah and Khellaf, Abdelhakim and Trinh, Vincent Quoc-Huy and Mizouni, Rabeb and Otrok, Hadi and Bentahar, Jamal and Hosseini, Mahdi S.},
+  journal = {arXiv},
   year    = {2025},
-  url     = {https://github.com/AtlasAnalyticsLab/AtlasPatch}
+  url     = {TODO: coming soon}
 }
 ```
 

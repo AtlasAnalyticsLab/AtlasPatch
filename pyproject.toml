@@ -4,15 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "atlas-patch"
-version = "0.2.0"
+version = "1.0.0"
 description = "A Python package for processing and handling whole slide images"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = {text = "CC-BY-NC-SA-4.0"}
 authors = [
-    {name = "Ahmed Alagha"},
-    {name = "Omar Metwally"},
     {name = "Yousef Kotp", email = "yousefkotp@outlook.com"},
+    {name = "Omar Metwally"},
+    {name = "Ahmed Alagha"},
 ]
 keywords = ["atlas-patch", "whole-slide-image", "wsi", "tissue-segmentation", "patch-extraction", "computational-pathology"]
 

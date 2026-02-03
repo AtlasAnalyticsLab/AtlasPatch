@@ -10,7 +10,7 @@ from atlas_patch.models.patch.registry import PatchFeatureExtractorRegistry
 logger = logging.getLogger(__name__)
 
 _MODEL_ID = "hf-hub:AI4Pathology/PathOrchestra"
-_EMB_DIM = 512  # TODO: verify this
+_EMB_DIM = 1024
 
 
 class PathOrchestraEncoder(PatchFeatureExtractor):
