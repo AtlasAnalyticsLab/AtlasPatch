@@ -47,7 +47,7 @@
     heuristic thresholding for tissue detection, or adopt AI-based approaches trained on limited-diversity data that operate at the patch level,
     incurring substantial computational complexity. We present AtlasPatch, an efficient and scalable slide preprocessing framework for accurate
     tissue detection and high-throughput patch extraction with minimal computational overhead. AtlasPatch’s tissue detection module is trained
-    on a heterogeneous and semi-manually annotated dataset of $\sim$35,000 WSI thumbnails, using efficient fine-tuning of the Segment Anything2 
+    on a heterogeneous and semi-manually annotated dataset of ~35,000 WSI thumbnails, using efficient fine-tuning of the Segment Anything2 
     model. The tool extrapolates tissue masks from thumbnails to full-resolution slides to extract patch coordinates at user-specified magnifications, 
     with options to stream patches directly into commonly used image encoders for embedding generation or export patch images for storage, all efficiently
     parallelized across CPUs and GPUs to maximize throughput. We assess AtlasPatch across segmentation accuracy, computational complexity, and downstream 

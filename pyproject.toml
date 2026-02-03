@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "atlas-patch"
-version = "1.0.0"
+version = "1.0.0.post3"
 description = "A Python package for processing and handling whole slide images"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "CC-BY-NC-SA-4.0"}
 authors = [
-    {name = "Yousef Kotp", email = "yousefkotp@outlook.com"},
+    {name = "Yousef Kotp"},
     {name = "Omar Metwally"},
     {name = "Ahmed Alagha"},
 ]
