@@ -665,10 +665,9 @@ If you use AtlasPatch in your research, please cite our paper:
 ```bibtex
 @article{atlaspatch2025,
   title   = {AtlasPatch: An Efficient and Scalable Tool for Whole Slide Image Preprocessing in Computational Pathology},
-  author  = {Alagha, Ahmed and Leclerc, Christopher and Kotp, Yousef and Abdelwahed, Omar and Moras, Calvin and Rentopoulos, Peter and Rostami, Rose and Nguyen, Bich Ngoc and Baig, Jumanah and Khellaf, Abdelhakim and Trinh, Vincent Quoc-Huy and Mizouni, Rabeb and Otrok, Hadi and Bentahar, Jamal and Hosseini, Mahdi S.},
-  journal = {arXiv},
-  year    = {2025},
-  url     = {TODO: coming soon}
+  author  = {Alagha, Ahmed and Leclerc, Christopher and Kotp, Yousef and Metwally, Omar and Moras, Calvin and Rentopoulos, Peter and Rostami, Ghodsiyeh and Nguyen, Bich Ngoc and Baig, Jumanah and Khellaf, Abdelhakim and Trinh, Vincent Quoc-Huy and Mizouni, Rabeb and Otrok, Hadi and Bentahar, Jamal and Hosseini, Mahdi S.},
+  journal = {arXiv preprint arXiv:2602.03998},
+  year    = {2025}
 }
 ```
 
