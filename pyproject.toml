@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "atlas-patch"
-version = "1.0.0.post3"
+version = "1.0.0.post4"
 description = "A Python package for processing and handling whole slide images"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -15,6 +15,17 @@ authors = [
     {name = "Ahmed Alagha"},
 ]
 keywords = ["atlas-patch", "whole-slide-image", "wsi", "tissue-segmentation", "patch-extraction", "computational-pathology"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: Other/Proprietary License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Healthcare Industry",
+]
 
 dependencies = [
     "openslide-python>=1.2.0",
@@ -65,7 +76,7 @@ packages = ["atlas_patch"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py38"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = [
