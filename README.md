@@ -13,7 +13,7 @@
 <!-- TODO: Update paper link (XXXX.XXXXX) once published on arXiv -->
 <p align="center">
   <a href="https://atlasanalyticslab.github.io/AtlasPatch/"><b>Project Page</b></a> |
-  <a href="https://arxiv.org/abs/XXXX.XXXXX"><b>Paper</b></a> |
+  <a href="https://arxiv.org/abs/2602.03998"><b>Paper</b></a> |
   <a href="https://huggingface.co/AtlasAnalyticsLab/AtlasPatch"><b>Hugging Face</b></a> |
   <a href="https://github.com/AtlasAnalyticsLab/AtlasPatch"><b>GitHub</b></a>
 </p>
