@@ -663,7 +663,7 @@ Have a question not covered here? Feel free to [open an issue](https://github.co
 If you use AtlasPatch in your research, please cite our paper:
 
 ```bibtex
-@article{atlaspatch2025,
+@article{atlaspatch2026,
   title   = {AtlasPatch: An Efficient and Scalable Tool for Whole Slide Image Preprocessing in Computational Pathology},
   author  = {Alagha, Ahmed and Leclerc, Christopher and Kotp, Yousef and Metwally, Omar and Moras, Calvin and Rentopoulos, Peter and Rostami, Ghodsiyeh and Nguyen, Bich Ngoc and Baig, Jumanah and Khellaf, Abdelhakim and Trinh, Vincent Quoc-Huy and Mizouni, Rabeb and Otrok, Hadi and Bentahar, Jamal and Hosseini, Mahdi S.},
   journal = {arXiv preprint arXiv:2602.03998},
