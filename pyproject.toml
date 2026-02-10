@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=45", "wheel"]
+requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "atlas-patch"
-version = "1.0.0.post4"
+version = "1.0.0.post5"
 description = "A Python package for processing and handling whole slide images"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -69,10 +69,17 @@ dev = [
 atlaspatch = "atlas_patch.cli:main"
 
 [tool.setuptools]
-packages = ["atlas_patch"]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["atlas_patch*"]
 
 [tool.setuptools.package-dir]
 "" = "."
+
+[tool.setuptools.package-data]
+"atlas_patch" = ["configs/*.yaml"]
 
 [tool.ruff]
 line-length = 100
