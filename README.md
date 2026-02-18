@@ -2,7 +2,7 @@
   <img src="https://raw.githubusercontent.com/AtlasAnalyticsLab/AtlasPatch/main/assets/images/Logo.png" alt="AtlasPatch Logo" width="100%">
 </p>
 
-# AtlasPatch: An Efficient Tissue Detection and High-throughput Patch Extraction for Computational Pathology at Scale
+# AtlasPatch: Efficient Tissue Detection and High-throughput Patch Extraction for Computational Pathology at Scale
 
 <p align="center">
   <a href="https://pypi.org/project/atlas-patch/"><img alt="PyPI" src="https://img.shields.io/pypi/v/atlas-patch"></a>
