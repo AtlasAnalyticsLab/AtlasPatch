@@ -2,7 +2,7 @@
   <img src="https://raw.githubusercontent.com/AtlasAnalyticsLab/AtlasPatch/main/assets/images/Logo.png" alt="AtlasPatch Logo" width="100%">
 </p>
 
-# AtlasPatch: An Efficient and Scalable Tool for Whole Slide Image Preprocessing in Computational Pathology
+# AtlasPatch: An Efficient Tissue Detection and High-throughput Patch Extraction for Computational Pathology at Scale
 
 <p align="center">
   <a href="https://pypi.org/project/atlas-patch/"><img alt="PyPI" src="https://img.shields.io/pypi/v/atlas-patch"></a>
@@ -664,7 +664,7 @@ If you use AtlasPatch in your research, please cite our paper:
 
 ```bibtex
 @article{atlaspatch2026,
-  title   = {AtlasPatch: An Efficient and Scalable Tool for Whole Slide Image Preprocessing in Computational Pathology},
+  title   = {AtlasPatch: Efficient Tissue Detection and High-throughput Patch Extraction for Computational Pathology at Scale},
   author  = {Alagha, Ahmed and Leclerc, Christopher and Kotp, Yousef and Metwally, Omar and Moras, Calvin and Rentopoulos, Peter and Rostami, Ghodsiyeh and Nguyen, Bich Ngoc and Baig, Jumanah and Khellaf, Abdelhakim and Trinh, Vincent Quoc-Huy and Mizouni, Rabeb and Otrok, Hadi and Bentahar, Jamal and Hosseini, Mahdi S.},
   journal = {arXiv preprint arXiv:2602.03998},
   year    = {2026}
