@@ -19,6 +19,11 @@ from atlas_patch.utils.image import is_black_patch, is_white_patch
 logger = logging.getLogger("atlas_patch.extraction_service")
 
 
+def _global_lattice_start(start: int, *, step: int, patch_size: int) -> int:
+    """Snap a contour bound onto the slide-global lattice anchored at (0, 0)."""
+    return max(0, ((int(start) - int(patch_size)) // int(step)) * int(step))
+
+
 class PatchExtractionService(ExtractionService):
     """Extracts patch coordinates (and optional images) from WSIs given a tissue mask."""
 
@@ -93,8 +98,10 @@ class PatchExtractionService(ExtractionService):
         for contour, holes in zip(tissue_contours, holes_contours):
             x0, y0, ww, hh = cv2.boundingRect(contour)
             stop_x, stop_y = x0 + ww, y0 + hh
-            for y in range(y0, stop_y, step_src):
-                for x in range(x0, stop_x, step_src):
+            start_x = _global_lattice_start(x0, step=step_src, patch_size=patch_size_src)
+            start_y = _global_lattice_start(y0, step=step_src, patch_size=patch_size_src)
+            for y in range(start_y, stop_y, step_src):
+                for x in range(start_x, stop_x, step_src):
                     if not self._in_tissue((x, y), contour, holes, patch_size=patch_size_src):
                         continue
 
