@@ -9,6 +9,12 @@ from .features import (
     missing_features,
     parse_feature_list,
 )
+from .feature_h5 import (
+    PatchFeatureData,
+    append_slide_embedding,
+    load_patch_feature_data,
+    write_patient_embedding_h5,
+)
 from .h5 import H5AppendWriter
 from .hf import import_module_from_hf
 from .image import is_black_patch, is_white_patch
@@ -29,5 +35,9 @@ __all__ = [
     "parse_feature_list",
     "get_existing_features",
     "missing_features",
+    "PatchFeatureData",
+    "load_patch_feature_data",
+    "append_slide_embedding",
+    "write_patient_embedding_h5",
     "import_module_from_hf",
 ]

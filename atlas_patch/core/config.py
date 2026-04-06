@@ -37,6 +37,22 @@ def _validate_device(device: str) -> str:
     raise ValueError(f"device must be 'cpu', 'cuda', or 'cuda:<index>', got {device}")
 
 
+def _normalize_names(values: list[str], name: str) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for raw in values:
+        item = str(raw).strip().lower()
+        if not item:
+            raise ValueError(f"{name} entries must be non-empty strings.")
+        if item in seen:
+            continue
+        normalized.append(item)
+        seen.add(item)
+    if not normalized:
+        raise ValueError(f"At least one {name} entry must be provided.")
+    return normalized
+
+
 @dataclass
 class SegmentationConfig:
     checkpoint_path: Path | None
@@ -146,6 +162,40 @@ class ProcessingConfig:
             raise FileNotFoundError(f"Input path not found: {self.input_path}")
         if self.mpp_csv is not None and not self.mpp_csv.exists():
             raise FileNotFoundError(f"MPP CSV not found: {self.mpp_csv}")
+        return self
+
+
+@dataclass
+class SlideEncodingConfig:
+    input_path: Path
+    encoders: list[str]
+    recursive: bool = False
+    device: str = "cuda"
+    skip_existing: bool = True
+    mpp_csv: Path | None = None
+
+    def validated(self) -> SlideEncodingConfig:
+        if not self.input_path.exists():
+            raise FileNotFoundError(f"Input path not found: {self.input_path}")
+        self.encoders = _normalize_names(self.encoders, "slide encoder")
+        self.device = _validate_device(str(self.device))
+        if self.mpp_csv is not None and not self.mpp_csv.exists():
+            raise FileNotFoundError(f"MPP CSV not found: {self.mpp_csv}")
+        return self
+
+
+@dataclass
+class PatientEncodingConfig:
+    manifest_path: Path
+    encoders: list[str]
+    device: str = "cuda"
+    skip_existing: bool = True
+
+    def validated(self) -> PatientEncodingConfig:
+        if not self.manifest_path.exists():
+            raise FileNotFoundError(f"Patient manifest not found: {self.manifest_path}")
+        self.encoders = _normalize_names(self.encoders, "patient encoder")
+        self.device = _validate_device(str(self.device))
         return self
 
 

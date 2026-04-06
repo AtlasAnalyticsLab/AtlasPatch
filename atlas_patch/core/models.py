@@ -34,3 +34,28 @@ class ExtractionResult:
     metadata: dict[str, Any] = field(default_factory=dict)
     coords: np.ndarray | None = None  # Optional in-memory coords for visualization
     patch_size_level0: int | None = None
+
+
+@dataclass
+class SlideEmbeddingResult:
+    slide: Slide
+    h5_path: Path
+    encoder_name: str
+    dataset_key: str
+    embedding_dim: int
+    num_patches: int
+    source_patch_encoder: str
+    metadata: dict[str, Any] = field(default_factory=dict)
+    embedding: np.ndarray | None = None
+
+
+@dataclass
+class PatientEmbeddingResult:
+    case_id: str
+    h5_path: Path
+    encoder_name: str
+    embedding_dim: int
+    num_slides: int
+    source_patch_encoder: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+    embedding: np.ndarray | None = None
