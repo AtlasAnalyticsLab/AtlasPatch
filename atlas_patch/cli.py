@@ -5,32 +5,11 @@ import sys
 from pathlib import Path
 
 import click
-import torch
-from tqdm import tqdm
 
-from atlas_patch.core.config import (
-    AppConfig,
-    ExtractionConfig,
-    FeatureExtractionConfig,
-    OutputConfig,
-    ProcessingConfig,
-    SegmentationConfig,
-    VisualizationConfig,
-)
-from atlas_patch.core.models import Slide
-from atlas_patch.models.patch import PatchFeatureExtractorRegistry, build_default_registry
-from atlas_patch.models.patch.custom import register_feature_extractors_from_module
-from atlas_patch.orchestration.runner import ProcessingRunner
-from atlas_patch.services.extraction import PatchExtractionService
-from atlas_patch.services.feature_embedding import PatchFeatureEmbeddingService, resolve_feature_dtype
-from atlas_patch.services.mpp import CSVMPPResolver
-from atlas_patch.services.segmentation import SAM2SegmentationService
-from atlas_patch.services.visualization import DefaultVisualizationService
-from atlas_patch.services.wsi_loader import DefaultWSILoader
+from atlas_patch import __version__
 from atlas_patch.utils import (
     configure_logging,
     install_embedding_log_filter,
-    parse_feature_list,
 )
 from atlas_patch.utils.params import get_wsi_files
 from atlas_patch.utils.visualization import visualize_mask_on_thumbnail
@@ -45,10 +24,6 @@ install_embedding_log_filter()
 
 def _default_config_path() -> Path:
     return Path(__file__).resolve().parent / "configs" / "sam2.1_hiera_t.yaml"
-
-
-FEATURE_EXTRACTOR_CHOICES = build_default_registry(device="cpu").available()
-
 
 # Shared option sets -----------------------------------------------------------
 _COMMON_OPTIONS: list = [
@@ -154,9 +129,11 @@ _FEATURE_OPTIONS: list = [
         "--feature-extractors",
         required=True,
         type=str,
-        help="Space/comma separated feature extractors to run (available: "
-        + ", ".join(FEATURE_EXTRACTOR_CHOICES)
-        + "; add more via --feature-plugin).",
+        help=(
+            "Space/comma separated feature extractors to run. "
+            "The registry is resolved lazily at runtime; install `atlas-patch[patch-encoders]` "
+            "for optional timm/transformers/open-clip based models and add more via --feature-plugin."
+        ),
     ),
     click.option(
         "--feature-batch-size",
@@ -233,6 +210,24 @@ def _run_pipeline(
     feature_cfg: FeatureExtractionConfig | None = None,
     registry: PatchFeatureExtractorRegistry | None = None,
 ) -> tuple[list, list]:
+    from tqdm import tqdm
+
+    from atlas_patch.core.config import (
+        AppConfig,
+        ExtractionConfig,
+        OutputConfig,
+        ProcessingConfig,
+        SegmentationConfig,
+        VisualizationConfig,
+    )
+    from atlas_patch.orchestration.runner import ProcessingRunner
+    from atlas_patch.services.extraction import PatchExtractionService
+    from atlas_patch.services.feature_embedding import PatchFeatureEmbeddingService
+    from atlas_patch.services.mpp import CSVMPPResolver
+    from atlas_patch.services.segmentation import SAM2SegmentationService
+    from atlas_patch.services.visualization import DefaultVisualizationService
+    from atlas_patch.services.wsi_loader import DefaultWSILoader
+
     configure_logging(verbose)
 
     processing_cfg = ProcessingConfig(
@@ -336,6 +331,14 @@ def _run_tissue_visualization(
     mpp_csv: str | None,
     verbose: bool,
 ) -> tuple[list[tuple[Slide, Path]], list[tuple[Slide, Exception | str]]]:
+    from tqdm import tqdm
+
+    from atlas_patch.core.config import ProcessingConfig, SegmentationConfig, VisualizationConfig
+    from atlas_patch.core.models import Slide
+    from atlas_patch.services.mpp import CSVMPPResolver
+    from atlas_patch.services.segmentation import SAM2SegmentationService
+    from atlas_patch.services.wsi_loader import DefaultWSILoader
+
     configure_logging(verbose)
 
     processing_cfg = ProcessingConfig(
@@ -464,7 +467,7 @@ def _echo_mask_results(
 
 
 @click.group()
-@click.version_option(version="0.2.0")
+@click.version_option(version=__version__)
 def cli():
     """AtlasPatch CLI.
 
@@ -612,6 +615,14 @@ def process(
     feature_plugins: tuple[str, ...],
 ):
     """Run segmentation, patch extraction, and feature embedding into a single H5."""
+    import torch
+
+    from atlas_patch.core.config import FeatureExtractionConfig
+    from atlas_patch.models.patch import build_default_registry
+    from atlas_patch.models.patch.custom import register_feature_extractors_from_module
+    from atlas_patch.services.feature_embedding import resolve_feature_dtype
+    from atlas_patch.utils import parse_feature_list
+
     feat_device = feature_device.lower() if feature_device else device.lower()
     torch_device = torch.device(feat_device)
     dtype = resolve_feature_dtype(torch_device, feature_precision.lower())

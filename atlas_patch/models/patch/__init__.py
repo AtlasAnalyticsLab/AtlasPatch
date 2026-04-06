@@ -1,32 +1,10 @@
 from __future__ import annotations
 
+from importlib import import_module
+
 import torch
 
-from atlas_patch.models.patch.biomedclip import register_biomedclip_model
-from atlas_patch.models.patch.clip import register_openai_clip_models
-from atlas_patch.models.patch.conch import register_conch_models
-from atlas_patch.models.patch.convnext import register_convnexts
-from atlas_patch.models.patch.chief_ctranspath import register_chief_ctranspath_model
-from atlas_patch.models.patch.dinov2 import register_dinov2_models
-from atlas_patch.models.patch.dinov3 import register_dinov3_models
-from atlas_patch.models.patch.gigapath import register_prov_gigapath_model
-from atlas_patch.models.patch.hibou import register_hibou_models
-from atlas_patch.models.patch.hoptimus import register_hoptimus_models
-from atlas_patch.models.patch.lunit import register_lunit_models
-from atlas_patch.models.patch.medsiglip import register_medsiglip_model
-from atlas_patch.models.patch.midnight import register_midnight_model
-from atlas_patch.models.patch.musk import register_musk_model
-from atlas_patch.models.patch.omiclip import register_omiclip_model
-from atlas_patch.models.patch.openmidnight import register_openmidnight_model
-from atlas_patch.models.patch.pathorchestra import register_pathorchestra_model
-from atlas_patch.models.patch.phikon import register_phikon_models
-from atlas_patch.models.patch.plip import register_plip_model
-from atlas_patch.models.patch.quilt import register_quilt_models
 from atlas_patch.models.patch.registry import PatchFeatureExtractorRegistry
-from atlas_patch.models.patch.resnet import register_resnets
-from atlas_patch.models.patch.uni import register_uni_models
-from atlas_patch.models.patch.virchow import register_virchow_models
-from atlas_patch.models.patch.vit import register_vits
 from atlas_patch.models.patch.custom import (
     CustomEncoderComponents,
     CustomEncoderLoader,
@@ -43,6 +21,33 @@ __all__ = [
     "register_feature_extractors_from_module",
 ]
 
+_REGISTRARS: tuple[tuple[str, str], ...] = (
+    ("atlas_patch.models.patch.resnet", "register_resnets"),
+    ("atlas_patch.models.patch.convnext", "register_convnexts"),
+    ("atlas_patch.models.patch.vit", "register_vits"),
+    ("atlas_patch.models.patch.dinov2", "register_dinov2_models"),
+    ("atlas_patch.models.patch.dinov3", "register_dinov3_models"),
+    ("atlas_patch.models.patch.clip", "register_openai_clip_models"),
+    ("atlas_patch.models.patch.conch", "register_conch_models"),
+    ("atlas_patch.models.patch.omiclip", "register_omiclip_model"),
+    ("atlas_patch.models.patch.quilt", "register_quilt_models"),
+    ("atlas_patch.models.patch.uni", "register_uni_models"),
+    ("atlas_patch.models.patch.lunit", "register_lunit_models"),
+    ("atlas_patch.models.patch.plip", "register_plip_model"),
+    ("atlas_patch.models.patch.medsiglip", "register_medsiglip_model"),
+    ("atlas_patch.models.patch.musk", "register_musk_model"),
+    ("atlas_patch.models.patch.openmidnight", "register_openmidnight_model"),
+    ("atlas_patch.models.patch.pathorchestra", "register_pathorchestra_model"),
+    ("atlas_patch.models.patch.hoptimus", "register_hoptimus_models"),
+    ("atlas_patch.models.patch.hibou", "register_hibou_models"),
+    ("atlas_patch.models.patch.biomedclip", "register_biomedclip_model"),
+    ("atlas_patch.models.patch.phikon", "register_phikon_models"),
+    ("atlas_patch.models.patch.virchow", "register_virchow_models"),
+    ("atlas_patch.models.patch.gigapath", "register_prov_gigapath_model"),
+    ("atlas_patch.models.patch.midnight", "register_midnight_model"),
+    ("atlas_patch.models.patch.chief_ctranspath", "register_chief_ctranspath_model"),
+)
+
 
 def build_default_registry(
     *,
@@ -53,28 +58,8 @@ def build_default_registry(
     """Factory that registers the built-in extractors."""
     dev = torch.device(device)
     registry = PatchFeatureExtractorRegistry()
-    register_resnets(registry, device=dev, num_workers=num_workers, dtype=dtype)
-    register_convnexts(registry, device=dev, num_workers=num_workers, dtype=dtype)
-    register_vits(registry, device=dev, num_workers=num_workers, dtype=dtype)
-    register_dinov2_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
-    register_dinov3_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
-    register_openai_clip_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
-    register_conch_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
-    register_omiclip_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
-    register_quilt_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
-    register_uni_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
-    register_lunit_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
-    register_plip_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
-    register_medsiglip_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
-    register_musk_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
-    register_openmidnight_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
-    register_pathorchestra_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
-    register_hoptimus_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
-    register_hibou_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
-    register_biomedclip_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
-    register_phikon_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
-    register_virchow_models(registry, device=dev, num_workers=num_workers, dtype=dtype)
-    register_prov_gigapath_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
-    register_midnight_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
-    register_chief_ctranspath_model(registry, device=dev, num_workers=num_workers, dtype=dtype)
+    for module_name, registrar_name in _REGISTRARS:
+        module = import_module(module_name)
+        registrar = getattr(module, registrar_name)
+        registrar(registry, device=dev, num_workers=num_workers, dtype=dtype)
     return registry

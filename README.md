@@ -64,7 +64,7 @@
 ### Quick Install (Recommended)
 
 ```bash
-# Install AtlasPatch
+# Install base AtlasPatch
 pip install atlas-patch
 
 # Install SAM2 (required for tissue segmentation)
@@ -96,7 +96,15 @@ Before installing AtlasPatch, you need the OpenSlide system library:
 
 ### Optional Encoder Dependencies
 
-Some feature extractors require additional dependencies that must be installed separately:
+AtlasPatch keeps model-specific dependencies out of the base install.
+
+Use the optional extra below if you want the broader built-in patch encoder registry:
+
+```bash
+pip install "atlas-patch[patch-encoders]"
+```
+
+Some encoders also require upstream project packages that must still be installed separately:
 
 ```bash
 # For CONCH encoder (conch_v1, conch_v15)
@@ -106,7 +114,7 @@ pip install git+https://github.com/Mahmoodlab/CONCH.git
 pip install git+https://github.com/lilab-stanford/MUSK.git
 ```
 
-These are only needed if you plan to use those specific encoders.
+These installs are only needed if you plan to use those specific encoders.
 
 ### Alternative Installation Methods
 
@@ -307,8 +315,8 @@ All visualization outputs are saved under `<output>/visualization/`.
 | `--save-images` | Off | Export each patch as a PNG file under `<output>/images/<stem>/`. |
 | `--recursive` | Off | Walk subdirectories when `WSI_PATH` is a directory. |
 | `--mpp-csv` | None | Path to a CSV file with `wsi,mpp` columns to override microns-per-pixel when slide metadata is missing or incorrect. |
-| `--skip-existing` | Off | Skip slides that already have an output H5 file. |
-| `--force` | Off | Overwrite existing output files. |
+| `--skip-existing` | On | Skip slides that already have an output H5 file. This is the default behavior. |
+| `--force` | Off | Reprocess slides even when an output H5 file already exists. |
 | `--verbose`, `-v` | Off | Enable debug logging and disable the progress bar. |
 | `--write-batch` | `8192` | Number of coordinate rows to buffer before flushing to H5. Tune for RAM vs. I/O trade-off. |
 
@@ -641,10 +649,10 @@ If your format isn't supported, consider converting it to a supported format or 
 <details>
 <summary><b>How do I skip already processed slides?</b></summary>
 
-Use the `--skip-existing` flag to skip slides that already have an output H5 file:
+`process` and `segment-and-get-coords` already skip existing per-slide H5 outputs by default. Use `--force` when you want to overwrite them:
 
 ```bash
-atlaspatch process /path/to/slides --output ./output --skip-existing
+atlaspatch process /path/to/slides --output ./output --force
 ```
 </details>
 

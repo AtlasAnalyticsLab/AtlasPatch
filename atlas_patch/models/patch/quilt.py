@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 
 import torch
-from transformers import CLIPModel, CLIPProcessor
 
 from atlas_patch.models.patch.base import PatchFeatureExtractor
 from atlas_patch.models.patch.registry import PatchFeatureExtractorRegistry
@@ -53,6 +52,8 @@ class QuiltNet(PatchFeatureExtractor):
 
             forward_fn = _forward
         else:
+            from transformers import CLIPModel, CLIPProcessor
+
             model = CLIPModel.from_pretrained(model_id)
             processor = CLIPProcessor.from_pretrained(model_id)
 

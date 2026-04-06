@@ -30,6 +30,13 @@ class PatchFeatureExtractorRegistry:
         builder = self._builders[key]
         try:
             return builder()
+        except ModuleNotFoundError as exc:
+            logger.exception("Missing optional dependency for feature extractor '%s'", name)
+            dependency = exc.name or "unknown dependency"
+            raise RuntimeError(
+                f"Feature extractor '{name}' requires optional dependency '{dependency}'. "
+                "Install `atlas-patch[patch-encoders]` and any model-specific packages documented in the README."
+            ) from exc
         except Exception:
             logger.exception("Failed to create feature extractor '%s'", name)
             raise
