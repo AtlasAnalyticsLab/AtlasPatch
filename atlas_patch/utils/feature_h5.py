@@ -18,6 +18,13 @@ REQUIRED_PATCH_FILE_ATTRS = (
     "patch_size",
     "target_magnification",
 )
+REQUIRED_SLIDE_EMBEDDING_ATTRS = (
+    "source_patch_encoder",
+    "num_patches",
+    "patch_size",
+    "patch_size_level0",
+    "target_magnification",
+)
 
 
 @dataclass(frozen=True)
@@ -34,6 +41,27 @@ class PatchFeatureData:
     @property
     def num_patches(self) -> int:
         return int(self.features.shape[0])
+
+
+@dataclass(frozen=True)
+class PatchArtifactSummary:
+    h5_path: Path
+    num_patches: int
+    patch_size_level0: int
+    patch_size: int
+    target_magnification: int
+    wsi_path: str | None = None
+
+
+@dataclass(frozen=True)
+class SlideEmbeddingSummary:
+    dataset_key: str
+    embedding_dim: int
+    source_patch_encoder: str
+    num_patches: int
+    patch_size: int
+    patch_size_level0: int
+    target_magnification: int
 
 
 def _encode_attr_value(value: Any) -> Any:
@@ -66,11 +94,70 @@ def _read_required_int_attrs(h5_path: Path, *sources: Mapping[str, Any]) -> dict
     return values
 
 
-def _coerce_embedding(embedding: np.ndarray, *, label: str) -> np.ndarray:
+def coerce_1d_embedding(embedding: np.ndarray, *, label: str) -> np.ndarray:
     vector = np.asarray(embedding)
     if vector.ndim != 1:
         raise ValueError(f"{label} must be 1-D, got shape {vector.shape}")
     return vector
+
+
+def read_patch_artifact_summary(h5_path: str | Path) -> PatchArtifactSummary:
+    path = Path(h5_path)
+    with h5py.File(path, "r") as handle:
+        coords_ds = handle.get("coords")
+        if not isinstance(coords_ds, h5py.Dataset):
+            raise ValueError(f"{path} is missing required dataset 'coords'.")
+
+        num_patches_attr = handle.attrs.get("num_patches")
+        if num_patches_attr is not None:
+            num_patches = int(num_patches_attr)
+        else:
+            num_patches = int(coords_ds.shape[0])
+
+        attrs = _read_required_int_attrs(path, handle.attrs, coords_ds.attrs)
+        wsi_path = handle.attrs.get("wsi_path")
+
+    return PatchArtifactSummary(
+        h5_path=path,
+        num_patches=num_patches,
+        patch_size_level0=attrs["patch_size_level0"],
+        patch_size=attrs["patch_size"],
+        target_magnification=attrs["target_magnification"],
+        wsi_path=str(wsi_path) if wsi_path is not None else None,
+    )
+
+
+def read_slide_embedding_summary(
+    h5_path: str | Path,
+    encoder_name: str,
+) -> SlideEmbeddingSummary | None:
+    path = Path(h5_path)
+    dataset_key = slide_feature_dataset_key(encoder_name)
+
+    with h5py.File(path, "r") as handle:
+        dataset = handle.get(dataset_key)
+        if dataset is None:
+            return None
+        if not isinstance(dataset, h5py.Dataset):
+            raise ValueError(f"{path} contains '{dataset_key}', but it is not an HDF5 dataset.")
+        if dataset.ndim != 1:
+            raise ValueError(f"{path} has invalid slide embedding shape {dataset.shape} for '{dataset_key}'.")
+
+        attrs = _read_required_int_attrs(path, dataset.attrs)
+        missing = [key for key in REQUIRED_SLIDE_EMBEDDING_ATTRS if key not in dataset.attrs]
+        if missing:
+            joined = ", ".join(missing)
+            raise ValueError(f"{path} is missing required slide embedding metadata for '{dataset_key}': {joined}")
+
+        return SlideEmbeddingSummary(
+            dataset_key=dataset_key,
+            embedding_dim=int(dataset.shape[0]),
+            source_patch_encoder=str(dataset.attrs["source_patch_encoder"]).strip().lower(),
+            num_patches=int(dataset.attrs["num_patches"]),
+            patch_size=attrs["patch_size"],
+            patch_size_level0=attrs["patch_size_level0"],
+            target_magnification=attrs["target_magnification"],
+        )
 
 
 def load_patch_feature_data(
@@ -134,7 +221,7 @@ def append_slide_embedding(
     path = Path(h5_path)
     dataset_key = slide_feature_dataset_key(encoder_name)
     dataset_name = dataset_key.split("/", 1)[1]
-    vector = _coerce_embedding(embedding, label=dataset_key)
+    vector = coerce_1d_embedding(embedding, label=dataset_key)
 
     with h5py.File(path, "r+") as handle:
         group = handle.require_group("slide_features")
@@ -161,7 +248,7 @@ def write_patient_embedding_h5(
 ) -> Path:
     """Write a compact patient-level embedding H5 atomically."""
     path = Path(output_path)
-    vector = _coerce_embedding(embedding, label=str(path))
+    vector = coerce_1d_embedding(embedding, label=str(path))
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists() and not overwrite:
         raise FileExistsError(f"Patient embedding already exists: {path}")

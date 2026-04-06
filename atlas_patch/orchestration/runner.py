@@ -199,8 +199,12 @@ class ProcessingRunner:
             raise ValueError("max_open_slides must be defined")
         return max(1, int(cfg_val))
 
-    def run(self) -> tuple[list[ExtractionResult], list[tuple[Slide, Exception | str]]]:
-        slides = self.discover_slides()
+    def run(
+        self,
+        slides: list[Slide] | None = None,
+    ) -> tuple[list[ExtractionResult], list[tuple[Slide, Exception | str]]]:
+        if slides is None:
+            slides = self.discover_slides()
         slides = self._attach_mpp(slides)
 
         if not slides:

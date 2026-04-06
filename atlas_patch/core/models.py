@@ -46,7 +46,6 @@ class SlideEmbeddingResult:
     num_patches: int
     source_patch_encoder: str
     metadata: dict[str, Any] = field(default_factory=dict)
-    embedding: np.ndarray | None = None
 
 
 @dataclass
@@ -58,4 +57,3 @@ class PatientEmbeddingResult:
     num_slides: int
     source_patch_encoder: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
-    embedding: np.ndarray | None = None

@@ -3,6 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+DEFAULT_FEATURE_BATCH_SIZE = 32
+DEFAULT_FEATURE_NUM_WORKERS = 4
+DEFAULT_FEATURE_PRECISION = "float16"
+
+
+def default_sam2_config_path() -> Path:
+    return Path(__file__).resolve().parent.parent / "configs" / "sam2.1_hiera_t.yaml"
+
 
 def _ensure_positive(value: int, name: str) -> int:
     if value <= 0:
@@ -108,10 +116,10 @@ class ExtractionConfig:
 @dataclass
 class FeatureExtractionConfig:
     extractors: list[str]
-    batch_size: int = 32
+    batch_size: int = DEFAULT_FEATURE_BATCH_SIZE
     device: str = "cuda"
-    num_workers: int = 4
-    precision: str = "float32"
+    num_workers: int = DEFAULT_FEATURE_NUM_WORKERS
+    precision: str = DEFAULT_FEATURE_PRECISION
     plugins: list[Path] = field(default_factory=list)
 
     def validated(self) -> FeatureExtractionConfig:
@@ -167,20 +175,13 @@ class ProcessingConfig:
 
 @dataclass
 class SlideEncodingConfig:
-    input_path: Path
     encoders: list[str]
-    recursive: bool = False
     device: str = "cuda"
     skip_existing: bool = True
-    mpp_csv: Path | None = None
 
     def validated(self) -> SlideEncodingConfig:
-        if not self.input_path.exists():
-            raise FileNotFoundError(f"Input path not found: {self.input_path}")
         self.encoders = _normalize_names(self.encoders, "slide encoder")
         self.device = _validate_device(str(self.device))
-        if self.mpp_csv is not None and not self.mpp_csv.exists():
-            raise FileNotFoundError(f"MPP CSV not found: {self.mpp_csv}")
         return self
 
 
