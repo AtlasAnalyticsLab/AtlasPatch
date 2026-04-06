@@ -25,7 +25,7 @@ def _normalize_dataset_component(name: str, *, prefix: str) -> str:
     return normalize_encoder_name(value)
 
 
-def _validate_output_stem(value: str, *, field_name: str) -> str:
+def validate_output_stem(value: str, *, field_name: str) -> str:
     cleaned = str(value).strip()
     if not cleaned:
         raise ValueError(f"{field_name} must be a non-empty string")
@@ -99,10 +99,10 @@ def patient_encoder_dir(output_cfg: OutputConfig, encoder_name: str) -> Path:
 
 
 def patient_embedding_path(output_cfg: OutputConfig, encoder_name: str, case_id: str) -> Path:
-    case_stem = _validate_output_stem(case_id, field_name="case_id")
+    case_stem = validate_output_stem(case_id, field_name="case_id")
     return patient_encoder_dir(output_cfg, encoder_name) / f"{case_stem}.h5"
 
 
 def patient_lock_path(output_cfg: OutputConfig, encoder_name: str, case_id: str) -> Path:
-    case_stem = _validate_output_stem(case_id, field_name="case_id")
+    case_stem = validate_output_stem(case_id, field_name="case_id")
     return patient_encoder_dir(output_cfg, encoder_name) / f"{case_stem}.lock"

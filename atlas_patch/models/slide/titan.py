@@ -5,8 +5,8 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from atlas_patch.models.common import coerce_model_embedding, resolve_model_device
 from atlas_patch.models.slide.base import SlideEncoder, SlideEncoderSpec
-from atlas_patch.models.slide.common import coerce_slide_embedding, resolve_slide_device
 from atlas_patch.models.slide.registry import SlideEncoderRegistry
 from atlas_patch.utils.feature_h5 import load_patch_feature_data
 
@@ -36,7 +36,7 @@ class TitanSlideEncoder(SlideEncoder):
     )
 
     def __init__(self, *, device: str | torch.device = "cuda") -> None:
-        self.device = resolve_slide_device(device)
+        self.device = resolve_model_device(device)
         self.dtype = torch.float16 if self.device.type == "cuda" else torch.float32
         self.model = _load_titan_model(device=self.device, dtype=self.dtype)
 
@@ -67,10 +67,10 @@ class TitanSlideEncoder(SlideEncoder):
                 coords,
                 int(patch_data.patch_size_level0),
             )
-        return coerce_slide_embedding(
+        return coerce_model_embedding(
             embedding,
             expected_dim=self.embedding_dim,
-            encoder_name="TITAN",
+            label="TITAN",
         )
 
     def cleanup(self) -> None:

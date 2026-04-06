@@ -6,8 +6,8 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from atlas_patch.models.common import coerce_model_embedding, resolve_model_device
 from atlas_patch.models.slide.base import SlideEncoder, SlideEncoderSpec
-from atlas_patch.models.slide.common import coerce_slide_embedding, resolve_slide_device
 from atlas_patch.models.slide.registry import SlideEncoderRegistry
 from atlas_patch.utils.feature_h5 import load_patch_feature_data
 
@@ -44,7 +44,7 @@ class PrismSlideEncoder(SlideEncoder):
     )
 
     def __init__(self, *, device: str | torch.device = "cuda") -> None:
-        self.device = resolve_slide_device(device)
+        self.device = resolve_model_device(device)
         self.dtype = torch.float16 if self.device.type == "cuda" else torch.float32
         self.model = _load_prism_model(device=self.device, dtype=self.dtype)
 
@@ -74,10 +74,10 @@ class PrismSlideEncoder(SlideEncoder):
             output = self.model.slide_representations(features, tile_mask=tile_mask)
         if not isinstance(output, dict) or "image_embedding" not in output:
             raise ValueError("PRISM did not return an 'image_embedding' entry.")
-        return coerce_slide_embedding(
+        return coerce_model_embedding(
             output["image_embedding"],
             expected_dim=self.embedding_dim,
-            encoder_name="PRISM",
+            label="PRISM",
         )
 
     def cleanup(self) -> None:

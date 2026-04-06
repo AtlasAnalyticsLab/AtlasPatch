@@ -25,6 +25,10 @@ REQUIRED_SLIDE_EMBEDDING_ATTRS = (
     "patch_size_level0",
     "target_magnification",
 )
+REQUIRED_PATIENT_EMBEDDING_ATTRS = (
+    "encoder_name",
+    "num_slides",
+)
 
 
 @dataclass(frozen=True)
@@ -62,6 +66,17 @@ class SlideEmbeddingSummary:
     patch_size: int
     patch_size_level0: int
     target_magnification: int
+
+
+@dataclass(frozen=True)
+class PatientEmbeddingSummary:
+    embedding_dim: int
+    encoder_name: str
+    num_slides: int
+    source_patch_encoder: str | None = None
+    source_manifest: str | None = None
+    source_slide_h5_paths: tuple[str, ...] = ()
+    source_slide_patch_summaries: tuple[PatchArtifactSummary, ...] = ()
 
 
 def _encode_attr_value(value: Any) -> Any:
@@ -157,6 +172,91 @@ def read_slide_embedding_summary(
             patch_size=attrs["patch_size"],
             patch_size_level0=attrs["patch_size_level0"],
             target_magnification=attrs["target_magnification"],
+        )
+
+
+def _decode_json_list_attr(value: Any, *, label: str) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    try:
+        parsed = json.loads(str(value))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{label} must be valid JSON.") from exc
+    if not isinstance(parsed, list):
+        raise ValueError(f"{label} must decode to a JSON list.")
+    return tuple(str(item) for item in parsed)
+
+
+def _decode_patient_source_slide_summaries(
+    value: Any,
+    *,
+    label: str,
+) -> tuple[PatchArtifactSummary, ...]:
+    if value is None:
+        return ()
+    try:
+        parsed = json.loads(str(value))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{label} must be valid JSON.") from exc
+    if not isinstance(parsed, list):
+        raise ValueError(f"{label} must decode to a JSON list.")
+
+    summaries: list[PatchArtifactSummary] = []
+    for item in parsed:
+        if not isinstance(item, dict):
+            raise ValueError(f"{label} entries must be JSON objects.")
+        summaries.append(
+            PatchArtifactSummary(
+                h5_path=Path(str(item["h5_path"])).expanduser().resolve(),
+                num_patches=int(item["num_patches"]),
+                patch_size_level0=int(item["patch_size_level0"]),
+                patch_size=int(item["patch_size"]),
+                target_magnification=int(item["target_magnification"]),
+                wsi_path=(str(item["wsi_path"]) if item.get("wsi_path") is not None else None),
+            )
+        )
+    return tuple(summaries)
+
+
+def read_patient_embedding_summary(h5_path: str | Path) -> PatientEmbeddingSummary:
+    path = Path(h5_path)
+    with h5py.File(path, "r") as handle:
+        dataset = handle.get("features")
+        if not isinstance(dataset, h5py.Dataset):
+            raise ValueError(f"{path} is missing required dataset 'features'.")
+        if dataset.ndim != 1:
+            raise ValueError(f"{path} has invalid patient embedding shape {dataset.shape}.")
+
+        missing = [key for key in REQUIRED_PATIENT_EMBEDDING_ATTRS if key not in handle.attrs]
+        if missing:
+            joined = ", ".join(missing)
+            raise ValueError(f"{path} is missing required patient embedding metadata: {joined}")
+
+        return PatientEmbeddingSummary(
+            embedding_dim=int(dataset.shape[0]),
+            encoder_name=str(handle.attrs["encoder_name"]).strip().lower(),
+            num_slides=int(handle.attrs["num_slides"]),
+            source_patch_encoder=(
+                str(handle.attrs["source_patch_encoder"]).strip().lower()
+                if "source_patch_encoder" in handle.attrs
+                else None
+            ),
+            source_manifest=(
+                str(handle.attrs["source_manifest"])
+                if "source_manifest" in handle.attrs
+                else None
+            ),
+            source_slide_h5_paths=tuple(
+                str(Path(item).expanduser().resolve())
+                for item in _decode_json_list_attr(
+                    handle.attrs.get("source_slide_h5_paths"),
+                    label=f"{path} source_slide_h5_paths",
+                )
+            ),
+            source_slide_patch_summaries=_decode_patient_source_slide_summaries(
+                handle.attrs.get("source_slide_patch_summaries"),
+                label=f"{path} source_slide_patch_summaries",
+            ),
         )
 
 

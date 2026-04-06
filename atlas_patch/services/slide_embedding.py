@@ -9,6 +9,11 @@ from atlas_patch.core.config import ExtractionConfig, OutputConfig, SlideEncodin
 from atlas_patch.core.models import Slide, SlideEmbeddingResult
 from atlas_patch.core.paths import slide_append_lock_path, slide_feature_dataset_key
 from atlas_patch.models.slide import SlideEncoderRegistry, build_default_registry
+from atlas_patch.services._embedding_runtime import (
+    acquire_exclusive_lock,
+    cleanup_encoder,
+    release_lock,
+)
 from atlas_patch.utils.feature_h5 import (
     PatchArtifactSummary,
     SlideEmbeddingSummary,
@@ -33,43 +38,6 @@ class SlideEmbeddingService:
         self.output_cfg = output_cfg.validated()
         self.slide_cfg = slide_cfg.validated()
         self.registry = registry or build_default_registry(device=self.slide_cfg.device)
-
-    def _acquire_lock(self, slide: Slide) -> tuple[int | None, Path]:
-        lock_path = slide_append_lock_path(slide, self.output_cfg, self.extraction_cfg)
-        lock_path.parent.mkdir(parents=True, exist_ok=True)
-        payload = f"pid={os.getpid()},time={int(time.time())},slide={slide.path},phase=slide-embedding"
-        try:
-            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            os.write(fd, payload.encode())
-            os.fsync(fd)
-            return fd, lock_path
-        except FileExistsError:
-            return None, lock_path
-        except Exception as exc:  # noqa: BLE001
-            raise RuntimeError(f"Failed to create slide lock {lock_path}: {exc}") from exc
-
-    @staticmethod
-    def _release_lock(fd: int | None, lock_path: Path) -> None:
-        if fd is not None:
-            try:
-                os.close(fd)
-            except Exception:
-                pass
-        try:
-            lock_path.unlink()
-        except FileNotFoundError:
-            pass
-        except Exception:
-            pass
-
-    @staticmethod
-    def _cleanup_encoder(encoder) -> None:
-        cleanup = getattr(encoder, "cleanup", None)
-        if callable(cleanup):
-            try:
-                cleanup()
-            except Exception:
-                pass
 
     @staticmethod
     def _build_result(
@@ -203,7 +171,14 @@ class SlideEmbeddingService:
                                 )
                                 continue
 
-                    lock_fd, lock_path = self._acquire_lock(slide)
+                    lock_fd, lock_path = acquire_exclusive_lock(
+                        slide_append_lock_path(slide, self.output_cfg, self.extraction_cfg),
+                        payload=(
+                            f"pid={os.getpid()},time={int(time.time())},"
+                            f"slide={slide.path},phase=slide-embedding"
+                        ),
+                        label="slide",
+                    )
                     if lock_fd is None:
                         failures.append(
                             (
@@ -253,8 +228,8 @@ class SlideEmbeddingService:
                     except Exception as exc:  # noqa: BLE001
                         failures.append((slide, RuntimeError(f"{encoder_name}: {exc}")))
                     finally:
-                        self._release_lock(lock_fd, lock_path)
+                        release_lock(lock_fd, lock_path)
             finally:
-                self._cleanup_encoder(encoder)
+                cleanup_encoder(encoder)
 
         return results, failures

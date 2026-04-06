@@ -13,13 +13,13 @@ from atlas_patch.core.config import (
     DEFAULT_FEATURE_PRECISION,
     AppConfig,
     FeatureExtractionConfig,
+    PatientEncodingConfig,
     SlideEncodingConfig,
     default_sam2_config_path,
 )
-from atlas_patch.core.models import Slide
+from atlas_patch.core.models import PatientCase, Slide
 from atlas_patch.core.paths import patch_h5_path
 from atlas_patch.models.patch.registry import PatchFeatureExtractorRegistry
-from atlas_patch.models.slide.registry import SlideEncoderRegistry
 from atlas_patch.utils import (
     configure_logging,
     install_embedding_log_filter,
@@ -37,8 +37,9 @@ logging.basicConfig(
 install_embedding_log_filter()
 
 # Shared option sets -----------------------------------------------------------
-_COMMON_OPTIONS: list = [
-    click.argument("wsi_path", type=click.Path(exists=True)),
+_INPUT_ARGUMENT = click.argument("wsi_path", type=click.Path(exists=True))
+
+_PIPELINE_OPTIONS: list = [
     click.option(
         "--output",
         "-o",
@@ -119,15 +120,20 @@ _COMMON_OPTIONS: list = [
     click.option("--visualize-grids", is_flag=True, help="Render patch grid overlay."),
     click.option("--visualize-mask", is_flag=True, help="Render predicted mask overlay."),
     click.option("--visualize-contours", is_flag=True, help="Render contour overlay."),
-    click.option("--recursive", is_flag=True, help="Recursively search directories for WSIs."),
-    click.option(
-        "--mpp-csv", type=click.Path(exists=True), default=None, help="CSV with custom MPP."
-    ),
     click.option(
         "--skip-existing/--force", default=True, show_default=True, help="Skip existing H5."
     ),
     click.option("--verbose", "-v", is_flag=True, help="Enable debug logging."),
 ]
+
+_DISCOVERY_OPTIONS: list = [
+    click.option("--recursive", is_flag=True, help="Recursively search directories for WSIs."),
+    click.option(
+        "--mpp-csv", type=click.Path(exists=True), default=None, help="CSV with custom MPP."
+    ),
+]
+
+_COMMON_OPTIONS: list = [_INPUT_ARGUMENT, *_PIPELINE_OPTIONS, *_DISCOVERY_OPTIONS]
 
 _FEATURE_RUNTIME_OPTIONS: list = [
     click.option(
@@ -194,6 +200,10 @@ def common_options(func):
     return _apply_options(func, _COMMON_OPTIONS)
 
 
+def pipeline_options(func):
+    return _apply_options(func, _PIPELINE_OPTIONS)
+
+
 def feature_options(func):
     return _apply_options(func, _FEATURE_OPTIONS)
 
@@ -236,23 +246,23 @@ def _build_patch_feature_registry(
     return registry, feat_device, precision
 
 
-def _resolve_slide_encoder_requirements(
-    slide_registry: SlideEncoderRegistry,
+def _resolve_encoder_requirements(
+    registry,
     encoders: list[str],
 ) -> tuple[int, list[str]]:
-    specs = [slide_registry.get_spec(name) for name in encoders]
+    specs = [registry.get_spec(name) for name in encoders]
     patch_sizes = {spec.patch_size for spec in specs}
     if len(patch_sizes) != 1:
         parts = ", ".join(f"{spec.name}:{spec.patch_size}" for spec in specs)
         raise click.ClickException(
-            "Requested slide encoders require incompatible patch geometries for one canonical H5: "
+            "Requested encoders require incompatible patch geometries for one canonical H5: "
             f"{parts}"
         )
     required_patch_encoders = sorted({spec.patch_encoder_name for spec in specs})
     return next(iter(patch_sizes)), required_patch_encoders
 
 
-def _validate_existing_slide_outputs(app_cfg: AppConfig, slides: list[Slide]) -> None:
+def _validate_existing_patch_artifacts(app_cfg: AppConfig, slides: list[Slide]) -> None:
     if not app_cfg.output.skip_existing:
         return
 
@@ -268,18 +278,18 @@ def _validate_existing_slide_outputs(app_cfg: AppConfig, slides: list[Slide]) ->
         if summary.patch_size != app_cfg.extraction.patch_size:
             raise click.ClickException(
                 f"Existing patch artifact {h5_path} has patch_size={summary.patch_size}, "
-                f"but encode-slide requested --patch-size {app_cfg.extraction.patch_size}. "
+                f"but the current run expects --patch-size {app_cfg.extraction.patch_size}. "
                 "Re-run with --force to rebuild the canonical H5."
             )
         if summary.target_magnification != app_cfg.extraction.target_magnification:
             raise click.ClickException(
                 f"Existing patch artifact {h5_path} has target_mag={summary.target_magnification}, "
-                f"but encode-slide requested --target-mag {app_cfg.extraction.target_magnification}. "
+                f"but the current run expects --target-mag {app_cfg.extraction.target_magnification}. "
                 "Re-run with --force to rebuild the canonical H5."
             )
 
 
-def _collect_ready_slide_artifacts(
+def _collect_ready_patch_artifacts(
     app_cfg: AppConfig,
     slides: list[Slide],
     *,
@@ -310,7 +320,7 @@ def _collect_ready_slide_artifacts(
             if summary.patch_size != app_cfg.extraction.patch_size:
                 raise ValueError(
                     f"{h5_path} has patch_size={summary.patch_size}, "
-                    f"but encode-slide expects {app_cfg.extraction.patch_size}."
+                    f"but the current run expects {app_cfg.extraction.patch_size}."
                 )
             missing = missing_features(
                 h5_path,
@@ -328,9 +338,37 @@ def _collect_ready_slide_artifacts(
     return artifacts, failures
 
 
-def _build_wsi_app_config(
+def _collect_ready_patient_cases(
+    cases: list[PatientCase],
     *,
-    wsi_path: str,
+    slide_h5_by_path: dict[Path, Path],
+    slide_errors: dict[Path, Exception | str],
+) -> tuple[list[PatientCase], list[tuple[PatientCase, Exception | str]]]:
+    ready_cases: list[PatientCase] = []
+    failures: list[tuple[PatientCase, Exception | str]] = []
+
+    for case in cases:
+        missing: list[str] = []
+        for slide in case.slides:
+            resolved_path = slide.path.resolve()
+            if resolved_path in slide_h5_by_path:
+                continue
+            err = slide_errors.get(resolved_path)
+            if err is None:
+                missing.append(f"{slide.path.name}: no canonical patch artifact was produced")
+            else:
+                missing.append(f"{slide.path.name}: {err}")
+        if missing:
+            failures.append((case, RuntimeError("; ".join(missing))))
+            continue
+        ready_cases.append(case)
+
+    return ready_cases, failures
+
+
+def _build_pipeline_app_config(
+    *,
+    input_path: str,
     output: str,
     patch_size: int,
     step_size: int | None,
@@ -363,7 +401,7 @@ def _build_wsi_app_config(
 
     return AppConfig(
         processing=ProcessingConfig(
-            input_path=Path(wsi_path),
+            input_path=Path(input_path),
             recursive=recursive,
             mpp_csv=Path(mpp_csv) if mpp_csv else None,
         ),
@@ -477,7 +515,7 @@ def _run_pipeline_from_config(
 
 def _run_pipeline(
     *,
-    wsi_path: str,
+    input_path: str,
     output: str,
     patch_size: int,
     step_size: int | None,
@@ -503,8 +541,8 @@ def _run_pipeline(
     registry: PatchFeatureExtractorRegistry | None = None,
     announce_completion: bool = True,
 ) -> tuple[list, list]:
-    app_cfg = _build_wsi_app_config(
-        wsi_path=wsi_path,
+    app_cfg = _build_pipeline_app_config(
+        input_path=input_path,
         output=output,
         patch_size=patch_size,
         step_size=step_size,
@@ -694,6 +732,18 @@ def _echo_slide_results(
             click.echo(f"[FAIL] {slide.path.name}: {err}", err=True)
 
 
+def _echo_patient_results(
+    results: list, failures: list, verbose: bool
+) -> None:
+    click.echo(f"Completed {len(results)} patient embedding(s), failures: {len(failures)}")
+    if verbose:
+        for res in results:
+            status = "reused" if res.metadata.get("reused") else "written"
+            click.echo(f"[OK] {res.case_id} -> {res.h5_path} ({status})")
+        for case, err in failures:
+            click.echo(f"[FAIL] {case.case_id}: {err}", err=True)
+
+
 @click.group()
 @click.version_option(version=__version__)
 def cli():
@@ -732,7 +782,7 @@ def segment_and_get_coords(
 ):
     """Segment, patchify, and optionally visualize WSI files."""
     results, failures = _run_pipeline(
-        wsi_path=wsi_path,
+        input_path=wsi_path,
         output=output,
         patch_size=patch_size,
         step_size=step_size,
@@ -866,7 +916,7 @@ def process(
         plugins=[Path(p) for p in feature_plugins],
     )
     results, failures = _run_pipeline(
-        wsi_path=wsi_path,
+        input_path=wsi_path,
         output=output,
         patch_size=patch_size,
         step_size=step_size,
@@ -944,7 +994,7 @@ def encode_slide(
         choices=available_encoders,
         item_label="slide encoder",
     )
-    required_patch_size, required_patch_encoders = _resolve_slide_encoder_requirements(
+    required_patch_size, required_patch_encoders = _resolve_encoder_requirements(
         slide_registry,
         encoders,
     )
@@ -981,8 +1031,8 @@ def encode_slide(
         device=device.lower(),
         skip_existing=skip_existing,
     ).validated()
-    app_cfg = _build_wsi_app_config(
-        wsi_path=wsi_path,
+    app_cfg = _build_pipeline_app_config(
+        input_path=wsi_path,
         output=output,
         patch_size=patch_size,
         step_size=step_size,
@@ -1012,7 +1062,7 @@ def encode_slide(
             recursive=app_cfg.processing.recursive,
         )
     ]
-    _validate_existing_slide_outputs(app_cfg, slides)
+    _validate_existing_patch_artifacts(app_cfg, slides)
 
     try:
         _, failures = _run_pipeline_from_config(
@@ -1026,7 +1076,7 @@ def encode_slide(
         raise click.ClickException(str(exc)) from exc
 
     failed_slide_paths = {slide.path.resolve() for slide, _ in failures}
-    artifacts, artifact_failures = _collect_ready_slide_artifacts(
+    artifacts, artifact_failures = _collect_ready_patch_artifacts(
         app_cfg,
         slides,
         required_patch_encoders=required_patch_encoders,
@@ -1044,6 +1094,168 @@ def encode_slide(
 
 
 @cli.command()
+@click.argument("manifest_path", type=click.Path(exists=True))
+@feature_runtime_options
+@pipeline_options
+@click.option(
+    "--patient-encoders",
+    required=True,
+    type=str,
+    help="Space/comma separated patient encoders to run.",
+)
+def encode_patient(
+    manifest_path: str,
+    output: str,
+    patch_size: int,
+    step_size: int | None,
+    target_mag: int,
+    device: str,
+    feature_device: str | None,
+    feature_batch_size: int,
+    feature_num_workers: int,
+    feature_precision: str,
+    tissue_thresh: float,
+    white_thresh: int,
+    black_thresh: int,
+    seg_batch_size: int,
+    write_batch: int,
+    patch_workers: int | None,
+    max_open_slides: int | None,
+    fast_mode: bool,
+    save_images: bool,
+    visualize_grids: bool,
+    visualize_mask: bool,
+    visualize_contours: bool,
+    skip_existing: bool,
+    verbose: bool,
+    feature_plugins: tuple[str, ...],
+    patient_encoders: str,
+):
+    """Run the WSI pipeline from a case manifest and write patient embeddings."""
+    from atlas_patch.models.patient import build_default_registry
+    from atlas_patch.services.patient_embedding import (
+        PatientEmbeddingService,
+        load_patient_cases,
+    )
+
+    patient_registry = build_default_registry(device=device.lower())
+    available_encoders = patient_registry.available()
+    encoders = parse_named_list(
+        patient_encoders,
+        choices=available_encoders,
+        item_label="patient encoder",
+    )
+    required_patch_size, required_patch_encoders = _resolve_encoder_requirements(
+        patient_registry,
+        encoders,
+    )
+    if patch_size != required_patch_size:
+        raise click.ClickException(
+            f"Requested patient encoders require patch_size={required_patch_size}, "
+            f"but encode-patient was given --patch-size {patch_size}."
+        )
+
+    cases, slides = load_patient_cases(manifest_path)
+    if not cases:
+        raise click.ClickException(f"{manifest_path} does not contain any cases.")
+
+    patch_registry, feat_device, precision = _build_patch_feature_registry(
+        device=device,
+        feature_device=feature_device,
+        feature_num_workers=feature_num_workers,
+        feature_precision=feature_precision,
+        feature_plugins=feature_plugins,
+    )
+    available_extractors = patch_registry.available()
+    missing_extractors = [
+        name for name in required_patch_encoders if name not in available_extractors
+    ]
+    if missing_extractors:
+        joined = ", ".join(missing_extractors)
+        raise click.ClickException(
+            f"Required patch extractor(s) for the selected patient encoders are unavailable: {joined}"
+        )
+
+    feature_cfg = FeatureExtractionConfig(
+        extractors=required_patch_encoders,
+        batch_size=feature_batch_size,
+        device=feat_device,
+        num_workers=feature_num_workers,
+        precision=precision,
+        plugins=[Path(p) for p in feature_plugins],
+    ).validated()
+    patient_cfg = PatientEncodingConfig(
+        manifest_path=Path(manifest_path),
+        encoders=encoders,
+        device=device.lower(),
+        skip_existing=skip_existing,
+    ).validated()
+    app_cfg = _build_pipeline_app_config(
+        input_path=manifest_path,
+        output=output,
+        patch_size=patch_size,
+        step_size=step_size,
+        target_mag=target_mag,
+        device=device,
+        tissue_thresh=tissue_thresh,
+        white_thresh=white_thresh,
+        black_thresh=black_thresh,
+        seg_batch_size=seg_batch_size,
+        write_batch=write_batch,
+        patch_workers=patch_workers,
+        max_open_slides=max_open_slides,
+        fast_mode=fast_mode,
+        save_images=save_images,
+        visualize_grids=visualize_grids,
+        visualize_mask=visualize_mask,
+        visualize_contours=visualize_contours,
+        recursive=False,
+        mpp_csv=None,
+        skip_existing=skip_existing,
+        feature_cfg=feature_cfg,
+    )
+    _validate_existing_patch_artifacts(app_cfg, slides)
+
+    try:
+        _, pipeline_failures = _run_pipeline_from_config(
+            app_cfg,
+            slides=slides,
+            verbose=verbose,
+            registry=patch_registry,
+            announce_completion=False,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise click.ClickException(str(exc)) from exc
+
+    failed_slide_paths = {slide.path.resolve() for slide, _ in pipeline_failures}
+    artifacts, artifact_failures = _collect_ready_patch_artifacts(
+        app_cfg,
+        slides,
+        required_patch_encoders=required_patch_encoders,
+        failed_slide_paths=failed_slide_paths,
+    )
+    slide_errors: dict[Path, Exception | str] = {
+        slide.path.resolve(): err for slide, err in [*pipeline_failures, *artifact_failures]
+    }
+    slide_h5_by_path = {slide.path.resolve(): h5_path for slide, h5_path in artifacts}
+    ready_cases, case_failures = _collect_ready_patient_cases(
+        cases,
+        slide_h5_by_path=slide_h5_by_path,
+        slide_errors=slide_errors,
+    )
+    results, embedding_failures = PatientEmbeddingService(
+        app_cfg.output,
+        patient_cfg,
+        registry=patient_registry,
+    ).embed_all(
+        ready_cases,
+        slide_h5_by_path=slide_h5_by_path,
+    )
+    failures = [*case_failures, *embedding_failures]
+    _echo_patient_results(results, failures, verbose)
+
+
+@cli.command()
 def info():
     """Display supported formats and output structure."""
     click.echo(
@@ -1054,6 +1266,7 @@ def info():
         "Outputs: HDF5 per slide under patches/<stem>.h5; optional PNGs under images/<stem>; visualizations under visualization/."
     )
     click.echo("Slide embeddings append into slide_features/<encoder> inside patches/<stem>.h5.")
+    click.echo("Patient embeddings are written separately under patient_features/<encoder>/<case_id>.h5.")
 
 
 def main():

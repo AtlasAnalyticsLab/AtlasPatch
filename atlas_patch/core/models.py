@@ -57,3 +57,13 @@ class PatientEmbeddingResult:
     num_slides: int
     source_patch_encoder: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class PatientCase:
+    case_id: str
+    slides: tuple[Slide, ...]
+
+    @property
+    def num_slides(self) -> int:
+        return len(self.slides)
