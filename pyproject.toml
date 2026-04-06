@@ -67,6 +67,10 @@ slide-encoders = [
     "sacremoses>=0.1.1",
     "moozy>=0.1.0",
 ]
+patient-encoders = [
+    "timm>=0.9.0",
+    "moozy>=0.1.0",
+]
 titan = [
     "einops>=0.8.0",
     "einops-exts>=0.0.4",
