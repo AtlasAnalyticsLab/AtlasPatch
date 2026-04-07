@@ -449,46 +449,84 @@ def _run_pipeline_from_config(
 
     configure_logging(verbose)
 
-    from atlas_patch.orchestration.runner import ProcessingRunner
-    from atlas_patch.services.extraction import PatchExtractionService
-    from atlas_patch.services.feature_embedding import PatchFeatureEmbeddingService
-    from atlas_patch.services.mpp import CSVMPPResolver
-    from atlas_patch.services.segmentation import SAM2SegmentationService
-    from atlas_patch.services.visualization import DefaultVisualizationService
-    from atlas_patch.services.wsi_loader import DefaultWSILoader
+    from atlas_patch.orchestration.runner import ProcessingRunner, classify_existing_slide_output
 
-    segmentation_service = SAM2SegmentationService(app_cfg.segmentation)
-    extractor_service = PatchExtractionService(app_cfg.extraction, app_cfg.output)
-    visualizer_service = None
-    if (
-        app_cfg.output.visualize_grids
-        or app_cfg.output.visualize_mask
-        or app_cfg.output.visualize_contours
-    ):
-        visualizer_service = DefaultVisualizationService(
-            app_cfg.output,
-            app_cfg.extraction,
-            app_cfg.visualization,
+    if slides is None:
+        slides = [
+            Slide(path=Path(path))
+            for path in get_wsi_files(
+                str(app_cfg.processing.input_path),
+                recursive=app_cfg.processing.recursive,
+            )
+        ]
+    else:
+        slides = list(slides)
+
+    if not slides:
+        logging.getLogger("atlas_patch.runner").warning("No slides found to process.")
+        return [], []
+
+    preflight_results: list = []
+    slides_to_process: list[Slide] = []
+    for slide in slides:
+        decision, existing_result = classify_existing_slide_output(app_cfg, slide)
+        if decision == "skip":
+            continue
+        if decision == "reuse" and existing_result is not None:
+            preflight_results.append(existing_result)
+            continue
+        slides_to_process.append(slide)
+
+    results = list(preflight_results)
+    failures: list = []
+    wsi_loader = None
+
+    if slides_to_process:
+        from atlas_patch.services.extraction import PatchExtractionService
+        from atlas_patch.services.mpp import CSVMPPResolver
+        from atlas_patch.services.segmentation import SAM2SegmentationService
+        from atlas_patch.services.visualization import DefaultVisualizationService
+        from atlas_patch.services.wsi_loader import DefaultWSILoader
+
+        wsi_loader = DefaultWSILoader()
+        segmentation_service = SAM2SegmentationService(app_cfg.segmentation)
+        extractor_service = PatchExtractionService(app_cfg.extraction, app_cfg.output)
+        visualizer_service = None
+        if (
+            app_cfg.output.visualize_grids
+            or app_cfg.output.visualize_mask
+            or app_cfg.output.visualize_contours
+        ):
+            visualizer_service = DefaultVisualizationService(
+                app_cfg.output,
+                app_cfg.extraction,
+                app_cfg.visualization,
+            )
+
+        mpp_resolver = CSVMPPResolver(app_cfg.processing.mpp_csv)
+        runner = ProcessingRunner(
+            config=app_cfg,
+            segmentation=segmentation_service,
+            extractor=extractor_service,
+            visualizer=visualizer_service,
+            mpp_resolver=mpp_resolver,
+            wsi_loader=wsi_loader,
+            show_progress=not verbose,
         )
 
-    mpp_resolver = CSVMPPResolver(app_cfg.processing.mpp_csv)
-    wsi_loader = DefaultWSILoader()
-    runner = ProcessingRunner(
-        config=app_cfg,
-        segmentation=segmentation_service,
-        extractor=extractor_service,
-        visualizer=visualizer_service,
-        mpp_resolver=mpp_resolver,
-        wsi_loader=wsi_loader,
-        show_progress=not verbose,
-    )
+        try:
+            run_results, run_failures = runner.run(slides=slides_to_process)
+            results.extend(run_results)
+            failures.extend(run_failures)
+        finally:
+            segmentation_service.close()
 
-    try:
-        results, failures = runner.run(slides=slides)
-    finally:
-        segmentation_service.close()
+    if app_cfg.features is not None and results:
+        from atlas_patch.services.feature_embedding import PatchFeatureEmbeddingService
+        from atlas_patch.services.wsi_loader import DefaultWSILoader
 
-    if app_cfg.features is not None:
+        if wsi_loader is None:
+            wsi_loader = DefaultWSILoader()
         feature_service = PatchFeatureEmbeddingService(
             app_cfg.extraction,
             app_cfg.output,

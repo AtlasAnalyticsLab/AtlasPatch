@@ -275,6 +275,8 @@ class PatchFeatureEmbeddingService(FeatureEmbeddingService):
             progress.update(completed_units)
 
         for name in self.extractor_names:
+            if not any(name in missing_for_slide for missing_for_slide in pending.values()):
+                continue
             try:
                 extractor = self.registry.create(name)
             except Exception as e:  # noqa: BLE001

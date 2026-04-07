@@ -9,7 +9,11 @@ from typing import Iterable, Mapping
 from atlas_patch.core.config import OutputConfig, PatientEncodingConfig
 from atlas_patch.core.models import PatientCase, PatientEmbeddingResult, Slide
 from atlas_patch.core.paths import patient_embedding_path, patient_lock_path, validate_output_stem
-from atlas_patch.models.patient import PatientEncoderRegistry, build_default_registry
+from atlas_patch.models.patient import (
+    PatientEncoderRegistry,
+    PatientEncoderSpec,
+    build_default_registry,
+)
 from atlas_patch.services._embedding_runtime import (
     acquire_exclusive_lock,
     cleanup_encoder,
@@ -121,7 +125,7 @@ class PatientEmbeddingService:
     def _validate_reusable_embedding(
         *,
         output_path: Path,
-        encoder,
+        spec: PatientEncoderSpec,
         case: PatientCase,
         slide_h5_paths: list[Path],
     ) -> PatientEmbeddingResult | None:
@@ -132,13 +136,13 @@ class PatientEmbeddingService:
             summary = read_patient_embedding_summary(output_path)
         except Exception:
             return None
-        if summary.encoder_name != encoder.name:
+        if summary.encoder_name != spec.name:
             return None
-        if summary.embedding_dim != encoder.embedding_dim:
+        if summary.embedding_dim != spec.embedding_dim:
             return None
         if summary.num_slides != case.num_slides:
             return None
-        if summary.source_patch_encoder != encoder.required_patch_encoder:
+        if summary.source_patch_encoder != spec.patch_encoder_name:
             return None
         current_slide_h5s = tuple(str(path.resolve()) for path in slide_h5_paths)
         if summary.source_slide_h5_paths != current_slide_h5s:
@@ -148,7 +152,7 @@ class PatientEmbeddingService:
         return PatientEmbeddingResult(
             case_id=case.case_id,
             h5_path=output_path,
-            encoder_name=encoder.name,
+            encoder_name=spec.name,
             embedding_dim=summary.embedding_dim,
             num_slides=summary.num_slides,
             source_patch_encoder=summary.source_patch_encoder,
@@ -168,46 +172,55 @@ class PatientEmbeddingService:
             return results, failures
 
         for encoder_name in self.patient_cfg.encoders:
+            spec = self.registry.get_spec(encoder_name)
+            pending_cases: list[tuple[PatientCase, Path, list[Path], bool]] = []
+
+            for case in ordered_cases:
+                try:
+                    slide_h5_paths = [
+                        slide_h5_by_path[slide.path.resolve()].resolve()
+                        for slide in case.slides
+                    ]
+                except KeyError as exc:
+                    failures.append(
+                        (
+                            case,
+                            RuntimeError(
+                                f"{encoder_name}: missing canonical patch artifact for {exc.args[0]}"
+                            ),
+                        )
+                    )
+                    continue
+
+                output_path = patient_embedding_path(self.output_cfg, encoder_name, case.case_id)
+                if self.patient_cfg.skip_existing and output_path.exists():
+                    reused = self._validate_reusable_embedding(
+                        output_path=output_path,
+                        spec=spec,
+                        case=case,
+                        slide_h5_paths=slide_h5_paths,
+                    )
+                    if reused is not None:
+                        results.append(reused)
+                        continue
+                    overwrite = True
+                else:
+                    overwrite = not self.patient_cfg.skip_existing
+
+                pending_cases.append((case, output_path, slide_h5_paths, overwrite))
+
+            if not pending_cases:
+                continue
+
             try:
                 encoder = self.registry.create(encoder_name)
             except Exception as exc:  # noqa: BLE001
-                for case in ordered_cases:
+                for case, _, _, _ in pending_cases:
                     failures.append((case, RuntimeError(f"{encoder_name}: {exc}")))
                 continue
 
             try:
-                for case in ordered_cases:
-                    try:
-                        slide_h5_paths = [
-                            slide_h5_by_path[slide.path.resolve()].resolve()
-                            for slide in case.slides
-                        ]
-                    except KeyError as exc:
-                        failures.append(
-                            (
-                                case,
-                                RuntimeError(
-                                    f"{encoder_name}: missing canonical patch artifact for {exc.args[0]}"
-                                ),
-                            )
-                        )
-                        continue
-
-                    output_path = patient_embedding_path(self.output_cfg, encoder_name, case.case_id)
-                    if self.patient_cfg.skip_existing and output_path.exists():
-                        reused = self._validate_reusable_embedding(
-                            output_path=output_path,
-                            encoder=encoder,
-                            case=case,
-                            slide_h5_paths=slide_h5_paths,
-                        )
-                        if reused is not None:
-                            results.append(reused)
-                            continue
-                        overwrite = True
-                    else:
-                        overwrite = not self.patient_cfg.skip_existing
-
+                for case, output_path, slide_h5_paths, overwrite in pending_cases:
                     lock_fd, lock_path = acquire_exclusive_lock(
                         patient_lock_path(self.output_cfg, encoder_name, case.case_id),
                         payload=(
@@ -240,9 +253,9 @@ class PatientEmbeddingService:
                             output_path,
                             embedding,
                             attrs={
-                                "encoder_name": encoder.name,
+                                "encoder_name": spec.name,
                                 "num_slides": case.num_slides,
-                                "source_patch_encoder": encoder.required_patch_encoder,
+                                "source_patch_encoder": spec.patch_encoder_name,
                                 "source_manifest": str(self.patient_cfg.manifest_path.resolve()),
                                 "source_slide_h5_paths": [
                                     str(path.resolve()) for path in slide_h5_paths
@@ -265,10 +278,10 @@ class PatientEmbeddingService:
                             PatientEmbeddingResult(
                                 case_id=case.case_id,
                                 h5_path=output_path,
-                                encoder_name=encoder.name,
+                                encoder_name=spec.name,
                                 embedding_dim=int(embedding.shape[0]),
                                 num_slides=case.num_slides,
-                                source_patch_encoder=encoder.required_patch_encoder,
+                                source_patch_encoder=spec.patch_encoder_name,
                                 metadata={"reused": False},
                             )
                         )
