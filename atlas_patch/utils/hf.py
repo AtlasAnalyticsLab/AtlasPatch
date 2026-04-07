@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+from pathlib import Path
 from types import ModuleType
 
 from huggingface_hub import hf_hub_download
@@ -15,3 +16,15 @@ def import_module_from_hf(repo_id: str, filename: str) -> ModuleType:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def download_hf_file(repo_id: str, filename: str) -> Path:
+    """Download a file from HuggingFace Hub and return its local path."""
+    return Path(hf_hub_download(repo_id, filename=filename))
+
+
+def load_remote_class(repo_id: str, class_reference: str):
+    """Load a trusted remote-code class from a HuggingFace model repo."""
+    from transformers.dynamic_module_utils import get_class_from_dynamic_module
+
+    return get_class_from_dynamic_module(class_reference, repo_id)

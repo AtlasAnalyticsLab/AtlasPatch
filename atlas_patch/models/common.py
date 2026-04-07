@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from contextlib import nullcontext
 
 import numpy as np
 import torch
@@ -16,6 +17,12 @@ def resolve_model_device(device: str | torch.device) -> torch.device:
         logger.warning("Model inference requested on CUDA but unavailable; using CPU instead.")
         return torch.device("cpu")
     return resolved
+
+
+def model_autocast(device: torch.device, dtype: torch.dtype):
+    if device.type != "cuda" or dtype == torch.float32:
+        return nullcontext()
+    return torch.autocast(device_type=device.type, dtype=dtype)
 
 
 def coerce_model_embedding(

@@ -302,7 +302,7 @@ def load_patch_feature_data(
         feature_name=feature_key,
         dataset_key=dataset_key,
         features=np.asarray(features, dtype=np.float32),
-        coords=np.asarray(coords, dtype=np.int64),
+        coords=np.asarray(coords),
         patch_size_level0=attrs["patch_size_level0"],
         patch_size=attrs["patch_size"],
         target_magnification=attrs["target_magnification"],

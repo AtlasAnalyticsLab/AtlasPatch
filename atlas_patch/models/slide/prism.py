@@ -6,9 +6,10 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from atlas_patch.models.common import coerce_model_embedding, resolve_model_device
+from atlas_patch.models.common import coerce_model_embedding, model_autocast, resolve_model_device
 from atlas_patch.models.slide.base import SlideEncoder, SlideEncoderSpec
 from atlas_patch.models.slide.registry import SlideEncoderRegistry
+from atlas_patch.utils.hf import download_hf_file, load_remote_class
 from atlas_patch.utils.feature_h5 import load_patch_feature_data
 
 _MODEL_ID = "paige-ai/Prism"
@@ -22,16 +23,27 @@ def _load_prism_model(*, device: torch.device, dtype: torch.dtype):
     try:
         import environs  # noqa: F401
         import sacremoses  # noqa: F401
-        from transformers import AutoModel
+        from safetensors.torch import load_file
     except ModuleNotFoundError as exc:
         raise RuntimeError(
             "PRISM requires optional slide-encoder dependencies. "
             "Install `atlas-patch[prism]` or `atlas-patch[slide-encoders]`."
         ) from exc
 
-    model = AutoModel.from_pretrained(_MODEL_ID, trust_remote_code=True)
-    if hasattr(model, "text_decoder"):
-        model.text_decoder = None
+    config_class = load_remote_class(_MODEL_ID, "configuring_prism.PrismConfig")
+    model_class = load_remote_class(_MODEL_ID, "modeling_prism.Prism")
+    config = config_class.from_json_file(str(download_hf_file(_MODEL_ID, "config.json")))
+    config.tie_word_embeddings = False
+    config.biogpt_config.tie_word_embeddings = False
+
+    model = model_class(config)
+    state_dict = load_file(str(download_hf_file(_MODEL_ID, "model.safetensors")))
+    # PRISM shares repeated layer weights, so the checkpoint only stores one copy per shared block.
+    _, unexpected = model.load_state_dict(state_dict, strict=False)
+    if unexpected:
+        joined = ", ".join(sorted(unexpected))
+        raise RuntimeError(f"PRISM checkpoint contains unexpected parameter keys: {joined}")
+    model.text_decoder = None
     return model.to(device=device, dtype=dtype).eval()
 
 
@@ -63,15 +75,9 @@ class PrismSlideEncoder(SlideEncoder):
 
         features = torch.from_numpy(patch_data.features).unsqueeze(0).to(
             device=self.device,
-            dtype=self.dtype,
         )
-        tile_mask = torch.ones(
-            (1, patch_data.num_patches),
-            device=self.device,
-            dtype=torch.long,
-        )
-        with torch.inference_mode():
-            output = self.model.slide_representations(features, tile_mask=tile_mask)
+        with torch.inference_mode(), model_autocast(self.device, self.dtype):
+            output = self.model.slide_representations(features)
         if not isinstance(output, dict) or "image_embedding" not in output:
             raise ValueError("PRISM did not return an 'image_embedding' entry.")
         return coerce_model_embedding(

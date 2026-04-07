@@ -5,9 +5,10 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from atlas_patch.models.common import coerce_model_embedding, resolve_model_device
+from atlas_patch.models.common import coerce_model_embedding, model_autocast, resolve_model_device
 from atlas_patch.models.slide.base import SlideEncoder, SlideEncoderSpec
 from atlas_patch.models.slide.registry import SlideEncoderRegistry
+from atlas_patch.utils.hf import download_hf_file, load_remote_class
 from atlas_patch.utils.feature_h5 import load_patch_feature_data
 
 _MODEL_ID = "MahmoodLab/TITAN"
@@ -16,14 +17,20 @@ _PATCH_FEATURE_DIM = 768
 
 def _load_titan_model(*, device: torch.device, dtype: torch.dtype):
     try:
-        from transformers import AutoModel
+        from safetensors.torch import load_file
+
+        config_class = load_remote_class(_MODEL_ID, "configuration_titan.TitanConfig")
+        model_class = load_remote_class(_MODEL_ID, "modeling_titan.Titan")
     except ModuleNotFoundError as exc:
         raise RuntimeError(
             "TITAN requires optional slide-encoder dependencies. "
             "Install `atlas-patch[titan]` or `atlas-patch[slide-encoders]`."
         ) from exc
 
-    model = AutoModel.from_pretrained(_MODEL_ID, trust_remote_code=True)
+    config = config_class.from_json_file(str(download_hf_file(_MODEL_ID, "config.json")))
+    model = model_class(config)
+    state_dict = load_file(str(download_hf_file(_MODEL_ID, "model.safetensors")))
+    model.load_state_dict(state_dict, strict=True)
     return model.to(device=device, dtype=dtype).eval()
 
 
@@ -55,13 +62,12 @@ class TitanSlideEncoder(SlideEncoder):
 
         features = torch.from_numpy(patch_data.features).unsqueeze(0).to(
             device=self.device,
-            dtype=self.dtype,
         )
         coords = torch.from_numpy(patch_data.coords[:, :2]).unsqueeze(0).to(
             device=self.device,
             dtype=torch.int64,
         )
-        with torch.inference_mode():
+        with torch.inference_mode(), model_autocast(self.device, self.dtype):
             embedding = self.model.encode_slide_from_patch_features(
                 features,
                 coords,
