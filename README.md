@@ -7,10 +7,10 @@
 <p align="center">
   <a href="https://pypi.org/project/atlas-patch/"><img alt="PyPI" src="https://img.shields.io/pypi/v/atlas-patch"></a>
   <a href="https://pypi.org/project/atlas-patch/"><img alt="Python" src="https://img.shields.io/pypi/pyversions/atlas-patch"></a>
+  <a href="https://huggingface.co/AtlasAnalyticsLab/AtlasPatch"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20HuggingFace-Model-yellow" alt="HuggingFace"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-CC--BY--NC--SA--4.0-blue"></a>
 </p>
 
-<!-- TODO: Update paper link (XXXX.XXXXX) once published on arXiv -->
 <p align="center">
   <a href="https://atlasanalyticslab.github.io/AtlasPatch/"><b>Project Page</b></a> |
   <a href="https://arxiv.org/abs/2602.03998"><b>Paper</b></a> |
@@ -20,93 +20,101 @@
 
 ## Table of Contents
 - [Installation](#installation)
-  - [Quick Install (Recommended)](#quick-install-recommended)
-  - [OpenSlide Prerequisites](#openslide-prerequisites)
-  - [Optional Encoder Dependencies](#optional-encoder-dependencies)
+  - [1. Install OpenSlide](#1-install-openslide)
+  - [2. Install AtlasPatch](#2-install-atlaspatch)
+  - [3. Install SAM2](#3-install-sam2)
+  - [Optional extras](#optional-extras)
   - [Alternative Installation Methods](#alternative-installation-methods)
 - [Usage Guide](#usage-guide)
-  - [Pipeline Checkpoints](#pipeline-checkpoints)
-    - [A - Tissue Detection](#a-tissue-detection)
-    - [B - Patch Coordinate Extraction](#b-patch-coordinate-extraction)
-    - [C - Patch Embedding](#c-patch-embedding)
-    - [D - Patch Writing](#d-patch-writing)
-  - [Visualization Samples](#visualization-samples)
-  - [Process Command Arguments](#process-command-arguments)
-    - [Required](#required)
-    - [Optional](#optional)
-      - [Patch Layout](#patch-layout)
-      - [Segmentation & Extraction Performance](#segmentation--extraction-performance)
-      - [Feature Extraction](#feature-extraction)
-      - [Filtering & Quality](#filtering--quality)
-      - [Visualization](#visualization)
-      - [Run Control](#run-control)
-- [Supported Formats](#supported-formats)
-- [Using Extracted Data](#using-extracted-data)
-  - [Patch Coordinates](#patch-coordinates)
-  - [Feature Matrices](#feature-matrices)
-- [Available Feature Extractors](#available-feature-extractors)
-  - [Core vision backbones on Natural Images](#core-vision-backbones-on-natural-images)
-  - [Medical- and Pathology-Specific Vision Encoders](#medical--and-pathology-specific-vision-encoders)
-  - [CLIP-like models](#clip-like-models)
-    - [Natural Images](#natural-images)
-    - [Medical- and Pathology-Specific CLIP](#medical--and-pathology-specific-clip)
-- [Bring Your Own Encoder](#bring-your-own-encoder)
+  - [Choose a Command](#choose-a-command)
+  - [Quick Start](#quick-start)
+    - [Full patch pipeline](#full-patch-pipeline)
+    - [Slide encoding](#slide-encoding)
+    - [Patient encoding](#patient-encoding)
+  - [Supported Inputs](#supported-inputs)
+- [Encoders](#encoders)
+  - [Available Patch Feature Extractors](#available-patch-feature-extractors)
+    - [Core vision backbones on Natural Images](#core-vision-backbones-on-natural-images)
+    - [Medical- and Pathology-Specific Vision Encoders](#medical--and-pathology-specific-vision-encoders)
+    - [CLIP-like models](#clip-like-models)
+      - [Natural Images](#natural-images)
+      - [Medical- and Pathology-Specific CLIP](#medical--and-pathology-specific-clip)
+    - [Bring Your Own Encoder](#bring-your-own-encoder)
+  - [Available Slide Encoders](#available-slide-encoders)
+  - [Available Patient Encoders](#available-patient-encoders)
+- [Output Files](#output-files)
+  - [What AtlasPatch writes](#what-atlaspatch-writes)
+    - [Per-Slide H5 files](#per-slide-h5-files)
+    - [Patient embedding files](#patient-embedding-files)
+    - [Optional image outputs](#optional-image-outputs)
+  - [Reading the files](#reading-the-files)
+    - [Patch coordinates](#patch-coordinates)
+    - [Patch feature matrices](#patch-feature-matrices)
+    - [Slide embeddings](#slide-embeddings)
+    - [Patient embeddings](#patient-embeddings)
 - [SLURM job scripts](#slurm-job-scripts)
 - [Frequently Asked Questions (FAQ)](#frequently-asked-questions-faq)
 - [Feedback](#feedback)
 - [Citation](#citation)
 - [License](#license)
-- [Future Updates](#future-updates)
-  - [Slide Encoders](#slide-encoders)
 
 ## Installation
 
-### Quick Install (Recommended)
+AtlasPatch targets Python 3.10+.
+
+<a id="openslide-prerequisites"></a>
+
+### 1. Install OpenSlide
+
+AtlasPatch needs the OpenSlide system library before you install the Python package.
 
 ```bash
-# Install AtlasPatch
-pip install atlas-patch
+# conda
+conda install -c conda-forge openslide
 
-# Install SAM2 (required for tissue segmentation)
+# Ubuntu / Debian
+sudo apt-get install openslide-tools
+
+# macOS
+brew install openslide
+```
+
+### 2. Install AtlasPatch
+
+```bash
+pip install atlas-patch
+```
+
+### 3. Install SAM2
+
+All WSI-facing AtlasPatch commands use SAM2 for tissue segmentation.
+
+```bash
 pip install git+https://github.com/facebookresearch/sam2.git
 ```
 
-> **Note:** AtlasPatch requires the OpenSlide system library for WSI processing. See [OpenSlide Prerequisites](#openslide-prerequisites) below.
+### Optional extras
 
-### OpenSlide Prerequisites
+The default install stays lean. Install only the model stacks you need.
 
-Before installing AtlasPatch, you need the OpenSlide system library:
+| Use case | Install |
+| --- | --- |
+| Broader built-in patch encoder registry | `pip install "atlas-patch[patch-encoders]"` |
+| TITAN slide encoding | `pip install "atlas-patch[titan]"` |
+| PRISM slide encoding | `pip install "atlas-patch[prism]"` |
+| MOOZY slide or patient encoding | `pip install "atlas-patch[moozy]"` |
+| All bundled slide encoder extras | `pip install "atlas-patch[slide-encoders]"` |
+| All bundled patient encoder extras | `pip install "atlas-patch[patient-encoders]"` |
 
-- **Using Conda (Recommended)**:
-  ```bash
-  conda install -c conda-forge openslide
-  ```
-
-- **Ubuntu/Debian**:
-  ```bash
-  sudo apt-get install openslide-tools
-  ```
-
-- **macOS**:
-  ```bash
-  brew install openslide
-  ```
-
-- **Other systems**: Visit [OpenSlide Documentation](https://openslide.org/)
-
-### Optional Encoder Dependencies
-
-Some feature extractors require additional dependencies that must be installed separately:
+Some patch encoders still require upstream project packages in addition to `atlas-patch[patch-encoders]`:
 
 ```bash
-# For CONCH encoder (conch_v1, conch_v15)
-pip install git+https://github.com/Mahmoodlab/CONCH.git
+# Optional: CONCH patch encoders
+pip install git+https://github.com/MahmoodLab/CONCH.git
 
-# For MUSK encoder
+# Optional: MUSK patch encoder
 pip install git+https://github.com/lilab-stanford/MUSK.git
 ```
-
-These are only needed if you plan to use those specific encoders.
 
 ### Alternative Installation Methods
 
@@ -125,255 +133,113 @@ conda install -c conda-forge openslide
 pip install atlas-patch
 pip install git+https://github.com/facebookresearch/sam2.git
 ```
+
 </details>
 
 <details>
-<summary><b>Using uv (faster installs)</b></summary>
+<summary><b>Using uv</b></summary>
 
 ```bash
-# Install uv (see https://docs.astral.sh/uv/getting-started/)
+# Install uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Create and activate environment
 uv venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+source .venv/bin/activate  # On Windows: .venv\\Scripts\\activate
 
 # Install AtlasPatch and SAM2
 uv pip install atlas-patch
 uv pip install git+https://github.com/facebookresearch/sam2.git
 ```
-</details>
 
+</details>
 
 ## Usage Guide
 
-AtlasPatch provides a flexible pipeline with **4 checkpoints** that you can use independently or combine based on your needs.
+### Choose a Command
 
-### Pipeline Checkpoints
+| Command | Use it when | Main outputs | Docs |
+| --- | --- | --- | --- |
+| `detect-tissue` | You only need tissue masks and overlays | `visualization/` | [docs/commands/detect-tissue.md](docs/commands/detect-tissue.md) |
+| `segment-and-get-coords` | You want patch locations now and feature extraction later | `patches/<stem>.h5` | [docs/commands/segment-and-get-coords.md](docs/commands/segment-and-get-coords.md) |
+| `process` | You want the full patch pipeline, including patch features | `patches/<stem>.h5`, optional `images/`, optional `visualization/` | [docs/commands/process.md](docs/commands/process.md) |
+| `encode-slide` | You want slide embeddings added to each slide H5 file | `patches/<stem>.h5` with `slide_features/<encoder>` | [docs/commands/encode-slide.md](docs/commands/encode-slide.md) |
+| `encode-patient` | You have a CSV file that lists which slides belong to each patient | `patient_features/<encoder>/<case_id>.h5` | [docs/commands/encode-patient.md](docs/commands/encode-patient.md) |
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/AtlasAnalyticsLab/AtlasPatch/main/assets/images/Checkouts.png" alt="AtlasPatch Pipeline Checkpoints" width="100%">
-</p>
+### Quick Start
 
-Quick overview of the checkpoint commands:
-- `detect-tissue`: runs SAM2 segmentation and writes mask overlays under `<output>/visualization/`.
-- `segment-and-get-coords`: runs segmentation + patch coordinate extraction into `<output>/patches/<stem>.h5`.
-- `process`: full pipeline (segmentation + coords + feature embeddings) in the same H5.
-- `segment-and-get-coords --save-images`: same as `segment-and-get-coords`, plus patch PNGs under `<output>/images/<stem>/`.
-
----
-
-#### [A] Tissue Detection
-
-Detect and visualize tissue regions in your WSI using SAM2 segmentation.
-
-```bash
-atlaspatch detect-tissue /path/to/slide.svs \
-  --output ./output \
-  --device cuda
-```
-
----
-
-#### [B] Patch Coordinate Extraction
-
-Detect tissue and extract patch coordinates without feature embedding.
-
-```bash
-atlaspatch segment-and-get-coords /path/to/slide.svs \
-  --output ./output \
-  --patch-size 256 \
-  --target-mag 20 \
-  --device cuda
-```
-
----
-
-#### [C] Patch Embedding
-
-Run the full pipeline: Tissue detection, coordinate extraction, and feature embedding.
+#### Full patch pipeline
 
 ```bash
 atlaspatch process /path/to/slide.svs \
   --output ./output \
   --patch-size 256 \
   --target-mag 20 \
-  --feature-extractors resnet50 \
+  --feature-extractors uni_v2 \
   --device cuda
 ```
 
----
+This writes a per-slide H5 file at `./output/patches/slide.h5` with:
 
-#### [D] Patch Writing
+- `coords`
+- `features/uni_v2`
+- slide metadata in file attributes
 
-Full pipeline with optional patch image export for visualization or downstream tasks.
+#### Slide encoding
 
 ```bash
-atlaspatch segment-and-get-coords /path/to/slide.svs \
+atlaspatch encode-slide /path/to/slides \
   --output ./output \
-  --patch-size 256 \
+  --slide-encoders titan \
+  --patch-size 512 \
   --target-mag 20 \
-  --device cuda \
-  --save-images
+  --device cuda
 ```
 
----
+`encode-slide` is WSI-only. It creates or reuses the per-slide patch H5, backfills the required upstream patch features automatically, and appends slide embeddings into the same file.
 
-Pass a directory instead of a single file to process multiple WSIs; outputs land in `<output>/patches/<stem>.h5` based on the path you provide to `--output`.
+See [Available Slide Encoders](#available-slide-encoders) for the built-in encoder list, requirements, and install extras.
 
-### Visualization Samples
+If you want multiple slide encoders in one run, they must be compatible with one patch geometry. For example, `titan` and `prism` need different patch sizes, so they should be run separately.
 
-Below are some examples for the output masks and overlays (original image, predicted mask, overlay, contours, grid).
+#### Patient encoding
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/AtlasAnalyticsLab/AtlasPatch/main/assets/images/VisualizationSamples.png" alt="AtlasPatch visualization samples" width="100%">
-</p>
+Create a CSV file:
 
-Quantitative and qualitative analysis of AtlasPatch tissue detection against existing slide-preprocessing tools.
+```csv
+case_id,slide_path,mpp
+case-001,/data/case-001-slide-a.svs,0.25
+case-001,/data/case-001-slide-b.svs,
+case-002,/data/case-002-slide-a.svs,
+```
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/AtlasAnalyticsLab/AtlasPatch/main/assets/images/Comparisons.jpg" alt="AtlasPatch method comparison" width="100%">
-</p>
-
-Representative WSI thumbnails are shown from diverse tissue features and artifact conditions, with tissue masks predicted by thresholding methods (TIAToolbox, CLAM) and deep learning methods (pretrained "non-finetuned" SAM2 model, Trident-QC, Trident-Hest and AtlasPatch), highlighting differences in boundary fidelity, artifact suppression and handling of fragmented tissue. Tissue detection performance is also shown on the held-out test set for AtlasPatch and baseline pipelines, highlighting that AtlasPatch matches or exceeds their segmentation quality. The segmentation complexity–performance trade-off, plotting F1-score against segmentation runtime (on a random set of 100 WSIs), shows AtlasPatch achieves high performance with substantially lower wall-clock time than tile-wise detectors and heuristic pipelines, underscoring its suitability for large-scale WSI preprocessing.
-
-### Process Command Arguments
-
-The `process` command is the primary entry point for most workflows. It runs the full pipeline: tissue segmentation, patch coordinate extraction, and feature embedding. You can process a single slide or an entire directory of WSIs in one command.
+Then run:
 
 ```bash
-atlaspatch process <WSI_PATH> --output <DIR> --patch-size <INT> --target-mag <INT> --feature-extractors <NAMES> [OPTIONS]
+atlaspatch encode-patient cases.csv \
+  --output ./output \
+  --patient-encoders moozy \
+  --patch-size 224 \
+  --target-mag 20 \
+  --device cuda
 ```
 
-#### Required
+`encode-patient` groups slides by `case_id`, creates or reuses per-slide H5 files, ensures the required patch features exist, and writes one patient embedding per case.
 
-| Argument | Description |
-| --- | --- |
-| `WSI_PATH` | Path to a single slide file or a directory containing slides. When a directory is provided, all supported formats are processed. |
-| `--output`, `-o` | Root directory for results. Outputs are organized as `<output>/patches/<stem>.h5` for coordinates and features, and `<output>/visualization/` for overlays. |
-| `--patch-size` | Final patch size in pixels at the target magnification (e.g., `256` for 256×256 patches). |
-| `--target-mag` | Magnification level to extract patches at. Common values: `5`, `10`, `20`, `40`. The pipeline reads from the closest available pyramid level and resizes if needed. |
-| `--feature-extractors` | Comma or space-separated list of encoder names from [Available Feature Extractors](#available-feature-extractors). Multiple encoders can be specified to extract several feature sets in one pass (e.g., `resnet50,uni_v2`). |
+See [Available Patient Encoders](#available-patient-encoders) for the built-in encoder list, requirements, and install extras.
 
-#### Optional
+### Supported Inputs
 
-##### Patch Layout
+From `atlaspatch info`:
 
-| Argument | Default | Description |
-| --- | --- | --- |
-| `--step-size` | Same as `--patch-size` | Stride between patches. Omit for non-overlapping grids. Use smaller values (e.g., `128` with `--patch-size 256`) to create 50% overlap. |
+- WSI formats: `.svs`, `.tif`, `.tiff`, `.ndpi`, `.vms`, `.vmu`, `.scn`, `.mrxs`, `.bif`, `.dcm`
+- image formats: `.png`, `.jpg`, `.jpeg`, `.bmp`, `.webp`, `.gif`
 
-##### Segmentation & Extraction Performance
+## Encoders
 
-| Argument | Default | Description |
-| --- | --- | --- |
-| `--device` | `cuda` | Device for SAM2 tissue segmentation. Options: `cuda`, `cuda:0`, `cuda:1`, or `cpu`. |
-| `--seg-batch-size` | `1` | Batch size for SAM2 thumbnail segmentation. Increase for faster processing if GPU memory allows. |
-| `--patch-workers` | CPU count | Number of threads for patch extraction and H5 writes. |
-| `--max-open-slides` | `200` | Maximum number of WSI files open simultaneously. Lower this if you hit file descriptor limits. |
+### Available Patch Feature Extractors
 
-##### Feature Extraction
-
-| Argument | Default | Description |
-| --- | --- | --- |
-| `--feature-device` | Same as `--device` | Device for feature extraction. Set separately to use a different GPU than segmentation. |
-| `--feature-batch-size` | `32` | Batch size for the feature extractor forward pass. Increase for faster throughput; decrease if running out of GPU memory. |
-| `--feature-num-workers` | `4` | Number of DataLoader workers for loading patches during feature extraction. |
-| `--feature-precision` | `float16` | Precision for feature extraction. Options: `float32`, `float16`, `bfloat16`. Lower precision reduces memory and can improve throughput on compatible GPUs. |
-
-##### Filtering & Quality
-
-| Argument | Default | Description |
-| --- | --- | --- |
-| `--fast-mode` | Enabled | Skips per-patch black/white content filtering for faster processing. Use `--no-fast-mode` to enable filtering. |
-| `--tissue-thresh` | `0.0` | Minimum tissue area fraction to keep a region. Filters out tiny tissue fragments. |
-| `--white-thresh` | `15` | Saturation threshold for white patch filtering (only with `--no-fast-mode`). Lower values are stricter. |
-| `--black-thresh` | `50` | RGB threshold for black/dark patch filtering (only with `--no-fast-mode`). Higher values are stricter. |
-
-##### Visualization
-
-| Argument | Default | Description |
-| --- | --- | --- |
-| `--visualize-grids` | Off | Render patch grid overlay on slide thumbnails. |
-| `--visualize-mask` | Off | Render tissue segmentation mask overlay. |
-| `--visualize-contours` | Off | Render tissue contour overlay. |
-
-All visualization outputs are saved under `<output>/visualization/`.
-
-##### Run Control
-
-| Argument | Default | Description |
-| --- | --- | --- |
-| `--save-images` | Off | Export each patch as a PNG file under `<output>/images/<stem>/`. |
-| `--recursive` | Off | Walk subdirectories when `WSI_PATH` is a directory. |
-| `--mpp-csv` | None | Path to a CSV file with `wsi,mpp` columns to override microns-per-pixel when slide metadata is missing or incorrect. |
-| `--skip-existing` | Off | Skip slides that already have an output H5 file. |
-| `--force` | Off | Overwrite existing output files. |
-| `--verbose`, `-v` | Off | Enable debug logging and disable the progress bar. |
-| `--write-batch` | `8192` | Number of coordinate rows to buffer before flushing to H5. Tune for RAM vs. I/O trade-off. |
-
-## Supported Formats
-
-AtlasPatch uses OpenSlide for WSIs and Pillow for standard images:
-
-- WSIs: `.svs`, `.tif`, `.tiff`, `.ndpi`, `.vms`, `.vmu`, `.scn`, `.mrxs`, `.bif`, `.dcm`
-- Images: `.png`, `.jpg`, `.jpeg`, `.bmp`, `.webp`, `.gif`
-
-## Using Extracted Data
-
-`atlaspatch process` writes one HDF5 per slide under `<output>/patches/<stem>.h5` containing coordinates and feature matrices. Coordinates and features share row order.
-
-### Patch Coordinates
-
-- Dataset: `coords` (int32, shape `(N, 5)`) with columns `(x, y, read_w, read_h, level)`.
-- `x` and `y` are level-0 pixel coordinates. `read_w`, `read_h`, and `level` describe how the patch was read from the WSI.
-- The level-0 footprint of each patch is stored as the `patch_size_level0` file attribute; some slide encoders use it for positional encoding (e.g., ALiBi in TITAN).
-
-Example:
-
-```python
-import h5py
-import numpy as np
-import openslide
-from PIL import Image
-
-h5_path = "output/patches/sample.h5"
-wsi_path = "/path/to/slide.svs"
-
-with h5py.File(h5_path, "r") as f:
-    coords = f["coords"][...]  # (N, 5) int32: [x, y, read_w, read_h, level]
-    patch_size = int(f.attrs["patch_size"])
-
-with openslide.OpenSlide(wsi_path) as wsi:
-    for x, y, read_w, read_h, level in coords:
-        img = wsi.read_region(
-            (int(x), int(y)),
-            int(level),
-            (int(read_w), int(read_h)),
-        ).convert("RGB")
-        if img.size != (patch_size, patch_size):
-            # Some slides don't have a pyramid level that matches target magnification exactly, so they have to be resized.
-            img = img.resize((patch_size, patch_size), resample=Image.BILINEAR)
-        patch = np.array(img)  # (H, W, 3) uint8
-```
-
-### Feature Matrices
-
-- Group: `features/` inside the same HDF5.
-- Each extractor is stored as `features/<name>` (float32, shape `(N, D)`), aligned row-for-row with `coords`.
-- List available feature sets with `list(f['features'].keys())`.
-
-```python
-import h5py
-
-with h5py.File("output/patches/sample.h5", "r") as f:
-    feat_names = list(f["features"].keys())
-    resnet50_feats = f["features/resnet50"][...]  # (N, 2048) float32
-```
-
-## Available Feature Extractors
-
-### Core vision backbones on Natural Images
+#### Core vision backbones on Natural Images
 
 | Name | Output Dim |
 | --- | --- |
@@ -404,7 +270,7 @@ with h5py.File("output/patches/sample.h5", "r") as f:
 | [`dinov3_vit7b16`](https://huggingface.co/facebook/dinov3-vit7b16-pretrain-lvd1689m) ([DINOv3](https://arxiv.org/abs/2508.10104)) | 4096 |
 | [`dinov3_vit7b16_sat`](https://huggingface.co/facebook/dinov3-vit7b16-pretrain-sat493m) ([DINOv3](https://arxiv.org/abs/2508.10104)) | 4096 |
 
-### Medical- and Pathology-Specific Vision Encoders
+#### Medical- and Pathology-Specific Vision Encoders
 
 | Name | Output Dim |
 | --- | --- |
@@ -441,9 +307,9 @@ with h5py.File("output/patches/sample.h5", "r") as f:
 >    ```
 > 3. Then you can use the encoder in your commands
 
-### CLIP-like models
+#### CLIP-like models
 
-#### Natural Images
+##### Natural Images
 
 | Name | Output Dim |
 | --- | --- |
@@ -457,7 +323,7 @@ with h5py.File("output/patches/sample.h5", "r") as f:
 | `clip_vit_l_14` ([Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020)) | 768 |
 | `clip_vit_l_14_336` ([Learning Transferable Visual Models From Natural Language Supervision](https://arxiv.org/abs/2103.00020)) | 768 |
 
-#### Medical- and Pathology-Specific CLIP
+##### Medical- and Pathology-Specific CLIP
 
 | Name | Output Dim |
 | --- | --- |
@@ -469,7 +335,7 @@ with h5py.File("output/patches/sample.h5", "r") as f:
 | [`biomedclip`](https://huggingface.co/microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224) ([BiomedCLIP: a multimodal biomedical foundation model pretrained from fifteen million scientific image-text pairs](https://aka.ms/biomedclip-paper)) | 512 |
 | [`omiclip`](https://huggingface.co/WangGuangyuLab/Loki) ([A visual-omics foundation model to bridge histopathology with spatial transcriptomics](https://www.nature.com/articles/s41592-025-02707-1)) | 768 |
 
-## Bring Your Own Encoder
+#### Bring Your Own Encoder
 
 Add a custom encoder without touching AtlasPatch by writing a small plugin and pointing the CLI at it with `--feature-plugin /path/to/plugin.py`. The plugin must expose a `register_feature_extractors(registry, device, dtype, num_workers)` function; inside that hook call `register_custom_encoder` with a loader that knows how to load the model and run a forward pass.
 
@@ -508,7 +374,138 @@ def register_feature_extractors(registry, device, dtype, num_workers):
     )
 ```
 
-Run AtlasPatch with `--feature-plugin /path/to/plugin.py --feature-extractors my_encoder` to benchmark your encoder alongside the built-ins, multiple plugins and extractors can be added at once. Outputs keep the same HDF5 layout—your custom embeddings live under `features/my_encoder` (row-aligned with `coords`) next to other extractors.
+Run AtlasPatch with `--feature-plugin /path/to/plugin.py --feature-extractors my_encoder` to benchmark your encoder alongside the built-ins. Multiple plugins and extractors can be added at once. Your custom embeddings will be written under `features/my_encoder`, row-aligned with `coords`, next to the built-in extractors.
+
+### Available Slide Encoders
+
+| Encoder | Embedding dim | Required patch encoder | Patch size | Model | Paper | Install |
+| --- | --- | --- | --- | --- | --- | --- |
+| `titan` | 768 | `conch_v15` | 512 | [MahmoodLab/TITAN](https://huggingface.co/MahmoodLab/TITAN) | [A multimodal whole-slide foundation model for pathology](https://www.nature.com/articles/s41591-025-03982-3) | `atlas-patch[titan]` or `atlas-patch[slide-encoders]` |
+| `prism` | 1280 | `virchow_v1` | 224 | [paige-ai/Prism](https://huggingface.co/paige-ai/Prism) | [PRISM: A Multi-Modal Generative Foundation Model for Slide-Level Histopathology](https://arxiv.org/abs/2405.10254) | `atlas-patch[prism]` or `atlas-patch[slide-encoders]` |
+| `moozy` | 768 | `lunit_vit_small_patch8_dino` | 224 | [AtlasAnalyticsLab/MOOZY](https://huggingface.co/AtlasAnalyticsLab/MOOZY) | [MOOZY: A Patient-First Foundation Model for Computational Pathology](https://arxiv.org/abs/2603.27048) | `atlas-patch[moozy]` or `atlas-patch[slide-encoders]` |
+
+### Available Patient Encoders
+
+| Encoder | Embedding dim | Required patch encoder | Patch size | Model | Paper | Install |
+| --- | --- | --- | --- | --- | --- | --- |
+| `moozy` | 768 | `lunit_vit_small_patch8_dino` | 224 | [AtlasAnalyticsLab/MOOZY](https://huggingface.co/AtlasAnalyticsLab/MOOZY) | [MOOZY: A Patient-First Foundation Model for Computational Pathology](https://arxiv.org/abs/2603.27048) | `atlas-patch[moozy]` or `atlas-patch[patient-encoders]` |
+
+## Output Files
+
+Everything AtlasPatch writes lives under the directory you pass to `--output`.
+
+### What AtlasPatch writes
+
+#### Per-Slide H5 files
+
+Each processed slide gets one H5 file:
+
+```text
+<output>/patches/<stem>.h5
+```
+
+That file may contain:
+
+- `coords`
+- `features/<patch_encoder>`
+- `slide_features/<slide_encoder>`
+
+Rows in `features/<patch_encoder>` are aligned with `coords`.
+
+#### Patient embedding files
+
+Patient embeddings are written separately:
+
+```text
+<output>/patient_features/<encoder>/<case_id>.h5
+```
+
+Each patient H5 file stores the case embedding in `features`.
+
+#### Optional image outputs
+
+- patch PNGs: `<output>/images/<stem>/`
+- overlays and masks: `<output>/visualization/`
+
+### Reading the files
+
+Per-slide H5 files keep patch coordinates, patch features, and slide embeddings together in one place.
+
+#### Patch coordinates
+
+- dataset: `coords`
+- shape: `(N, 5)`
+- columns: `(x, y, read_w, read_h, level)`
+- `x` and `y` are level-0 pixel coordinates.
+- `read_w`, `read_h`, and `level` describe how the patch was read from the WSI.
+- the level-0 footprint of each patch is stored as the `patch_size_level0` file attribute
+
+Example:
+
+```python
+import h5py
+import numpy as np
+import openslide
+from PIL import Image
+
+h5_path = "output/patches/sample.h5"
+wsi_path = "/path/to/slide.svs"
+
+with h5py.File(h5_path, "r") as f:
+    coords = f["coords"][...]  # (N, 5) int32: [x, y, read_w, read_h, level]
+    patch_size = int(f.attrs["patch_size"])
+
+with openslide.OpenSlide(wsi_path) as wsi:
+    for x, y, read_w, read_h, level in coords:
+        img = wsi.read_region(
+            (int(x), int(y)),
+            int(level),
+            (int(read_w), int(read_h)),
+        ).convert("RGB")
+        if img.size != (patch_size, patch_size):
+            img = img.resize((patch_size, patch_size), resample=Image.BILINEAR)
+        patch = np.array(img)  # (H, W, 3) uint8
+```
+
+#### Patch feature matrices
+
+- group: `features/`
+- dataset: `features/<patch_encoder>`
+- shape: `(N, D)`
+
+Rows in every feature matrix are aligned with `coords`.
+
+```python
+import h5py
+
+with h5py.File("output/patches/sample.h5", "r") as f:
+    feature_names = list(f["features"].keys())
+    resnet50_features = f["features/resnet50"][...]
+```
+
+#### Slide embeddings
+
+- group: `slide_features/`
+- dataset: `slide_features/<slide_encoder>`
+- shape: `(D,)`
+
+```python
+import h5py
+
+with h5py.File("output/patches/sample.h5", "r") as f:
+    titan_embedding = f["slide_features/titan"][...]
+```
+
+#### Patient embeddings
+
+Patient embeddings are stored in separate H5 files under `patient_features/<encoder>/`.
+
+```python
+import h5py
+
+with h5py.File("output/patient_features/moozy/case-001.h5", "r") as f:
+    case_embedding = f["features"][...]
+```
 
 ## SLURM job scripts
 
@@ -524,7 +521,7 @@ We prepared ready-to-run SLURM templates under `jobs/`:
   - Configure `FEATURES` (comma/space list, multiple extractors are supported), `FEATURE_DEVICE`, `FEATURE_BATCH`, `FEATURE_WORKERS`, and `FEATURE_PRECISION`.
   - This script is intended for feature extraction; use the patch script when you need segmentation + coordinates, and run the feature script to embed one or more models into those H5 files.
   - Submit with `sbatch jobs/atlaspatch_features.slurm.sh`.
-- Running multiple jobs: you can submit several jobs in a loop (e.g., 50 job using `for i in {1..50}; do sbatch jobs/atlaspatch_features.slurm.sh; done`). AtlasPatch uses per-slide lock files to avoid overlapping work on the same slide.
+- Running multiple jobs: you can submit several jobs in a loop (for example, `for i in {1..50}; do sbatch jobs/atlaspatch_features.slurm.sh; done`). AtlasPatch uses per-slide lock files to avoid overlapping work on the same slide.
 
 ## Frequently Asked Questions (FAQ)
 
@@ -641,10 +638,63 @@ If your format isn't supported, consider converting it to a supported format or 
 <details>
 <summary><b>How do I skip already processed slides?</b></summary>
 
-Use the `--skip-existing` flag to skip slides that already have an output H5 file:
+`process` and `segment-and-get-coords` already skip existing per-slide H5 outputs by default. Use `--force` when you want to overwrite them:
 
 ```bash
-atlaspatch process /path/to/slides --output ./output --skip-existing
+atlaspatch process /path/to/slides --output ./output --force
+```
+</details>
+
+<details>
+<summary><b>Can I run multiple slide encoders in one command?</b></summary>
+
+Yes, but only when they agree on the required patch geometry. `encode-slide` runs one patch pipeline and then appends the requested slide embeddings into the same per-slide H5 file, so all requested slide encoders in that run must agree on the patch size they need.
+
+For example, `titan` and `prism` should be run separately because they require different patch sizes.
+</details>
+
+<details>
+<summary><b>What does <code>encode-slide</code> or <code>encode-patient</code> reuse?</b></summary>
+
+Both commands reuse existing per-slide H5 files by default. If the required patch features for the requested encoder are already present, AtlasPatch uses them directly. If the H5 file exists but the required patch feature dataset is missing, AtlasPatch runs the missing patch feature extraction step and then continues with slide or patient encoding.
+
+Use `--force` if you want to rebuild instead of reuse.
+</details>
+
+<details>
+<summary><b>What should the <code>encode-patient</code> CSV file look like?</b></summary>
+
+The CSV file must contain:
+
+- `case_id`
+- `slide_path`
+
+It may also contain:
+
+- `mpp`
+
+Each row links one slide to one patient. AtlasPatch groups rows by `case_id`, runs or reuses the per-slide H5 pipeline for each referenced slide, and then writes one patient embedding per patient.
+</details>
+
+<details>
+<summary><b>Does <code>encode-patient</code> use slide embeddings?</b></summary>
+
+No. In `v1.1.0`, patient encoding uses the patch features stored in each slide H5 file. It does not read `slide_features/<encoder>`.
+</details>
+
+<details>
+<summary><b>Where are slide and patient embeddings written?</b></summary>
+
+Slide embeddings are written into the per-slide H5 file under:
+
+```text
+slide_features/<slide_encoder>
+```
+
+Patient embeddings are written to separate files under:
+
+```text
+patient_features/<encoder>/<case_id>.h5
 ```
 </details>
 
@@ -673,9 +723,4 @@ If you use AtlasPatch in your research, please cite our paper:
 
 ## License
 
-AtlasPatch is released under CC-BY-NC-SA-4.0, which strictly disallows commercial use of the model weights or any derivative works. Commercialization includes selling the model, offering it as a paid service, using it inside commercial products, or distributing modified versions for commercial gain. Non-commercial research, experimentation, educational use, and use by academic or non-profit organizations is permitted under the license terms. If you need commercial rights, please contact the authors to obtain a separate commercial license. See the LICENSE file in this repository for full terms. For the complete license text and detailed terms, see the [LICENSE](./LICENSE) file in this repository.
-
-## Future Updates
-
-### Slide Encoders
-- We plan to add slide-level encoders (open for extension): TITAN, PRISM, GigaPath, Madeleine.
+AtlasPatch is released under [CC BY-NC-SA 4.0](LICENSE).

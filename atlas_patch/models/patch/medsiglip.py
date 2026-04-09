@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 import torch
+from PIL import Image
 
 from atlas_patch.models.patch.base import PatchFeatureExtractor
 from atlas_patch.models.patch.registry import PatchFeatureExtractorRegistry
@@ -11,6 +12,14 @@ logger = logging.getLogger(__name__)
 
 _MODEL_ID = "google/medsiglip-448"
 _EMB_DIM = 1152
+_IMAGE_SIZE = (448, 448)
+
+
+def _resize_patch(pil_img: Image.Image) -> Image.Image:
+    image = pil_img if pil_img.mode == "RGB" else pil_img.convert("RGB")
+    if image.size == _IMAGE_SIZE:
+        return image
+    return image.resize(_IMAGE_SIZE, resample=Image.BILINEAR)
 
 
 class MedSigLip(PatchFeatureExtractor):
@@ -44,11 +53,11 @@ class MedSigLip(PatchFeatureExtractor):
             raise RuntimeError(
                 f"Loaded model '{_MODEL_ID}' does not expose get_image_features; cannot be used for patch embeddings."
             )
-
         model = model.to(device=self.device, dtype=self.dtype).eval()
 
         def _preprocess(pil_img):
-            inputs = processor(images=pil_img, padding="max_length", return_tensors="pt")
+            resized = _resize_patch(pil_img)
+            inputs = processor(images=resized, padding="max_length", return_tensors="pt")
             return inputs["pixel_values"].squeeze(0)
 
         super().__init__(

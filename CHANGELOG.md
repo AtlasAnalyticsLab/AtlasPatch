@@ -5,6 +5,21 @@ All notable changes to AtlasPatch will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - Unreleased
+
+### Added
+
+#### Slide and Patient Encoding
+- `encode-slide` command for slide embeddings appended into `slide_features/<encoder>` inside the canonical per-slide H5
+- `encode-patient` command for manifest-driven patient embeddings written under `patient_features/<encoder>/<case_id>.h5`
+- Slide encoder registry and built-in slide encoders: `titan`, `prism`, `moozy`
+- Patient encoder registry and built-in patient encoder: `moozy`
+
+#### Packaging and Release
+- Optional extras for slide and patient encoder stacks: `titan`, `prism`, `moozy`, `slide-encoders`, and `patient-encoders`
+- GitHub Release to PyPI trusted publishing workflow in `publish.yml`
+
+
 ## [1.0.0] - 2025-02-03
 
 ### Added

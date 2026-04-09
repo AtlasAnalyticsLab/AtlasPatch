@@ -9,13 +9,17 @@ import torch.nn as nn
 from atlas_patch.models.patch.base import PatchFeatureExtractor
 from atlas_patch.models.patch.registry import PatchFeatureExtractorRegistry
 
-from timm.layers import to_2tuple
-
 logger = logging.getLogger(__name__)
 
 _CHECKPOINT_ID = "1_vgRF1QXa8sPCOpJ1S9BihwZhXQMOVJc"
 _CHECKPOINT_NAME = "CHIEF_CTransPath.pth"
 _EMB_DIM = 768
+
+
+def _to_2tuple(value):
+    from timm.layers import to_2tuple
+
+    return to_2tuple(value)
 
 
 def _build_preprocess():
@@ -81,8 +85,8 @@ class ConvStem(nn.Module):
         assert patch_size == 4
         assert embed_dim % 8 == 0
 
-        img_size = to_2tuple(img_size)
-        patch_size = to_2tuple(patch_size)
+        img_size = _to_2tuple(img_size)
+        patch_size = _to_2tuple(patch_size)
         self.img_size = img_size
         self.patch_size = patch_size
         self.grid_size = (img_size[0] // patch_size[0], img_size[1] // patch_size[1])

@@ -9,7 +9,7 @@ from .config import (
     SegmentationConfig,
     VisualizationConfig,
 )
-from .models import ExtractionResult, Mask, Slide
+from .models import ExtractionResult, Mask, PatientCase, Slide
 
 __all__ = [
     "AppConfig",
@@ -21,5 +21,6 @@ __all__ = [
     "VisualizationConfig",
     "ExtractionResult",
     "Mask",
+    "PatientCase",
     "Slide",
 ]

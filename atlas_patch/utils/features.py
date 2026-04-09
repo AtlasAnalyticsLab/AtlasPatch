@@ -7,18 +7,18 @@ import click
 import h5py
 
 
-def parse_feature_list(raw: str, *, choices: list[str]) -> list[str]:
-    """Normalize, validate, and deduplicate a feature extractor list."""
+def parse_named_list(raw: str, *, choices: list[str], item_label: str) -> list[str]:
+    """Normalize, validate, and deduplicate a list of named registry entries."""
     parts = [p.strip().lower() for p in raw.replace(",", " ").split() if p.strip()]
     if not parts:
-        raise click.BadParameter("At least one feature extractor name is required.")
+        raise click.BadParameter(f"At least one {item_label} name is required.")
     unknown = [p for p in parts if p not in choices]
     if unknown:
         raise click.BadParameter(
-            f"Unknown extractor(s): {', '.join(unknown)}. Available: {', '.join(choices)}"
+            f"Unknown {item_label}(s): {', '.join(unknown)}. Available: {', '.join(choices)}"
         )
-    seen = set()
-    dupes = []
+    seen: set[str] = set()
+    dupes: list[str] = []
     unique_parts: list[str] = []
     for p in parts:
         if p in seen:
@@ -28,8 +28,8 @@ def parse_feature_list(raw: str, *, choices: list[str]) -> list[str]:
         unique_parts.append(p)
     if dupes:
         raise click.BadParameter(
-            f"Duplicate extractor(s) specified: {', '.join(sorted(set(dupes)))}. "
-            "Provide each extractor at most once."
+            f"Duplicate {item_label}(s) specified: {', '.join(sorted(set(dupes)))}. "
+            f"Provide each {item_label} once."
         )
     return unique_parts
 

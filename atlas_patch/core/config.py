@@ -3,6 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+DEFAULT_FEATURE_BATCH_SIZE = 32
+DEFAULT_FEATURE_NUM_WORKERS = 4
+DEFAULT_FEATURE_PRECISION = "float16"
+
+
+def default_sam2_config_path() -> Path:
+    return Path(__file__).resolve().parent.parent / "configs" / "sam2.1_hiera_t.yaml"
+
 
 def _ensure_positive(value: int, name: str) -> int:
     if value <= 0:
@@ -35,6 +43,22 @@ def _validate_device(device: str) -> str:
                 )
         return dev
     raise ValueError(f"device must be 'cpu', 'cuda', or 'cuda:<index>', got {device}")
+
+
+def _normalize_names(values: list[str], name: str) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for raw in values:
+        item = str(raw).strip().lower()
+        if not item:
+            raise ValueError(f"{name} entries must be non-empty strings.")
+        if item in seen:
+            continue
+        normalized.append(item)
+        seen.add(item)
+    if not normalized:
+        raise ValueError(f"At least one {name} entry must be provided.")
+    return normalized
 
 
 @dataclass
@@ -92,10 +116,10 @@ class ExtractionConfig:
 @dataclass
 class FeatureExtractionConfig:
     extractors: list[str]
-    batch_size: int = 32
+    batch_size: int = DEFAULT_FEATURE_BATCH_SIZE
     device: str = "cuda"
-    num_workers: int = 4
-    precision: str = "float32"
+    num_workers: int = DEFAULT_FEATURE_NUM_WORKERS
+    precision: str = DEFAULT_FEATURE_PRECISION
     plugins: list[Path] = field(default_factory=list)
 
     def validated(self) -> FeatureExtractionConfig:
@@ -146,6 +170,33 @@ class ProcessingConfig:
             raise FileNotFoundError(f"Input path not found: {self.input_path}")
         if self.mpp_csv is not None and not self.mpp_csv.exists():
             raise FileNotFoundError(f"MPP CSV not found: {self.mpp_csv}")
+        return self
+
+
+@dataclass
+class SlideEncodingConfig:
+    encoders: list[str]
+    device: str = "cuda"
+    skip_existing: bool = True
+
+    def validated(self) -> SlideEncodingConfig:
+        self.encoders = _normalize_names(self.encoders, "slide encoder")
+        self.device = _validate_device(str(self.device))
+        return self
+
+
+@dataclass
+class PatientEncodingConfig:
+    manifest_path: Path
+    encoders: list[str]
+    device: str = "cuda"
+    skip_existing: bool = True
+
+    def validated(self) -> PatientEncodingConfig:
+        if not self.manifest_path.exists():
+            raise FileNotFoundError(f"Patient manifest not found: {self.manifest_path}")
+        self.encoders = _normalize_names(self.encoders, "patient encoder")
+        self.device = _validate_device(str(self.device))
         return self
 
 

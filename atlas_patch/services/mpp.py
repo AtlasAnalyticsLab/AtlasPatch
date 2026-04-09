@@ -15,4 +15,6 @@ class CSVMPPResolver:
             self._mpp_map = load_mpp_csv(str(csv_path))
 
     def resolve(self, slide: Slide) -> float | None:
+        if slide.mpp is not None:
+            return float(slide.mpp)
         return get_mpp_for_wsi(str(slide.path), self._mpp_map)

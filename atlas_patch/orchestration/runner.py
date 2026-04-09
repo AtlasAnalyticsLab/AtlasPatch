@@ -36,6 +36,78 @@ def _chunked(items: Sequence[Slide], size: int) -> Iterable[Sequence[Slide]]:
         yield items[i : i + size]
 
 
+def build_existing_extraction_result(slide: Slide, h5_path: Path) -> ExtractionResult | None:
+    """Create a lightweight ExtractionResult from an existing H5."""
+    metadata: dict[str, Any] = {}
+    num_patches: int | None = None
+    patch_size_level0: int | None = None
+    try:
+        with h5py.File(h5_path, "r") as f:
+            num_attr = f.attrs.get("num_patches")
+            if num_attr is not None:
+                num_patches = int(num_attr)
+            elif "coords" in f:
+                num_patches = int(f["coords"].shape[0])
+
+            ps_level0_attr = f.attrs.get("patch_size_level0")
+            if ps_level0_attr is not None:
+                patch_size_level0 = int(ps_level0_attr)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(
+            "Failed to read existing output for %s; will reprocess. Error: %s",
+            slide.path.name,
+            e,
+        )
+        return None
+
+    if num_patches is None or num_patches <= 0:
+        return None
+
+    return ExtractionResult(
+        slide=slide,
+        h5_path=h5_path,
+        num_patches=int(num_patches),
+        patch_size_level0=patch_size_level0,
+        metadata=metadata,
+    )
+
+
+def classify_existing_slide_output(
+    config: AppConfig,
+    slide: Slide,
+) -> tuple[str | None, ExtractionResult | None]:
+    """Return how an existing patch H5 should be treated for this run.
+
+    Returns one of:
+    - (None, None): no reusable output; the slide needs full processing
+    - ("skip", None): output is fully complete for this run
+    - ("reuse", ExtractionResult): reuse patches/H5 and continue with downstream features
+    """
+    if not config.output.skip_existing:
+        return None, None
+
+    existing_path = find_existing_patch(slide, config.output, config.extraction)
+    if existing_path is None:
+        return None, None
+
+    feat_cfg = config.features
+    if feat_cfg is None or not feat_cfg.extractors:
+        return "skip", None
+
+    existing_result = build_existing_extraction_result(slide, existing_path)
+    if existing_result is None:
+        return None, None
+
+    missing = missing_features(
+        existing_path,
+        feat_cfg.extractors,
+        expected_total=existing_result.num_patches,
+    )
+    if not missing:
+        return "skip", None
+    return "reuse", existing_result
+
+
 class ProcessingRunner:
     """High-level orchestration of WSI segmentation, patch extraction, and visualization."""
 
@@ -68,41 +140,6 @@ class ProcessingRunner:
             slides.append(slide)
         return slides
 
-    def _build_existing_result(self, slide: Slide, h5_path: Path) -> ExtractionResult | None:
-        """Create a lightweight ExtractionResult from an existing H5 (no re-segmentation)."""
-        metadata: dict[str, Any] = {}
-        num_patches: int | None = None
-        patch_size_level0: int | None = None
-        try:
-            with h5py.File(h5_path, "r") as f:
-                num_attr = f.attrs.get("num_patches")
-                if num_attr is not None:
-                    num_patches = int(num_attr)
-                elif "coords" in f:
-                    num_patches = int(f["coords"].shape[0])
-
-                ps_level0_attr = f.attrs.get("patch_size_level0")
-                if ps_level0_attr is not None:
-                    patch_size_level0 = int(ps_level0_attr)
-        except Exception as e:  # noqa: BLE001
-            logger.warning(
-                "Failed to read existing output for %s; will reprocess. Error: %s",
-                slide.path.name,
-                e,
-            )
-            return None
-
-        if num_patches is None or num_patches <= 0:
-            return None
-
-        return ExtractionResult(
-            slide=slide,
-            h5_path=h5_path,
-            num_patches=int(num_patches),
-            patch_size_level0=patch_size_level0,
-            metadata=metadata,
-        )
-
     def _handle_existing_slide(
         self,
         slide: Slide,
@@ -113,35 +150,22 @@ class ProcessingRunner:
 
         Returns True when the slide is fully handled (skip or reuse), False to continue processing.
         """
-        if not self.config.output.skip_existing:
+        decision, existing_result = classify_existing_slide_output(self.config, slide)
+        if decision is None:
             return False
-
-        existing_path = find_existing_patch(slide, self.config.output, self.config.extraction)
-        if existing_path is None:
-            return False
-
-        feat_cfg = self.config.features
-        if feat_cfg is None or not feat_cfg.extractors:
+        if decision == "skip":
             logger.info("Skipping %s (already processed).", slide.path.name)
             if progress:
                 progress.update(1)
             return True
-
-        existing_result = self._build_existing_result(slide, existing_path)
         if existing_result is None:
-            logger.info("Existing output invalid for %s; reprocessing.", slide.path.name)
             return False
-
-        missing = missing_features(
-            existing_path, feat_cfg.extractors, expected_total=existing_result.num_patches
-        )
-        if not missing:
-            logger.info("Skipping %s (features complete).", slide.path.name)
-            if progress:
-                progress.update(1)
-            return True
-
         results.append(existing_result)
+        missing = missing_features(
+            existing_result.h5_path,
+            self.config.features.extractors,
+            expected_total=existing_result.num_patches,
+        )
         logger.info(
             "Reusing existing patches for %s; missing features: %s",
             slide.path.name,
@@ -199,8 +223,12 @@ class ProcessingRunner:
             raise ValueError("max_open_slides must be defined")
         return max(1, int(cfg_val))
 
-    def run(self) -> tuple[list[ExtractionResult], list[tuple[Slide, Exception | str]]]:
-        slides = self.discover_slides()
+    def run(
+        self,
+        slides: list[Slide] | None = None,
+    ) -> tuple[list[ExtractionResult], list[tuple[Slide, Exception | str]]]:
+        if slides is None:
+            slides = self.discover_slides()
         slides = self._attach_mpp(slides)
 
         if not slides:

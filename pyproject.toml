@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "atlas-patch"
-version = "1.0.0.post5"
+dynamic = ["version"]
 description = "A Python package for processing and handling whole slide images"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -40,24 +40,69 @@ dependencies = [
     "matplotlib>=3.5.0",
     "tqdm>=4.66.0",
     "torchvision>=0.15.0",
-    "timm>=0.9.0",
     "huggingface-hub>=0.23.0",
-    "gdown>=5.2.0",
-    "transformers>=4.41.0",
-    "sentencepiece>=0.2.0",
-    "open-clip-torch>=2.24.0",
-    "fairscale>=0.4.0",
-    "einops>=0.8.0",
-    "einops-exts>=0.0.4",
 ]
 
 [project.optional-dependencies]
+patch-encoders = [
+    "einops>=0.8.0",
+    "einops-exts>=0.0.4",
+    "fairscale>=0.4.0",
+    "gdown>=5.2.0",
+    "open-clip-torch>=2.24.0",
+    "sentencepiece>=0.2.0",
+    "timm>=0.9.0",
+    "transformers>=4.41.0",
+]
+slide-encoders = [
+    "einops>=0.8.0",
+    "einops-exts>=0.0.4",
+    "fairscale>=0.4.0",
+    "gdown>=5.2.0",
+    "open-clip-torch>=2.24.0",
+    "safetensors>=0.4.0",
+    "sentencepiece>=0.2.0",
+    "timm>=0.9.0",
+    "transformers>=4.41.0",
+    "environs>=11.0.0",
+    "sacremoses>=0.1.1",
+    "moozy>=0.1.0",
+]
+patient-encoders = [
+    "timm>=0.9.0",
+    "moozy>=0.1.0",
+]
+titan = [
+    "einops>=0.8.0",
+    "einops-exts>=0.0.4",
+    "fairscale>=0.4.0",
+    "gdown>=5.2.0",
+    "open-clip-torch>=2.24.0",
+    "safetensors>=0.4.0",
+    "sentencepiece>=0.2.0",
+    "transformers>=4.41.0",
+]
+prism = [
+    "safetensors>=0.4.0",
+    "timm>=0.9.0",
+    "transformers>=4.41.0",
+    "environs>=11.0.0",
+    "sacremoses>=0.1.1",
+]
+moozy = [
+    "timm>=0.9.0",
+    "moozy>=0.1.0",
+]
+release = [
+    "build>=1.2.2",
+    "twine>=5.1.1",
+]
 dev = [
-    "ruff>=0.1.0",
+    "mypy>=1.0.0",
     "pre-commit>=3.0.0",
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
-    "mypy>=1.0.0",
+    "ruff>=0.1.0",
 ]
 
 # See README for installation instructions:
@@ -80,6 +125,9 @@ include = ["atlas_patch*"]
 
 [tool.setuptools.package-data]
 "atlas_patch" = ["configs/*.yaml"]
+
+[tool.setuptools.dynamic]
+version = {attr = "atlas_patch.__version__"}
 
 [tool.ruff]
 line-length = 100
