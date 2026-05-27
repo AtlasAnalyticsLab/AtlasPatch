@@ -32,6 +32,7 @@
     - [Slide encoding](#slide-encoding)
     - [Patient encoding](#patient-encoding)
   - [Supported Inputs](#supported-inputs)
+  - [Visualization Samples](#visualization-samples)
 - [Encoders](#encoders)
   - [Available Patch Feature Extractors](#available-patch-feature-extractors)
     - [Core vision backbones on Natural Images](#core-vision-backbones-on-natural-images)
@@ -156,6 +157,12 @@ uv pip install git+https://github.com/facebookresearch/sam2.git
 
 ## Usage Guide
 
+AtlasPatch provides a flexible pipeline with **4 checkpoints** that you can use independently or combine based on your needs.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/AtlasAnalyticsLab/AtlasPatch/main/assets/images/Checkouts.png" alt="AtlasPatch Pipeline Checkpoints" width="100%">
+</p>
+
 ### Choose a Command
 
 | Command | Use it when | Main outputs | Docs |
@@ -234,6 +241,22 @@ From `atlaspatch info`:
 
 - WSI formats: `.svs`, `.tif`, `.tiff`, `.ndpi`, `.vms`, `.vmu`, `.scn`, `.mrxs`, `.bif`, `.dcm`
 - image formats: `.png`, `.jpg`, `.jpeg`, `.bmp`, `.webp`, `.gif`
+
+### Visualization Samples
+
+Below are some examples for the output masks and overlays (original image, predicted mask, overlay, contours, grid).
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/AtlasAnalyticsLab/AtlasPatch/main/assets/images/VisualizationSamples.png" alt="AtlasPatch visualization samples" width="100%">
+</p>
+
+Quantitative and qualitative analysis of AtlasPatch tissue detection against existing slide-preprocessing tools.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/AtlasAnalyticsLab/AtlasPatch/main/assets/images/Comparisons.jpg" alt="AtlasPatch method comparison" width="100%">
+</p>
+
+Representative WSI thumbnails are shown from diverse tissue features and artifact conditions, with tissue masks predicted by thresholding methods (TIAToolbox, CLAM) and deep learning methods (pretrained "non-finetuned" SAM2 model, Trident-QC, Trident-Hest and AtlasPatch), highlighting differences in boundary fidelity, artifact suppression and handling of fragmented tissue. Tissue detection performance is also shown on the held-out test set for AtlasPatch and baseline pipelines, highlighting that AtlasPatch matches or exceeds their segmentation quality. The segmentation complexity–performance trade-off, plotting F1-score against segmentation runtime (on a random set of 100 WSIs), shows AtlasPatch achieves high performance with substantially lower wall-clock time than tile-wise detectors and heuristic pipelines, underscoring its suitability for large-scale WSI preprocessing.
 
 ## Encoders
 
